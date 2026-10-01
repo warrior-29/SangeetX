@@ -2685,6 +2685,15 @@ pttToggle.addEventListener('change', async (e) => {
     showToast('You are blocked from voice', 'error');
     return;
   }
+  
+  // Agar mic denied hai to banner dikhao, toggle off rakho
+  if (e.target.checked && micPermissionState === 'denied') {
+    e.target.checked = false;
+    showMicBanner();
+    showToast('🎤 Mic blocked — click Allow', 'error');
+    return;
+  }
+  
   pttModeEnabled = e.target.checked;
   if (pttModeEnabled) alwaysOnToggle.checked = false;
   alwaysOnEnabled = alwaysOnToggle.checked;
@@ -2697,6 +2706,15 @@ alwaysOnToggle.addEventListener('change', async (e) => {
     showToast('You are blocked from voice', 'error');
     return;
   }
+  
+  // Agar mic denied hai to banner dikhao
+  if (e.target.checked && micPermissionState === 'denied') {
+    e.target.checked = false;
+    showMicBanner();
+    showToast('🎤 Mic blocked — click Allow', 'error');
+    return;
+  }
+  
   alwaysOnEnabled = e.target.checked;
   if (alwaysOnEnabled) pttToggle.checked = false;
   pttModeEnabled = pttToggle.checked;
@@ -2746,7 +2764,18 @@ async function updateMicState() {
   refreshIcons();
 }
 
-pttButton.addEventListener('pointerdown', (e) => { e.preventDefault(); if (pttModeEnabled && !alwaysOnEnabled) startTalking(); });
+pttButton.addEventListener('pointerdown', (e) => { 
+  e.preventDefault(); 
+  
+  // Mic denied check
+  if (micPermissionState === 'denied') {
+    showMicBanner();
+    showToast('🎤 Mic blocked — click Allow', 'error');
+    return;
+  }
+  
+  if (pttModeEnabled && !alwaysOnEnabled) startTalking(); 
+});
 pttButton.addEventListener('pointerup', (e) => { e.preventDefault(); if (isTalking) stopTalking(); });
 pttButton.addEventListener('pointerleave', () => { if (isTalking) stopTalking(); });
 pttButton.addEventListener('pointercancel', () => { if (isTalking) stopTalking(); });
