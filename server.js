@@ -251,7 +251,8 @@ io.on('connection', (socket) => {
         id: socket.id,
         name: userName,
         lastActive: Date.now(),
-        blocked: { chat: false, play: false, voice: false }
+        blocked: { chat: false, play: false, voice: false },
+        location: null   // 👈 NEW: Location field
       }],
       pending: [],
       messages: [],
@@ -325,7 +326,8 @@ io.on('connection', (socket) => {
     room.users.push({
       ...pending,
       lastActive: Date.now(),
-      blocked: { chat: false, play: false, voice: false }
+      blocked: { chat: false, play: false, voice: false },
+      location: null   // 👈 NEW: Location field
     });
 
     const userSocket = io.sockets.sockets.get(userId);
@@ -339,6 +341,17 @@ io.on('connection', (socket) => {
 
       analytics.activeSessions.set(userId, {
         name: pending.name, roomId, joinedAt: Date.now(), role: 'member'
+      });
+
+      // 👇 NEW: Existing users ki location naye user ko bhejo
+      room.users.forEach(u => {
+        if (u.location && u.id !== userId) {
+          io.to(userId).emit('partnerLocation', {
+            location: u.location,
+            userId: u.id,
+            userName: u.name
+          });
+        }
       });
     }
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
@@ -372,6 +385,29 @@ io.on('connection', (socket) => {
     }
     analytics.activeSessions.delete(userId);
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
+  });
+
+  // 👇 NEW: SHARE LOCATION HANDLER
+  socket.on('shareLocation', ({ roomId, location }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
+
+    // User ki location save karo
+    const user = room.users.find(u => u.id === socket.id);
+    if (user) {
+      user.location = location;
+      user.lastActive = Date.now();
+    }
+
+    // Room ke baaki users ko bhejo
+    socket.to(roomId).emit('partnerLocation', {
+      location,
+      userId: socket.id,
+      userName: socket.userName
+    });
+
+    console.log(`📍 Location shared in ${roomId} by ${socket.userName}`);
   });
 
   socket.on('updateState', ({ roomId, newState }) => {
