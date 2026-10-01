@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#08080C" />
 <title>Music Sync</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
@@ -159,7 +163,6 @@ body::before {
   transform:translateY(-50%);
   color:var(--muted);
   pointer-events:none;
-  transition:color 0.2s;
 }
 .input-wrap input:focus ~ .input-icon { color:var(--primary-2); }
 
@@ -460,11 +463,6 @@ body::before {
   letter-spacing:-0.3px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   max-width:100%;
-  animation:titleSlide 0.5s var(--ease);
-}
-@keyframes titleSlide {
-  from { opacity:0; transform:translateY(8px); }
-  to { opacity:1; transform:translateY(0); }
 }
 .song-artist {
   font-size:11px;
@@ -528,18 +526,6 @@ body::before {
   width:0%;
   box-shadow:0 0 10px var(--dynamic-1);
   transition:width 0.1s linear, background 0.5s;
-  position:relative; overflow:hidden;
-}
-.progress-fill::after {
-  content:"";
-  position:absolute; top:0; left:-100%;
-  width:100%; height:100%;
-  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-  animation:shimmer 2s infinite;
-}
-@keyframes shimmer {
-  0% { left:-100%; }
-  100% { left:100%; }
 }
 .time-row {
   display:flex; justify-content:space-between;
@@ -548,7 +534,7 @@ body::before {
   font-weight:600; padding:0 2px;
 }
 
-/* ============ CONTROLS — HIGH CONTRAST FIX ============ */
+/* ============ CONTROLS ============ */
 .controls {
   display:flex;
   align-items:center;
@@ -617,14 +603,10 @@ body::before {
 }
 .ctrl-btn.play:hover {
   transform:translateY(-2px) scale(1.06);
-  box-shadow:
-    0 16px 40px var(--dynamic-1),
-    0 0 0 4px rgba(0,0,0,0.3),
-    0 0 32px rgba(139,92,246,0.8);
 }
 .ctrl-btn.play:active { transform:scale(0.94); }
 
-/* ============ SEARCH BUTTON — HIGH CONTRAST FIX ============ */
+/* ============ SEARCH BUTTON ============ */
 .search-btn {
   width:100%;
   padding:13px 16px;
@@ -666,7 +648,6 @@ body::before {
   width:15px; height:15px;
   stroke-width:2.6;
   color:#FFFFFF;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));
 }
 .search-btn:hover .search-icon {
   transform:scale(1.08) rotate(-5deg);
@@ -871,7 +852,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   inset:0;
   background:rgba(0,0,0,0.8);
   backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
   z-index:100;
   align-items:center;
   justify-content:center;
@@ -972,7 +952,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   background:rgba(255,255,255,0.1);
   transform:scale(1.05);
 }
-.back-btn:active { transform:scale(0.92); }
 #searchInput {
   flex:1;
   padding:11px 16px;
@@ -1012,11 +991,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   cursor:pointer;
   transition:all 0.2s var(--ease);
   margin-bottom:4px;
-  animation:songIn 0.4s var(--ease) backwards;
-}
-@keyframes songIn {
-  from { opacity:0; transform:translateX(-12px); }
-  to { opacity:1; transform:translateX(0); }
 }
 .song-item:hover {
   background:rgba(255,255,255,0.05);
@@ -1024,7 +998,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .song-item:active {
   background:rgba(255,255,255,0.08);
-  transform:scale(0.99);
 }
 .song-item img {
   width:50px; height:50px;
@@ -1032,9 +1005,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   object-fit:cover;
   background:var(--surface-2);
   flex-shrink:0;
-  transition:transform 0.3s var(--spring);
 }
-.song-item:hover img { transform:scale(1.06); }
 .song-item-info { flex:1; min-width:0; }
 .song-item-title {
   font-size:13px;
@@ -1072,10 +1043,10 @@ input:checked + .slider:before { transform:translateX(16px); }
   background:var(--surface);
   border-radius:22px;
   padding:20px;
-  max-width:380px;
+  max-width:420px;
   width:100%;
   border:1px solid var(--border);
-  max-height:75vh;
+  max-height:80vh;
   overflow-y:auto;
   box-shadow:0 24px 60px rgba(0,0,0,0.7);
   animation:slideUp 0.4s var(--spring);
@@ -1110,11 +1081,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   background:var(--success);
   flex-shrink:0;
   box-shadow:0 0 8px var(--success);
-  animation:onlinePulse 2s infinite;
-}
-@keyframes onlinePulse {
-  0%,100% { box-shadow:0 0 8px var(--success); }
-  50% { box-shadow:0 0 16px var(--success); }
 }
 .user-item-dot.idle {
   background:var(--warning);
@@ -1169,6 +1135,39 @@ input:checked + .slider:before { transform:translateX(16px); }
   transform:scale(1.05);
 }
 .btn-remove:active { transform:scale(0.92); }
+
+/* ============ MUTE BUTTON ============ */
+.mute-btn {
+  background:rgba(139,92,246,0.12);
+  color:var(--primary-2);
+  border:1px solid rgba(139,92,246,0.25);
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:10px;
+  cursor:pointer;
+  font-family:inherit;
+  font-weight:800;
+  flex-shrink:0;
+  transition:all 0.2s var(--spring);
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.mute-btn [data-lucide] {
+  width:11px;
+  height:11px;
+  stroke-width:2.5;
+}
+.mute-btn:hover {
+  background:rgba(139,92,246,0.25);
+  transform:scale(1.05);
+}
+.mute-btn:active { transform:scale(0.94); }
+.mute-btn.muted {
+  background:rgba(239,68,68,0.15);
+  color:var(--danger);
+  border-color:rgba(239,68,68,0.3);
+}
 
 /* ============ CHAT PANEL ============ */
 #chatPanel {
@@ -1240,7 +1239,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   word-wrap:break-word;
   animation:msgIn 0.3s var(--spring);
   font-weight:500;
-  position:relative;
 }
 @keyframes msgIn {
   from { opacity:0; transform:translateY(8px) scale(0.94); }
@@ -1260,10 +1258,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   border-bottom-left-radius:5px;
   border:1px solid var(--border);
 }
-.chat-msg.mentioned {
-  border:1.5px solid var(--accent);
-  box-shadow:0 0 16px rgba(236,72,153,0.4);
-}
 .chat-msg-name {
   font-size:9px;
   font-weight:800;
@@ -1271,18 +1265,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   opacity:0.85;
   text-transform:uppercase;
   letter-spacing:0.8px;
-}
-.chat-msg-text { word-break:break-word; }
-.chat-msg-text .mention {
-  color:var(--accent);
-  font-weight:800;
-  background:rgba(236,72,153,0.15);
-  padding:1px 5px;
-  border-radius:5px;
-}
-.chat-msg.mine .chat-msg-text .mention {
-  color:#FFF;
-  background:rgba(255,255,255,0.25);
 }
 .chat-msg-time {
   font-size:9px;
@@ -1299,7 +1281,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   border-top:1px solid var(--border);
   padding-bottom:max(10px,env(safe-area-inset-bottom));
   flex-shrink:0;
-  position:relative;
 }
 .chat-input-row input {
   flex:1;
@@ -1338,53 +1319,11 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-send [data-lucide] { width:18px; height:18px; stroke-width:2.4; }
 .chat-send:hover {
   transform:scale(1.08);
-  box-shadow:0 10px 28px var(--primary-glow);
 }
 .chat-send:active { transform:scale(0.9); }
 .chat-send:disabled {
   opacity:0.4;
   cursor:not-allowed;
-  transform:none;
-}
-
-/* MENTION DROPDOWN */
-.mention-dropdown {
-  position:absolute;
-  bottom:100%;
-  left:14px;
-  right:14px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:6px;
-  margin-bottom:8px;
-  box-shadow:0 12px 32px rgba(0,0,0,0.6);
-  max-height:200px;
-  overflow-y:auto;
-  display:none;
-  z-index:10;
-  animation:slideUp 0.2s var(--spring);
-}
-.mention-dropdown.active { display:block; }
-.mention-item {
-  padding:10px 12px;
-  border-radius:10px;
-  cursor:pointer;
-  font-size:13px;
-  font-weight:600;
-  transition:background 0.15s;
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-.mention-item:hover,
-.mention-item.selected {
-  background:rgba(139,92,246,0.15);
-}
-.mention-item [data-lucide] {
-  width:14px;
-  height:14px;
-  color:var(--primary-2);
 }
 
 .reaction-layer {
@@ -1444,7 +1383,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.success { border-color:rgba(16,185,129,0.4); }
 .toast.success [data-lucide] { color:var(--success); }
 
-/* ============ RESPONSIVE ============ */
+/* RESPONSIVE */
 @media (max-height:700px) {
   .album-art { width:min(42vw, 155px); }
   .player-section { gap:7px; }
@@ -1530,6 +1469,9 @@ input:checked + .slider:before { transform:translateX(16px); }
       <span id="syncText">Synced</span>
     </div>
     <div class="topbar-actions">
+      <button class="icon-btn" id="muteAllBtn" title="Mute All Voices">
+        <i data-lucide="volume-2"></i>
+      </button>
       <button class="icon-btn" id="chatBtn" title="Chat">
         <i data-lucide="message-circle"></i>
         <span class="badge" id="chatBadge" style="display:none;">0</span>
@@ -1666,7 +1608,6 @@ input:checked + .slider:before { transform:translateX(16px); }
     <p class="chat-empty">No messages yet</p>
   </div>
   <div class="chat-input-row">
-    <div class="mention-dropdown" id="mentionDropdown"></div>
     <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500" />
     <button class="chat-send" id="chatSend">
       <i data-lucide="send"></i>
@@ -1717,11 +1658,12 @@ let pendingRequestUserId = null;
 let unreadMessages = 0;
 let chatOpen = false;
 let audio = document.getElementById('audioPlayer');
-let myPermissions = { chat: false, play: false, voice: false }; // false = not blocked
-let mentionQuery = '';
-let mentionStart = -1;
-let mentionActive = false;
-let mentionSelectedIndex = 0;
+let myPermissions = { chat: false, play: false, voice: false };
+
+/* ===== VOICE MUTE STATE (per-device) ===== */
+const mutedUsers = new Set();      // Specific users muted (by lowercase name)
+const remoteAudios = new Map();    // socketId -> { audio, userName }
+let muteAll = false;                // Global mute for all voices
 
 /* ===== AUDIO ===== */
 let audioContext = null;
@@ -1886,12 +1828,115 @@ function startSyncCheck() {
   }, 3000);
 }
 
+/* ===== SESSION PERSISTENCE ===== */
+function saveSession() {
+  if (roomId && userName) {
+    localStorage.setItem('musicSyncSession', JSON.stringify({
+      roomId: roomId,
+      userName: userName,
+      isOwner: isOwner,
+      savedAt: Date.now()
+    }));
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem('musicSyncSession');
+}
+
+function getSavedSession() {
+  try {
+    const data = localStorage.getItem('musicSyncSession');
+    if (!data) return null;
+    const session = JSON.parse(data);
+    if (Date.now() - session.savedAt > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('musicSyncSession');
+      return null;
+    }
+    return session;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ===== MUTE FUNCTIONS ===== */
+function toggleMuteUser(userName) {
+  const key = userName.toLowerCase();
+  if (mutedUsers.has(key)) {
+    mutedUsers.delete(key);
+    showToast(`🔊 ${userName} unmuted`, 'success');
+  } else {
+    mutedUsers.add(key);
+    showToast(`🔇 ${userName} muted`, 'success');
+  }
+  saveMuteState();
+  applyMuteState();
+  renderUsers(window._currentUsers || []);
+}
+
+function toggleMuteAll() {
+  muteAll = !muteAll;
+  applyMuteState();
+  updateMuteAllButton();
+  showToast(
+    muteAll 
+      ? '🔇 All voices muted — music only' 
+      : '🔊 All voices unmuted',
+    'success'
+  );
+}
+
+function updateMuteAllButton() {
+  const btn = document.getElementById('muteAllBtn');
+  if (!btn) return;
+  const icon = btn.querySelector('[data-lucide]');
+  if (muteAll) {
+    btn.style.background = 'rgba(239,68,68,0.15)';
+    btn.style.borderColor = 'rgba(239,68,68,0.3)';
+    btn.style.color = 'var(--danger)';
+    if (icon) icon.setAttribute('data-lucide', 'volume-x');
+  } else {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    if (icon) icon.setAttribute('data-lucide', 'volume-2');
+  }
+  refreshIcons();
+}
+
+function applyMuteState() {
+  remoteAudios.forEach((entry) => {
+    if (entry.audio && entry.userName) {
+      const isUserMuted = mutedUsers.has(entry.userName.toLowerCase());
+      entry.audio.muted = muteAll || isUserMuted;
+    }
+  });
+}
+
+function saveMuteState() {
+  try {
+    localStorage.setItem('mutedUsers', JSON.stringify(Array.from(mutedUsers)));
+    localStorage.setItem('muteAll', muteAll.toString());
+  } catch (e) {}
+}
+
+function loadMuteState() {
+  try {
+    const saved = localStorage.getItem('mutedUsers');
+    if (saved) JSON.parse(saved).forEach(n => mutedUsers.add(n));
+    const g = localStorage.getItem('muteAll');
+    if (g === 'true') muteAll = true;
+  } catch (e) {}
+}
+
 /* ===== INIT ===== */
 document.getElementById('createRoomBtn').addEventListener('click', () => {
   const name = document.getElementById('userNameInput').value.trim();
   if (!name) { showToast('Please enter your name first', 'error'); return; }
   userName = name;
   roomId = name.toLowerCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 9000 + 1000);
+  isOwner = true;
+  saveSession();
   initSocket();
   socket.on('connect', () => socket.emit('createRoom', { roomId, userName }));
 });
@@ -1902,6 +1947,8 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
   if (!name || !room) { showToast('Please enter both name and room code', 'error'); return; }
   userName = name;
   roomId = room;
+  isOwner = false;
+  saveSession();
   initSocket();
   socket.on('connect', () => socket.emit('requestJoin', { roomId, userName }));
 });
@@ -1945,8 +1992,16 @@ function initSocket() {
     refreshIcons();
   });
 
-  socket.on('kicked', ({ message }) => { showToast(message, 'error'); setTimeout(() => location.reload(), 2000); });
-  socket.on('roomClosed', ({ message }) => { showToast(message, 'error'); setTimeout(() => location.reload(), 2000); });
+  socket.on('kicked', ({ message }) => { 
+    clearSession();
+    showToast(message, 'error'); 
+    setTimeout(() => location.reload(), 2000); 
+  });
+  socket.on('roomClosed', ({ message }) => { 
+    clearSession();
+    showToast(message, 'error'); 
+    setTimeout(() => location.reload(), 2000); 
+  });
   socket.on('ownerOffline', ({ message }) => { showToast(message); });
   socket.on('permissionDenied', ({ message }) => { showToast(message, 'error'); });
   socket.on('disconnect', () => { document.getElementById('connectionDot').classList.remove('online', 'idle'); });
@@ -1981,7 +2036,11 @@ function initSocket() {
     meter.style.background = color + '15';
   });
 
-  socket.on('voiceSignal', async ({ signal }) => await handleVoiceSignal(signal));
+  socket.on('voiceSignal', async ({ signal, from, userName: fromName }) => {
+    window._lastVoiceFromId = from;
+    window._lastVoiceFromName = fromName;
+    await handleVoiceSignal(signal);
+  });
 
   socket.on('pttState', ({ userName: fromName, isTalking: talk }) => {
     if (talk) {
@@ -2002,10 +2061,6 @@ function initSocket() {
       unreadMessages++;
       updateChatBadge();
     }
-    // Notification if mentioned
-    if (msg.mentions && msg.mentions.includes(socket.id)) {
-      showToast(`${msg.userName} mentioned you!`, 'success');
-    }
   });
 
   socket.on('messageDeleted', ({ messageId }) => {
@@ -2024,7 +2079,6 @@ function initSocket() {
 }
 
 function applyPermissions() {
-  // Chat
   const chatInput = document.getElementById('chatInput');
   const chatSend = document.getElementById('chatSend');
   if (myPermissions.chat) {
@@ -2037,17 +2091,16 @@ function applyPermissions() {
     chatInput.placeholder = 'Type a message...';
   }
 
-  // Voice
   const pttCard = document.getElementById('pttCard');
   if (myPermissions.voice) {
     pttCard.classList.add('blocked');
-    pttToggle.disabled = true;
-    alwaysOnToggle.disabled = true;
+    document.getElementById('pttToggle').disabled = true;
+    document.getElementById('alwaysOnToggle').disabled = true;
     if (localStream) releaseMic();
   } else {
     pttCard.classList.remove('blocked');
-    pttToggle.disabled = false;
-    alwaysOnToggle.disabled = false;
+    document.getElementById('pttToggle').disabled = false;
+    document.getElementById('alwaysOnToggle').disabled = false;
   }
 }
 
@@ -2092,6 +2145,7 @@ function renderUsers(users) {
   list.innerHTML = users.map(u => {
     const isMe = u.id === socket.id;
     const isBlocked = u.blocked && (u.blocked.chat || u.blocked.play || u.blocked.voice);
+    const isMuted = mutedUsers.has(u.name.toLowerCase());
     return `
       <div class="user-item">
         <div class="user-item-left">
@@ -2100,15 +2154,31 @@ function renderUsers(users) {
           ${u.isOwner ? '<span class="user-item-role">OWNER</span>' : ''}
           ${isBlocked ? '<span class="user-item-blocked-tag">BLOCKED</span>' : ''}
         </div>
-        ${isOwner && !isMe ? `<button class="btn-remove" data-uid="${u.id}">Remove</button>` : ''}
+        <div style="display:flex;gap:4px;align-items:center;">
+          ${!isMe ? `
+            <button class="mute-btn ${isMuted ? 'muted' : ''}" data-mute-name="${esc(u.name)}">
+              <i data-lucide="${isMuted ? 'volume-x' : 'volume-2'}"></i>
+              <span>${isMuted ? 'Unmute' : 'Mute'}</span>
+            </button>
+          ` : ''}
+          ${isOwner && !isMe ? `<button class="btn-remove" data-uid="${u.id}">Remove</button>` : ''}
+        </div>
       </div>
     `;
   }).join('');
-  list.querySelectorAll('.btn-remove').forEach(btn => {
+  refreshIcons();
+
+  list.querySelectorAll('.btn-remove[data-uid]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (confirm('Remove this user?')) {
         socket.emit('removeUser', { roomId, userId: btn.dataset.uid });
       }
+    });
+  });
+
+  list.querySelectorAll('.mute-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleMuteUser(btn.dataset.muteName);
     });
   });
 }
@@ -2133,6 +2203,8 @@ document.getElementById('usersBtn').addEventListener('click', () =>
 document.getElementById('closeUsersBtn').addEventListener('click', () =>
   document.getElementById('usersPanel').classList.remove('active'));
 
+document.getElementById('muteAllBtn').addEventListener('click', toggleMuteAll);
+
 document.getElementById('chatBtn').addEventListener('click', () => {
   chatOpen = true;
   unreadMessages = 0;
@@ -2148,126 +2220,22 @@ document.getElementById('chatBtn').addEventListener('click', () => {
 document.getElementById('closeChat').addEventListener('click', () => {
   chatOpen = false;
   document.getElementById('chatPanel').classList.remove('active');
-  hideMentionDropdown();
 });
 document.getElementById('chatSend').addEventListener('click', sendChat);
-
-/* ===== CHAT INPUT WITH @MENTION ===== */
-const chatInput = document.getElementById('chatInput');
-const mentionDropdown = document.getElementById('mentionDropdown');
-
-chatInput.addEventListener('input', (e) => {
-  const value = e.target.value;
-  const cursorPos = e.target.selectionStart;
-  const textBefore = value.substring(0, cursorPos);
-  const atMatch = textBefore.match(/@(\w*)$/);
-
-  if (atMatch) {
-    mentionQuery = atMatch[1].toLowerCase();
-    mentionStart = cursorPos - atMatch[0].length;
-    mentionActive = true;
-    mentionSelectedIndex = 0;
-    showMentionDropdown();
-  } else {
-    hideMentionDropdown();
-  }
+document.getElementById('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
 });
-
-chatInput.addEventListener('keydown', (e) => {
-  if (mentionActive) {
-    const items = mentionDropdown.querySelectorAll('.mention-item');
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      mentionSelectedIndex = Math.min(mentionSelectedIndex + 1, items.length - 1);
-      updateMentionSelection();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
-      updateMentionSelection();
-    } else if (e.key === 'Enter' && items.length > 0) {
-      e.preventDefault();
-      items[mentionSelectedIndex].click();
-      return;
-    } else if (e.key === 'Escape') {
-      hideMentionDropdown();
-    }
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    sendChat();
-  }
-});
-
-function showMentionDropdown() {
-  // Get current users
-  const users = window._currentUsers || [];
-  const filtered = users.filter(u =>
-    u.id !== socket.id &&
-    u.name.toLowerCase().includes(mentionQuery)
-  );
-
-  if (filtered.length === 0) {
-    hideMentionDropdown();
-    return;
-  }
-
-  mentionDropdown.innerHTML = filtered.map((u, i) => `
-    <div class="mention-item ${i === mentionSelectedIndex ? 'selected' : ''}" data-name="${esc(u.name)}">
-      <i data-lucide="user"></i>
-      <span>${esc(u.name)}</span>
-    </div>
-  `).join('');
-  mentionDropdown.classList.add('active');
-  refreshIcons();
-
-  mentionDropdown.querySelectorAll('.mention-item').forEach(item => {
-    item.addEventListener('click', () => {
-      insertMention(item.dataset.name);
-    });
-  });
-}
-
-function updateMentionSelection() {
-  const items = mentionDropdown.querySelectorAll('.mention-item');
-  items.forEach((item, i) => {
-    item.classList.toggle('selected', i === mentionSelectedIndex);
-  });
-}
-
-function insertMention(name) {
-  const value = chatInput.value;
-  const before = value.substring(0, mentionStart);
-  const after = value.substring(chatInput.selectionStart);
-  chatInput.value = before + '@' + name + ' ' + after;
-  chatInput.focus();
-  chatInput.setSelectionRange(before.length + name.length + 2, before.length + name.length + 2);
-  hideMentionDropdown();
-}
-
-function hideMentionDropdown() {
-  mentionActive = false;
-  mentionDropdown.classList.remove('active');
-}
 
 function sendChat() {
   if (myPermissions.chat) {
     showToast('You are blocked from chatting', 'error');
     return;
   }
-  const text = chatInput.value.trim();
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
   if (!text) return;
-
-  // Parse mentions
-  const users = window._currentUsers || [];
-  const mentions = [];
-  users.forEach(u => {
-    if (text.includes('@' + u.name)) {
-      mentions.push(u.id);
-    }
-  });
-
-  socket.emit('chatMessage', { roomId, text, mentions });
-  chatInput.value = '';
-  hideMentionDropdown();
+  socket.emit('chatMessage', { roomId, text, mentions: [] });
+  input.value = '';
 }
 
 function renderChat(messages, replace) {
@@ -2281,33 +2249,18 @@ function renderChat(messages, replace) {
   if (emptyMsg) emptyMsg.remove();
   messages.forEach(m => {
     const mine = m.userId === socket.id;
-    const isMentioned = m.mentions && m.mentions.includes(socket.id);
     const div = document.createElement('div');
-    div.className = 'chat-msg ' + (mine ? 'mine' : 'theirs') + (isMentioned ? ' mentioned' : '');
+    div.className = 'chat-msg ' + (mine ? 'mine' : 'theirs');
     div.dataset.msgId = m.id;
     const time = new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-    // Highlight mentions in text
-    let textHtml = esc(m.text);
-    (window._currentUsers || []).forEach(u => {
-      if (u.id !== socket.id) {
-        const regex = new RegExp('@' + escapeRegex(u.name), 'g');
-        textHtml = textHtml.replace(regex, `<span class="mention">@${esc(u.name)}</span>`);
-      }
-    });
-
     div.innerHTML = `
       ${!mine ? `<div class="chat-msg-name">${esc(m.userName)}</div>` : ''}
-      <div class="chat-msg-text">${textHtml}</div>
+      <div>${esc(m.text)}</div>
       <div class="chat-msg-time">${time}</div>
     `;
     box.appendChild(div);
   });
   box.scrollTop = box.scrollHeight;
-}
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function updateChatBadge() {
@@ -2332,15 +2285,37 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 });
 
 window.addEventListener('load', () => {
+  loadMuteState();
+  updateMuteAllButton();
+  
   const params = new URLSearchParams(window.location.search);
   const r = params.get('room');
   if (r) {
     document.getElementById('roomIdInput').value = r;
     showToast('Room code auto-filled');
   }
+
+  const savedSession = getSavedSession();
+  if (savedSession) {
+    setTimeout(() => {
+      roomId = savedSession.roomId;
+      userName = savedSession.userName;
+      isOwner = savedSession.isOwner;
+      joinScreen.classList.remove('active');
+      mainScreen.classList.add('active');
+      initSocket();
+      socket.on('connect', () => {
+        if (isOwner) socket.emit('createRoom', { roomId, userName });
+        else socket.emit('requestJoin', { roomId, userName });
+      });
+    }, 500);
+  }
 });
 
-document.getElementById('cancelWaitBtn').addEventListener('click', () => location.reload());
+document.getElementById('cancelWaitBtn').addEventListener('click', () => {
+  clearSession();
+  location.reload();
+});
 
 async function applyRemoteState(state) {
   isRemoteUpdate = true;
@@ -2394,6 +2369,16 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   }
   updatePlayIcon();
   startHeartbeat();
+
+  // Media Session
+  if ('mediaSession' in navigator && track) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || 'Unknown',
+      artist: track.artist || 'Unknown',
+      album: 'Music Sync',
+      artwork: track.image ? [{ src: track.image, sizes: '512x512', type: 'image/jpeg' }] : []
+    });
+  }
 }
 
 document.getElementById('playBtn').addEventListener('click', () => {
@@ -2507,8 +2492,8 @@ async function searchSongs(query) {
       results.innerHTML = '<p class="search-hint">No results found</p>';
       return;
     }
-    results.innerHTML = data.results.map((s, i) => `
-      <div class="song-item" data-song='${JSON.stringify(s).replace(/'/g, "&apos;")}' style="animation-delay:${i * 30}ms">
+    results.innerHTML = data.results.map(s => `
+      <div class="song-item" data-song='${JSON.stringify(s).replace(/'/g, "&apos;")}'>
         <img src="${s.image || ''}" onerror="this.style.opacity='0.3'">
         <div class="song-item-info">
           <div class="song-item-title">${esc(s.title)}</div>
@@ -2684,11 +2669,22 @@ function createPeerConnection() {
   if (peerConnection) return;
   peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+  
   peerConnection.ontrack = (e) => {
     const remote = new Audio();
     remote.srcObject = e.streams[0];
     remote.play().catch(() => {});
+
+    const remoteName = window._lastVoiceFromName || 'Unknown';
+    const remoteId = window._lastVoiceFromId || ('remote-' + Date.now());
+    
+    const key = remoteId + '-' + Date.now();
+    remoteAudios.set(key, { audio: remote, userName: remoteName });
+
+    const isUserMuted = mutedUsers.has(remoteName.toLowerCase());
+    remote.muted = muteAll || isUserMuted;
   };
+  
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) socket.emit('voiceSignal', { roomId, signal: { type: 'ice', candidate: e.candidate } });
   };
@@ -2751,6 +2747,47 @@ function showToast(msg, type) {
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+/* ===== PWA SERVICE WORKER ===== */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then((reg) => console.log('SW registered:', reg.scope))
+    .catch((err) => console.log('SW failed:', err));
+}
+
+/* ===== MEDIA SESSION ===== */
+function setupMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (audio.paused && currentTrack) {
+      audio.play();
+      updatePlayIcon();
+      broadcastState({ isPlaying: true, position: audio.currentTime });
+    }
+  });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    if (!audio.paused) {
+      audio.pause();
+      updatePlayIcon();
+      broadcastState({ isPlaying: false, position: audio.currentTime });
+    }
+  });
+  navigator.mediaSession.setActionHandler('seekto', (details) => {
+    if (details.seekTime !== undefined && currentTrack) {
+      audio.currentTime = details.seekTime;
+      broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+    }
+  });
+}
+document.addEventListener('click', setupMediaSession, { once: true });
+
+/* ===== BACKGROUND PLAYBACK ===== */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && socket && !socket.connected) {
+    console.log('Reconnecting socket...');
+    socket.connect();
+  }
+});
 </script>
 </body>
 </html>
