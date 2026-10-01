@@ -2266,25 +2266,27 @@ async function setupMic(){
     hideMicBanner();
 
     if(socket&&socket.connected){
+      // ✅ Peer connection banao agar nahi hai
       if(!peerConnection){
         createPeerConnection();
-      } else if(localStream){
-        const senders = peerConnection.getSenders();
-        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-        if(!audioSender){
-          localStream.getTracks().forEach(track=>{
+      } else {
+        // ✅ Existing connection me tracks add karo agar nahi hai
+        const hasAudioTrack = peerConnection.getSenders().some(s => s.track && s.track.kind === 'audio');
+        if(!hasAudioTrack && localStream){
+          localStream.getTracks().forEach(track => {
             track.contentHint = 'speech';
             peerConnection.addTrack(track, localStream);
           });
         }
       }
       
+      // ✅ Offer bhejo (sirf polite peer nahi)
       setTimeout(async () => {
         if(!peerConnection) return;
         
-        const hasRemoteTrack = peerConnection.getReceivers().some(r => r.track);
-        if(hasRemoteTrack){
-          console.log('⏭️ Already receiving, skip offer');
+        // ✅ FIX: sirf remoteDescription check karo
+        if(peerConnection.remoteDescription && peerConnection.remoteDescription.type){
+          console.log('⏭️ Remote description already set, skip offer');
           return;
         }
         
@@ -2293,7 +2295,6 @@ async function setupMic(){
           return;
         }
         
-        // Polite peer: alphabetically chhota naam = polite (offer nahi bhejta)
         const myName = (userName || '').toLowerCase();
         const partnerName = (window._lastVoiceFromName || '').toLowerCase();
         const isPolite = myName && partnerName ? (myName > partnerName) : false;
@@ -2305,7 +2306,10 @@ async function setupMic(){
         
         try{
           makingOffer = true;
-          const offer=await peerConnection.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:false});
+          const offer=await peerConnection.createOffer({
+            offerToReceiveAudio:true,
+            offerToReceiveVideo:false
+          });
           await peerConnection.setLocalDescription(offer);
           socket.emit('voiceSignal',{roomId,signal:{type:'offer',sdp:offer.sdp}});
           console.log('📤 Offer sent');
