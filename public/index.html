@@ -1634,7 +1634,102 @@ input:checked + .slider:before { transform:translateX(16px); }
   .song-title { font-size:20px; }
   .ptt-button { height:52px; font-size:12px; }
 }
+/* ===== CHAT PRESENCE BAR ===== */
+.chat-presence {
+  padding:8px 14px;
+  background:rgba(139,92,246,0.08);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-height:38px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  flex-shrink:0;
+}
+.chat-presence::-webkit-scrollbar { display:none; }
+.chat-presence-list {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+  min-width:0;
+}
+.chat-presence-empty {
+  font-size:11px;
+  color:var(--muted);
+  font-weight:500;
+  font-style:italic;
+}
+.chat-presence-user {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid var(--border);
+  padding:4px 9px 4px 6px;
+  border-radius:100px;
+  font-size:11px;
+  font-weight:700;
+  color:var(--text);
+  white-space:nowrap;
+  flex-shrink:0;
+  animation:presenceIn 0.3s var(--spring);
+}
+@keyframes presenceIn {
+  from { opacity:0; transform:scale(0.8); }
+  to { opacity:1; transform:scale(1); }
+}
+.chat-presence-dot {
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 6px var(--success);
+  animation:pulse 1.5s infinite;
+  flex-shrink:0;
+}
+.chat-presence-user.is-me {
+  background:linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.2));
+  border-color:rgba(139,92,246,0.3);
+}
 
+/* ===== TYPING INDICATOR ===== */
+.typing-indicator {
+  padding:6px 14px 8px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:11px;
+  color:var(--text-dim);
+  font-weight:600;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  animation:typingIn 0.3s var(--ease);
+}
+@keyframes typingIn {
+  from { opacity:0; transform:translateY(4px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.typing-dots {
+  display:flex;
+  gap:3px;
+  align-items:center;
+}
+.typing-dots span {
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--primary-2);
+  animation:typingBounce 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay:0.15s; }
+.typing-dots span:nth-child(3) { animation-delay:0.3s; }
+@keyframes typingBounce {
+  0%,60%,100% { transform:translateY(0); opacity:0.4; }
+  30% { transform:translateY(-4px); opacity:1; }
+}
+  
 ::-webkit-scrollbar { width:0; height:0; }
 </style>
 </head>
@@ -1831,7 +1926,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- CHAT PANEL -->
+<!-- CHAT PANEL (updated structure) -->
 <div id="chatPanel">
   <div class="chat-header">
     <h3><i data-lucide="message-circle"></i> Chat</h3>
@@ -1839,9 +1934,26 @@ input:checked + .slider:before { transform:translateX(16px); }
       <i data-lucide="x"></i>
     </button>
   </div>
+
+  <!-- 👇 YE NAYA ADD KARO -->
+  <div class="chat-presence" id="chatPresence">
+    <div class="chat-presence-list" id="chatPresenceList">
+      <span class="chat-presence-empty">No one else is in chat</span>
+    </div>
+  </div>
+
   <div class="chat-messages" id="chatMessages">
     <p class="chat-empty">No messages yet</p>
   </div>
+
+  <!-- 👇 YE NAYA ADD KARO -->
+  <div class="typing-indicator" id="typingIndicator" style="display:none;">
+    <div class="typing-dots">
+      <span></span><span></span><span></span>
+    </div>
+    <span id="typingText">Someone is typing...</span>
+  </div>
+
   <div class="chat-input-row">
     <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500" />
     <button class="chat-send" id="chatSend">
@@ -2114,7 +2226,7 @@ function getSavedSession() {
     const data = localStorage.getItem('musicSyncSession');
     if (!data) return null;
     const session = JSON.parse(data);
-    if (Date.now() - session.savedAt > 24 * 60 * 60 * 1000) {
+    if (Date.now() - session.savedAt > 30 * 60 * 1000) {  // 30 minutes
       localStorage.removeItem('musicSyncSession');
       return null;
     }
