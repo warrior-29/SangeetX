@@ -17,7 +17,7 @@ const blockedUsers = {}; // { roomId: [{ name, time }] }
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 
 // ===== ANALYTICS =====
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@8174902497';
 const analytics = {
   visits: [],
   totalVisits: 0,
