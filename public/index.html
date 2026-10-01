@@ -1647,7 +1647,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   <button class="mic-banner-close" onclick="hideMicBanner()">✕</button>
 </div>  
 <div id="reactionLayer" class="reaction-layer"></div>
-<audio id="audioPlayer" preload="auto" crossorigin="anonymous"></audio>
+<audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -2343,6 +2343,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 });
 
 window.addEventListener('load', () => {
+  checkMicPermission();
   loadMuteState();
   updateMuteAllButton();
   
@@ -2784,13 +2785,69 @@ function stopTalking() {
 
 async function setupMic() {
   try {
+    // Check permission state first
+    let permissionStatus = null;
+    try {
+      permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+    } catch (e) {
+      // Some browsers don't support this
+    }
+
+    // If denied, show banner immediately
+    if (permissionStatus && permissionStatus.state === 'denied') {
+      showMicBanner();
+      throw new Error('Permission denied previously');
+    }
+
     localStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      audio: { 
+        echoCancellation: true, 
+        noiseSuppression: true, 
+        autoGainControl: true,
+        sampleRate: 48000
+      }
     });
+    
     localStream.getAudioTracks().forEach(t => t.enabled = false);
-    if (socket) createPeerConnection();
+    console.log('🎤 Mic ready');
+    hideMicBanner();
+    
+    if (socket && socket.connected) {
+      createPeerConnection();
+      
+      setTimeout(async () => {
+        if (peerConnection && peerConnection.signalingState === 'stable') {
+          try {
+            const offer = await peerConnection.createOffer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: false
+            });
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('voiceSignal', { 
+              roomId, 
+              signal: { type: 'offer', sdp: offer.sdp } 
+            });
+            console.log('📤 Offer sent');
+          } catch (e) {
+            console.log('Offer error:', e);
+          }
+        }
+      }, 500);
+    }
   } catch (e) {
-    showToast('Microphone permission denied', 'error');
+    console.log('Mic error:', e);
+    
+    if (e.name === 'NotAllowedError' || e.message?.includes('denied')) {
+      showMicBanner();
+      showToast('Mic permission blocked — see banner', 'error');
+    } else if (e.name === 'NotFoundError') {
+      showToast('No microphone found on this device', 'error');
+    } else if (e.name === 'NotReadableError') {
+      showToast('Microphone is being used by another app', 'error');
+    } else {
+      showToast('Microphone access failed', 'error');
+    }
+    
     pttToggle.checked = false;
     alwaysOnToggle.checked = false;
     pttModeEnabled = false;
@@ -2885,6 +2942,86 @@ function showToast(msg, type) {
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+/* ===== MIC PERMISSION BANNER ===== */
+function showMicBanner() {
+  const banner = document.getElementById('micBanner');
+  if (banner) {
+    banner.classList.add('show');
+    refreshIcons();
+  }
+}
+
+function hideMicBanner() {
+  const banner = document.getElementById('micBanner');
+  if (banner) banner.classList.remove('show');
+}
+
+async function checkMicPermission() {
+  try {
+    const status = await navigator.permissions.query({ name: 'microphone' });
+    if (status.state === 'denied') {
+      showMicBanner();
+    }
+    status.onchange = () => {
+      if (status.state === 'granted') {
+        hideMicBanner();
+        showToast('✅ Mic permission granted', 'success');
+      } else if (status.state === 'denied') {
+        showMicBanner();
+      }
+    };
+  } catch (e) {
+    // Permissions API not supported
+  }
+}
+
+/* ===== PWA INSTALL PROMPT ===== */
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  if (document.getElementById('installBanner')) return;
+  
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.className = 'mic-banner show';
+  banner.style.background = 'rgba(139,92,246,0.95)';
+  banner.style.boxShadow = '0 12px 32px rgba(139,92,246,0.4)';
+  banner.innerHTML = `
+    <i data-lucide="download"></i>
+    <div class="mic-banner-text">
+      <strong>Install Music Sync</strong>
+      Background playback + better experience
+    </div>
+    <button class="mic-banner-close" onclick="installPWA()" style="background:white;color:#8B5CF6;font-weight:800;width:auto;padding:0 10px;border-radius:8px;height:26px;">Install</button>
+  `;
+  document.body.appendChild(banner);
+  refreshIcons();
+}
+
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    showToast('✅ App installed!', 'success');
+  }
+  deferredPrompt = null;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.remove();
+}
+
+window.addEventListener('appinstalled', () => {
+  showToast('🎉 Music Sync installed!', 'success');
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.remove();
+});
 
 /* ===== PWA SERVICE WORKER ===== */
 if ('serviceWorker' in navigator) {
