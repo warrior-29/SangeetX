@@ -16,7 +16,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@8174902497';
 
 // ===== ROOMS STATE =====
 const rooms = {};
-const blockedUsers = {}; // { roomId: [{ name, time }] }
+const blockedUsers = {};
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 
 // ===== ANALYTICS =====
@@ -252,7 +252,8 @@ io.on('connection', (socket) => {
         name: userName,
         lastActive: Date.now(),
         blocked: { chat: false, play: false, voice: false },
-        location: null   // 👈 NEW: Location field
+        location: null,
+        chatActive: false
       }],
       pending: [],
       messages: [],
@@ -327,7 +328,8 @@ io.on('connection', (socket) => {
       ...pending,
       lastActive: Date.now(),
       blocked: { chat: false, play: false, voice: false },
-      location: null   // 👈 NEW: Location field
+      location: null,
+      chatActive: false
     });
 
     const userSocket = io.sockets.sockets.get(userId);
@@ -343,7 +345,6 @@ io.on('connection', (socket) => {
         name: pending.name, roomId, joinedAt: Date.now(), role: 'member'
       });
 
-      // 👇 NEW: Existing users ki location naye user ko bhejo
       room.users.forEach(u => {
         if (u.location && u.id !== userId) {
           io.to(userId).emit('partnerLocation', {
@@ -387,20 +388,18 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // 👇 NEW: SHARE LOCATION HANDLER
+  // ===== LOCATION SHARE =====
   socket.on('shareLocation', ({ roomId, location }) => {
     const room = rooms[roomId];
     if (!room) return;
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
 
-    // User ki location save karo
     const user = room.users.find(u => u.id === socket.id);
     if (user) {
       user.location = location;
       user.lastActive = Date.now();
     }
 
-    // Room ke baaki users ko bhejo
     socket.to(roomId).emit('partnerLocation', {
       location,
       userId: socket.id,
@@ -408,6 +407,51 @@ io.on('connection', (socket) => {
     });
 
     console.log(`📍 Location shared in ${roomId} by ${socket.userName}`);
+  });
+
+  // ===== CHAT PRESENCE =====
+  socket.on('chatPresence', ({ roomId, active }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+
+    user.chatActive = !!active;
+    user.lastActive = Date.now();
+
+    // Har user ko unke perspective se list bhejo
+    room.users.forEach(u => {
+      const userSocket = io.sockets.sockets.get(u.id);
+      if (userSocket) {
+        const activeUsers = room.users
+          .filter(x => x.chatActive)
+          .map(x => ({
+            id: x.id,
+            name: x.name,
+            isMe: x.id === u.id
+          }));
+        userSocket.emit('chatPresenceUpdate', { users: activeUsers });
+      }
+    });
+
+    console.log(`💬 Chat presence: ${user.name} is ${active ? 'IN' : 'OUT'}`);
+  });
+
+  // ===== TYPING INDICATOR =====
+  socket.on('typing', ({ roomId, isTyping }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+
+    // Baaki sabko bhejo (khud ko nahi)
+    socket.to(roomId).emit('userTyping', {
+      userName: user.name,
+      userId: socket.id,
+      isTyping: !!isTyping
+    });
   });
 
   socket.on('updateState', ({ roomId, newState }) => {
@@ -547,7 +591,30 @@ io.on('connection', (socket) => {
 
     if (roomId && rooms[roomId]) {
       const room = rooms[roomId];
+      
+      // Typing stop bhejo
+      socket.to(roomId).emit('userTyping', {
+        userName: socket.userName,
+        userId: socket.id,
+        isTyping: false
+      });
+
       room.users = room.users.filter(u => u.id !== socket.id);
+      
+      // Chat presence update bhejo
+      room.users.forEach(u => {
+        const userSocket = io.sockets.sockets.get(u.id);
+        if (userSocket) {
+          const activeUsers = room.users
+            .filter(x => x.chatActive)
+            .map(x => ({
+              id: x.id,
+              name: x.name,
+              isMe: x.id === u.id
+            }));
+          userSocket.emit('chatPresenceUpdate', { users: activeUsers });
+        }
+      });
 
       if (room.ownerId === socket.id) {
         room.ownerOnline = false;
