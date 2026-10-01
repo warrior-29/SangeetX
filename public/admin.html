@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#08080C" />
-<title>Admin Dashboard — Music Sync</title>
+<title>Admin Dashboard — SangeetX</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
@@ -286,10 +286,7 @@ body::before {
   background:rgba(239,68,68,0.25);
   box-shadow:0 6px 16px rgba(239,68,68,0.3);
 }
-.btn.small {
-  padding:6px 10px;
-  font-size:11px;
-}
+.btn.small { padding:6px 10px; font-size:11px; }
 .btn.small [data-lucide] { width:12px; height:12px; }
 .btn .label { display:inline; }
 
@@ -1237,12 +1234,11 @@ let refreshInterval = null;
 let confirmAction = null;
 let chatViewerRoomId = null;
 
-/* ============ ICON REFRESH ============ */
 function refreshIcons() {
   if (window.lucide) lucide.createIcons();
 }
 
-/* ============ LOGIN ============ */
+/* LOGIN */
 function login() {
   const pass = document.getElementById('adminPass').value.trim();
   if (!pass) { alert('Please enter password'); return; }
@@ -1292,7 +1288,7 @@ function updateLastUpdate() {
   el.textContent = 'Updated: ' + t;
 }
 
-/* ============ RENDER ============ */
+/* RENDER */
 function renderStats(data) {
   document.getElementById('todayVisits').textContent = data.todayVisits;
   document.getElementById('totalVisits').textContent = data.totalVisits;
@@ -1349,7 +1345,7 @@ function renderHourChart(hours) {
   }).join('');
 }
 
-/* ============ ROOMS ============ */
+/* ROOMS */
 function renderRooms(roomsList) {
   const container = document.getElementById('roomsList');
 
@@ -1466,7 +1462,7 @@ function renderRooms(roomsList) {
   refreshIcons();
 }
 
-/* ============ ROOM ACTIONS ============ */
+/* ROOM ACTIONS */
 function confirmDeleteRoom(roomId, ownerName) {
   document.getElementById('confirmText').innerHTML =
     `Delete room <strong>${esc(roomId)}</strong>?<br><br>
@@ -1546,7 +1542,7 @@ async function kickUser(roomId, userId, userName) {
   }
 }
 
-/* ============ CHAT VIEWER ============ */
+/* CHAT VIEWER */
 async function openChatViewer(roomId) {
   chatViewerRoomId = roomId;
   document.getElementById('chatViewerTitle').textContent = 'Chat — ' + roomId;
@@ -1614,7 +1610,7 @@ async function deleteMessage(messageId) {
   }
 }
 
-/* ============ ACTIVE SESSIONS ============ */
+/* ACTIVE SESSIONS */
 function renderActiveSessions(sessions) {
   const tableWrap = document.getElementById('activeTableWrap');
   const cardList = document.getElementById('activeCardList');
@@ -1672,7 +1668,7 @@ function renderActiveSessions(sessions) {
   refreshIcons();
 }
 
-/* ============ RECENT VISITS ============ */
+/* RECENT VISITS */
 function renderRecentVisits(visits) {
   const tableWrap = document.getElementById('recentTableWrap');
   const cardList = document.getElementById('recentCardList');
@@ -1744,7 +1740,7 @@ function esc(s) {
   return d.innerHTML;
 }
 
-/* ============ TOAST ============ */
+/* TOAST */
 function showToast(msg, type) {
   const t = document.getElementById('toast');
   const txt = document.getElementById('toastText');
@@ -1761,7 +1757,7 @@ function showToast(msg, type) {
   }, 2500);
 }
 
-/* ============ AUTO LOGIN ============ */
+/* AUTO LOGIN */
 window.addEventListener('load', () => {
   refreshIcons();
   const saved = localStorage.getItem('adminPass');
