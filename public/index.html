@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#08080C" />
-<title>Music Sync</title>
+<title>SangeetX</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="manifest" href="/manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -2011,11 +2011,51 @@ function initSocket() {
   socket.on('stateSync', (state) => applyRemoteState(state));
 
   socket.on('heartbeat', ({ position, isPlaying }) => {
-    if (!currentTrack) return;
-    if (Math.abs(audio.currentTime - position) > 0.5) audio.currentTime = position;
-    if (isPlaying && audio.paused) audio.play().catch(() => {});
-    if (!isPlaying && !audio.paused) audio.pause();
-  });
+  if (!currentTrack) return;
+  
+  // Play/pause state sync
+  if (isPlaying && audio.paused) {
+    audio.play().catch(() => {});
+  }
+  if (!isPlaying && !audio.paused) {
+    audio.pause();
+  }
+  
+  if (!isPlaying) return; // Agar pause hai to drift check ki zaroorat nahi
+  
+  // Calculate drift
+  const drift = audio.currentTime - position;
+  const absDrift = Math.abs(drift);
+  
+  // Drift smoothing logic
+  if (absDrift < 0.3) {
+    // 0-0.3s: Perfect sync, kuch mat karo
+    audio.playbackRate = 1.0;
+  } else if (absDrift < 2.0) {
+    // 0.3-2s: Smooth catch-up with playback rate
+    if (drift > 0) {
+      // Hum aage hain, thoda slow karo
+      audio.playbackRate = 0.97;
+    } else {
+      // Hum peeche hain, thoda fast karo
+      audio.playbackRate = 1.03;
+    }
+    
+    // 3 second baad rate reset karo
+    clearTimeout(window._rateResetTimeout);
+    window._rateResetTimeout = setTimeout(() => {
+      if (audio.playbackRate !== 1.0) {
+        audio.playbackRate = 1.0;
+        console.log('🎵 Playback rate reset to 1.0');
+      }
+    }, 3000);
+  } else {
+    // 2+ seconds: Bada drift, seek karo
+    console.log('⚠️ Large drift detected:', drift.toFixed(2) + 's, seeking...');
+    audio.currentTime = position;
+    audio.playbackRate = 1.0;
+  }
+});
 
   socket.on('syncPong', ({ clientTime }) => {
     const rtt = Date.now() - clientTime;
@@ -2323,9 +2363,36 @@ async function applyRemoteState(state) {
   if (state.track && (!currentTrack || currentTrack.id !== state.track.id)) {
     await loadTrack(state.track, state.position, state.isPlaying);
   } else if (currentTrack) {
-    if (Math.abs(audio.currentTime - state.position) > 0.5) audio.currentTime = state.position;
-    if (state.isPlaying && audio.paused) await audio.play().catch(() => {});
-    if (!state.isPlaying && !audio.paused) audio.pause();
+    // Play/pause sync
+    if (state.isPlaying && audio.paused) {
+      await audio.play().catch(() => {});
+    }
+    if (!state.isPlaying && !audio.paused) {
+      audio.pause();
+    }
+    
+    // Drift check (only if playing)
+    if (state.isPlaying && !audio.paused) {
+      const drift = audio.currentTime - state.position;
+      const absDrift = Math.abs(drift);
+      
+      if (absDrift < 0.3) {
+        // Perfect
+        audio.playbackRate = 1.0;
+      } else if (absDrift < 2.0) {
+        // Smooth adjust
+        audio.playbackRate = drift > 0 ? 0.97 : 1.03;
+        clearTimeout(window._rateResetTimeout);
+        window._rateResetTimeout = setTimeout(() => {
+          audio.playbackRate = 1.0;
+        }, 3000);
+      } else {
+        // Seek
+        audio.currentTime = state.position;
+        audio.playbackRate = 1.0;
+      }
+    }
+    
     updatePlayIcon();
   }
   isRemoteUpdate = false;
@@ -2457,11 +2524,16 @@ function broadcastState(partial) {
 
 function startHeartbeat() {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
+  // Har 3 second mein bhejo (pehle 5 tha)
   heartbeatInterval = setInterval(() => {
     if (currentTrack && !audio.paused) {
-      socket.emit('heartbeat', { roomId, position: audio.currentTime, isPlaying: true });
+      socket.emit('heartbeat', { 
+        roomId, 
+        position: audio.currentTime, 
+        isPlaying: true 
+      });
     }
-  }, 5000);
+  }, 3000);
 }
 
 const searchModal = document.getElementById('searchModal');
