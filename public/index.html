@@ -2083,6 +2083,7 @@ function updatePartnerStatus(users) {
 }
 
 function renderUsers(users) {
+  window._currentUsers = users;
   const list = document.getElementById('usersList');
   if (!users || users.length === 0) {
     list.innerHTML = '<p style="color:var(--muted);font-size:13px;">No members yet</p>';
@@ -2750,22 +2751,6 @@ function showToast(msg, type) {
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => toast.classList.remove('show'), 2500);
 }
-
-/* ===== STORE USERS GLOBALLY (for @mention) ===== */
-const origRenderUsers = renderUsers;
-window.renderUsers = renderUsers;
-// Override to store users
-const originalUpdatePartnerStatus = updatePartnerStatus;
-const origRenderUsersFn = renderUsers;
-
-// Store users list whenever updated
-const originalSetInterval = setInterval;
-setInterval(() => {
-  // Periodic check - not needed but safe
-}, 999999);
-
-// Patch: capture users
-const _origUsersUpdate = socket?.on;
 </script>
 </body>
 </html>
