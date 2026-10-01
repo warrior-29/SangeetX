@@ -1384,14 +1384,135 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.success { border-color:rgba(16,185,129,0.4); }
 .toast.success [data-lucide] { color:var(--success); }
 
-/* ===== MIC PERMISSION BANNER ===== */
-.mic-banner { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-100px); background:rgba(239,68,68,0.95); backdrop-filter:blur(20px); color:white; padding:12px 18px; border-radius:14px; font-size:12px; font-weight:700; z-index:400; max-width:90vw; display:flex; align-items:center; gap:10px; box-shadow:0 12px 32px rgba(239,68,68,0.4); transition:all 0.4s var(--spring); border:1px solid rgba(255,255,255,0.2); }
-.mic-banner.show { transform:translateX(-50%) translateY(0); }
+/* ===== MIC PERMISSION BANNER (TOP) ===== */
+.mic-banner {
+  position:fixed;
+  top:max(12px,env(safe-area-inset-top));
+  left:50%;
+  transform:translateX(-50%) translateY(-120px);
+  background:rgba(239,68,68,0.95);
+  backdrop-filter:blur(20px);
+  color:white;
+  padding:12px 18px;
+  border-radius:14px;
+  font-size:12px;
+  font-weight:700;
+  z-index:400;
+  max-width:90vw;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  box-shadow:0 12px 32px rgba(239,68,68,0.4);
+  transition:all 0.4s var(--spring);
+  border:1px solid rgba(255,255,255,0.2);
+  pointer-events:none;
+}
+.mic-banner.show {
+  transform:translateX(-50%) translateY(0);
+  pointer-events:auto;
+}
 .mic-banner [data-lucide] { width:16px; height:16px; stroke-width:2.5; flex-shrink:0; }
 .mic-banner-text { flex:1; line-height:1.4; min-width:0; }
 .mic-banner-text strong { display:block; font-size:11px; opacity:0.9; margin-bottom:2px; font-weight:600; }
-.mic-banner-close { background:rgba(255,255,255,0.2); border:none; color:white; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.mic-banner-close {
+  background:rgba(255,255,255,0.2);
+  border:none;
+  color:white;
+  width:24px; height:24px;
+  border-radius:50%;
+  cursor:pointer;
+  font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
 .mic-banner-close:active { background:rgba(255,255,255,0.35); }
+
+/* ===== PWA INSTALL BANNER (BOTTOM) ===== */
+.install-banner {
+  position:fixed;
+  bottom:max(20px, env(safe-area-inset-bottom));
+  left:50%;
+  transform:translateX(-50%) translateY(200px);
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  backdrop-filter:blur(20px);
+  color:white;
+  padding:12px 14px;
+  border-radius:16px;
+  font-size:12px;
+  font-weight:700;
+  z-index:450;
+  max-width:92vw;
+  width:auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  box-shadow:0 12px 40px rgba(139,92,246,0.6);
+  transition:all 0.5s var(--spring);
+  border:1px solid rgba(255,255,255,0.25);
+  pointer-events:none;
+  opacity:0;
+}
+.install-banner.show {
+  transform:translateX(-50%) translateY(0);
+  opacity:1;
+  pointer-events:auto;
+}
+.install-banner [data-lucide] {
+  width:22px;
+  height:22px;
+  stroke-width:2.5;
+  flex-shrink:0;
+}
+.install-banner-text {
+  flex:1;
+  line-height:1.35;
+  min-width:0;
+}
+.install-banner-text strong {
+  display:block;
+  font-size:12px;
+  font-weight:800;
+  margin-bottom:2px;
+  white-space:nowrap;
+}
+.install-banner-text span {
+  font-size:10px;
+  opacity:0.9;
+  font-weight:500;
+  white-space:nowrap;
+}
+.install-btn {
+  background:white;
+  color:var(--primary);
+  font-weight:800;
+  padding:0 14px;
+  height:34px;
+  border-radius:10px;
+  border:none;
+  cursor:pointer;
+  font-size:11px;
+  font-family:inherit;
+  flex-shrink:0;
+  transition:all 0.2s var(--spring);
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+}
+.install-btn:active { transform:scale(0.94); }
+.install-close {
+  background:rgba(255,255,255,0.25);
+  border:none;
+  color:white;
+  width:26px; height:26px;
+  border-radius:50%;
+  cursor:pointer;
+  font-size:13px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+  transition:all 0.2s var(--spring);
+}
+.install-close:active {
+  transform:scale(0.9);
+  background:rgba(255,255,255,0.45);
+}
 
 /* RESPONSIVE */
 @media (max-height:700px) {
@@ -1647,7 +1768,7 @@ input:checked + .slider:before { transform:translateX(16px); }
     <span style="font-size:10px;opacity:0.9;font-weight:500;">Allow mic to speak</span>
   </div>
   <button onclick="requestMicPermission()" style="background:white;color:#EF4444;font-weight:800;width:auto;padding:0 12px;border-radius:8px;height:28px;border:none;cursor:pointer;font-size:11px;flex-shrink:0;">Allow</button>
-  <button onclick="hideMicBanner()" style="background:rgba(255,255,255,0.25);border:none;color:white;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+  <button onclick="hideMicBanner()" class="mic-banner-close">✕</button>
 </div>
 
 <div id="reactionLayer" class="reaction-layer"></div>
@@ -1684,9 +1805,9 @@ let myPermissions = { chat: false, play: false, voice: false };
 let micPermissionState = 'prompt';  // 'granted' | 'denied' | 'prompt'
 
 /* ===== VOICE MUTE STATE (per-device) ===== */
-const mutedUsers = new Set();      // Specific users muted (by lowercase name)
-const remoteAudios = new Map();    // socketId -> { audio, userName }
-let muteAll = false;                // Global mute for all voices
+const mutedUsers = new Set();
+const remoteAudios = new Map();
+let muteAll = false;
 
 /* ===== AUDIO ===== */
 let audioContext = null;
@@ -2035,7 +2156,6 @@ function initSocket() {
   socket.on('heartbeat', ({ position, isPlaying }) => {
   if (!currentTrack) return;
   
-  // Play/pause state sync
   if (isPlaying && audio.paused) {
     audio.play().catch(() => {});
   }
@@ -2043,37 +2163,27 @@ function initSocket() {
     audio.pause();
   }
   
-  if (!isPlaying) return; // Agar pause hai to drift check ki zaroorat nahi
+  if (!isPlaying) return;
   
-  // Calculate drift
   const drift = audio.currentTime - position;
   const absDrift = Math.abs(drift);
   
-  // Drift smoothing logic
   if (absDrift < 0.3) {
-    // 0-0.3s: Perfect sync, kuch mat karo
     audio.playbackRate = 1.0;
   } else if (absDrift < 2.0) {
-    // 0.3-2s: Smooth catch-up with playback rate
     if (drift > 0) {
-      // Hum aage hain, thoda slow karo
       audio.playbackRate = 0.97;
     } else {
-      // Hum peeche hain, thoda fast karo
       audio.playbackRate = 1.03;
     }
     
-    // 3 second baad rate reset karo
     clearTimeout(window._rateResetTimeout);
     window._rateResetTimeout = setTimeout(() => {
       if (audio.playbackRate !== 1.0) {
         audio.playbackRate = 1.0;
-        console.log('🎵 Playback rate reset to 1.0');
       }
     }, 3000);
   } else {
-    // 2+ seconds: Bada drift, seek karo
-    console.log('⚠️ Large drift detected:', drift.toFixed(2) + 's, seeking...');
     audio.currentTime = position;
     audio.playbackRate = 1.0;
   }
@@ -2356,7 +2466,11 @@ window.addEventListener('load', () => {
   const r = params.get('room');
   if (r) {
     document.getElementById('roomIdInput').value = r;
-    showToast('Room code auto-filled');
+    // Auto-focus name input
+    setTimeout(() => {
+      document.getElementById('userNameInput').focus();
+    }, 300);
+    showToast('Room code auto-filled — enter your name');
   }
 
   const savedSession = getSavedSession();
@@ -2386,7 +2500,6 @@ async function applyRemoteState(state) {
   if (state.track && (!currentTrack || currentTrack.id !== state.track.id)) {
     await loadTrack(state.track, state.position, state.isPlaying);
   } else if (currentTrack) {
-    // Play/pause sync
     if (state.isPlaying && audio.paused) {
       await audio.play().catch(() => {});
     }
@@ -2394,23 +2507,19 @@ async function applyRemoteState(state) {
       audio.pause();
     }
     
-    // Drift check (only if playing)
     if (state.isPlaying && !audio.paused) {
       const drift = audio.currentTime - state.position;
       const absDrift = Math.abs(drift);
       
       if (absDrift < 0.3) {
-        // Perfect
         audio.playbackRate = 1.0;
       } else if (absDrift < 2.0) {
-        // Smooth adjust
         audio.playbackRate = drift > 0 ? 0.97 : 1.03;
         clearTimeout(window._rateResetTimeout);
         window._rateResetTimeout = setTimeout(() => {
           audio.playbackRate = 1.0;
         }, 3000);
       } else {
-        // Seek
         audio.currentTime = state.position;
         audio.playbackRate = 1.0;
       }
@@ -2432,7 +2541,6 @@ function updatePlayIcon() {
 async function loadTrack(track, position = 0, autoPlay = false) {
   currentTrack = track;
   
-  // Update UI
   document.getElementById('songTitle').textContent = track.title;
   document.getElementById('songArtist').textContent = track.artist;
 
@@ -2442,19 +2550,15 @@ async function loadTrack(track, position = 0, autoPlay = false) {
     : `<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
 
-  // Dynamic background + mood
   if (track.image) updateDynamicBackground(track.image);
   updateMood(track.title, track.artist);
 
-  // Reset playback rate (agar pichle drift se set tha)
   audio.playbackRate = 1.0;
 
-  // Set audio source
   audio.src = track.audioUrl;
   audio.crossOrigin = 'anonymous';
   audio.load();
 
-  // Position set AFTER metadata loads (accurate seek)
   const setPositionOnMetadata = () => {
     try {
       audio.currentTime = position || 0;
@@ -2465,7 +2569,6 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   };
   audio.addEventListener('loadedmetadata', setPositionOnMetadata);
 
-  // Auto-play if needed
   if (autoPlay) {
     try {
       initAudioContext();
@@ -2481,7 +2584,6 @@ async function loadTrack(track, position = 0, autoPlay = false) {
       startBeatDetection();
     } catch (e) {
       console.log('Autoplay failed:', e.message);
-      // Retry on user interaction
       document.addEventListener('click', () => {
         if (audio.paused && currentTrack) {
           audio.play().catch(() => {});
@@ -2490,13 +2592,9 @@ async function loadTrack(track, position = 0, autoPlay = false) {
     }
   }
 
-  // Update play icon
   updatePlayIcon();
-
-  // Start heartbeat for sync
   startHeartbeat();
 
-  // Update Media Session (lock screen controls)
   if ('mediaSession' in navigator && track) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -2595,7 +2693,6 @@ function broadcastState(partial) {
 
 function startHeartbeat() {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
-  // Har 3 second mein bhejo (pehle 5 tha)
   heartbeatInterval = setInterval(() => {
     if (currentTrack && !audio.paused) {
       socket.emit('heartbeat', { 
@@ -2687,7 +2784,6 @@ pttToggle.addEventListener('change', async (e) => {
     return;
   }
   
-  // Agar mic denied hai to banner dikhao, toggle off rakho
   if (e.target.checked && micPermissionState === 'denied') {
     e.target.checked = false;
     showMicBanner();
@@ -2708,7 +2804,6 @@ alwaysOnToggle.addEventListener('change', async (e) => {
     return;
   }
   
-  // Agar mic denied hai to banner dikhao
   if (e.target.checked && micPermissionState === 'denied') {
     e.target.checked = false;
     showMicBanner();
@@ -2768,7 +2863,6 @@ async function updateMicState() {
 pttButton.addEventListener('pointerdown', (e) => { 
   e.preventDefault(); 
   
-  // Mic denied check
   if (micPermissionState === 'denied') {
     showMicBanner();
     showToast('🎤 Mic blocked — click Allow', 'error');
@@ -2819,15 +2913,11 @@ function stopTalking() {
 
 async function setupMic() {
   try {
-    // Check permission state first
     let permissionStatus = null;
     try {
       permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-    } catch (e) {
-      // Some browsers don't support this
-    }
+    } catch (e) {}
 
-    // If denied, show banner immediately
     if (permissionStatus && permissionStatus.state === 'denied') {
       showMicBanner();
       throw new Error('Permission denied previously');
@@ -2906,7 +2996,6 @@ function createPeerConnection() {
     iceCandidatePoolSize: 10
   });
   
-  // Add all tracks ONCE
   if (localStream) {
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
@@ -2995,7 +3084,6 @@ async function handleVoiceSignal(signal) {
       }
     }
     
-    // Process queued ICE candidates
     if (peerConnection.remoteDescription && window._iceQueue) {
       for (const cand of window._iceQueue) {
         try {
@@ -3046,6 +3134,9 @@ function showToast(msg, type) {
 
 /* ===== MIC PERMISSION BANNER ===== */
 function showMicBanner() {
+  // Agar install banner khula hai toh mic banner skip karo
+  if (document.getElementById('installBanner')) return;
+  
   const banner = document.getElementById('micBanner');
   if (banner) {
     banner.classList.add('show');
@@ -3061,15 +3152,12 @@ function hideMicBanner() {
 /* ===== REQUEST MIC PERMISSION (button click) ===== */
 async function requestMicPermission() {
   try {
-    // Try to get mic
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Agar mil gaya, permission granted
     stream.getTracks().forEach(t => t.stop());
     micPermissionState = 'granted';
     hideMicBanner();
     showToast('✅ Mic allowed! Now toggle PTT again', 'success');
   } catch (e) {
-    // Permission denied
     micPermissionState = 'denied';
     showMicBanner();
     showToast('❌ Mic blocked. Check browser settings.', 'error');
@@ -3081,50 +3169,59 @@ async function checkMicPermission() {
     const status = await navigator.permissions.query({ name: 'microphone' });
     micPermissionState = status.state;
     
-    // Banner abhi mat dikhao — sirf state save karo
-    // Banner dikhega jab user mic use karega
-    
     status.onchange = () => {
       micPermissionState = status.state;
       if (status.state === 'granted') {
         hideMicBanner();
         showToast('✅ Mic permission granted', 'success');
       }
-      // Denied par bhi banner abhi mat dikhao
     };
   } catch (e) {
-    // Permissions API not supported — assume prompt
     micPermissionState = 'prompt';
   }
 }
 
-/* ===== PWA INSTALL PROMPT ===== */
+/* ===== PWA INSTALL PROMPT (BOTTOM BANNER) ===== */
 let deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  showInstallBanner();
+  
+  // Delay 2 sec — page settle hone do
+  setTimeout(() => showInstallBanner(), 2000);
 });
 
 function showInstallBanner() {
   if (document.getElementById('installBanner')) return;
+  if (!deferredPrompt) return;
   
   const banner = document.createElement('div');
   banner.id = 'installBanner';
-  banner.className = 'mic-banner show';
-  banner.style.background = 'rgba(139,92,246,0.95)';
-  banner.style.boxShadow = '0 12px 32px rgba(139,92,246,0.4)';
+  banner.className = 'install-banner';
   banner.innerHTML = `
     <i data-lucide="download"></i>
-    <div class="mic-banner-text">
+    <div class="install-banner-text">
       <strong>Install Music Sync</strong>
-      Background playback + better experience
+      <span>Background playback + better experience</span>
     </div>
-    <button class="mic-banner-close" onclick="installPWA()" style="background:white;color:#8B5CF6;font-weight:800;width:auto;padding:0 10px;border-radius:8px;height:26px;">Install</button>
+    <button class="install-btn" onclick="installPWA()">Install</button>
+    <button class="install-close" onclick="dismissInstallBanner()">✕</button>
   `;
   document.body.appendChild(banner);
   refreshIcons();
+  
+  requestAnimationFrame(() => {
+    setTimeout(() => banner.classList.add('show'), 50);
+  });
+}
+
+function dismissInstallBanner() {
+  const banner = document.getElementById('installBanner');
+  if (banner) {
+    banner.classList.remove('show');
+    setTimeout(() => banner.remove(), 500);
+  }
 }
 
 async function installPWA() {
@@ -3135,14 +3232,12 @@ async function installPWA() {
     showToast('✅ App installed!', 'success');
   }
   deferredPrompt = null;
-  const banner = document.getElementById('installBanner');
-  if (banner) banner.remove();
+  dismissInstallBanner();
 }
 
 window.addEventListener('appinstalled', () => {
   showToast('🎉 Music Sync installed!', 'success');
-  const banner = document.getElementById('installBanner');
-  if (banner) banner.remove();
+  dismissInstallBanner();
 });
 
 /* ===== PWA SERVICE WORKER ===== */
