@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#08080C" />
+<title>Admin Dashboard — Music Sync</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --bg:#08080C;
+  --surface:#16161F;
+  --surface-2:#1F1F2E;
+  --border:rgba(255,255,255,0.07);
+  --primary:#8B5CF6;
+  --primary-2:#A78BFA;
+  --accent:#EC4899;
+  --primary-glow:rgba(139,92,246,0.4);
+  --success:#10B981;
+  --warning:#F59E0B;
+  --danger:#EF4444;
+  --text:#FAFAFC;
+  --text-dim:#A8A8B3;
+  --muted:#5E5E6B;
+  --spring:cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease:cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body {
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  min-height:100dvh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+body::before {
+  content:"";
+  position:fixed;
+  inset:0;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(139,92,246,0.15) 0%, transparent 40%),
+    radial-gradient(circle at 90% 100%, rgba(236,72,153,0.12) 0%, transparent 40%);
+  pointer-events:none;
+  z-index:0;
+}
+
+/* Lucide base */
+[data-lucide] {
+  width:18px;
+  height:18px;
+  stroke-width:2;
+  transition:all 0.2s var(--ease);
+}
+
+.container {
+  max-width:1200px;
+  margin:0 auto;
+  position:relative;
+  z-index:1;
+  padding:16px;
+  padding-top:max(16px, env(safe-area-inset-top));
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
+}
+
+/* ============ LOGIN ============ */
+#loginScreen {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  min-height:100dvh;
+  padding:16px;
+  position:relative;
+  z-index:1;
+}
+.login-box {
+  background:rgba(22,22,32,0.85);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border:1px solid var(--border);
+  border-radius:24px;
+  padding:32px 24px;
+  max-width:400px;
+  width:100%;
+  text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,0.6);
+  animation:cardIn 0.6s var(--spring);
+}
+@keyframes cardIn {
+  from { opacity:0; transform:translateY(24px) scale(0.94); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.login-logo {
+  width:72px; height:72px;
+  margin:0 auto 20px;
+  border-radius:22px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 12px 32px var(--primary-glow);
+  position:relative;
+  animation:logoFloat 3.5s ease-in-out infinite;
+}
+.login-logo::before {
+  content:"";
+  position:absolute;
+  inset:-8px;
+  border-radius:28px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  opacity:0.35;
+  filter:blur(20px);
+  z-index:-1;
+}
+.login-logo [data-lucide] {
+  width:36px;
+  height:36px;
+  stroke-width:2.2;
+  color:white;
+}
+@keyframes logoFloat {
+  0%,100% { transform:translateY(0) rotate(0deg); }
+  50% { transform:translateY(-6px) rotate(-3deg); }
+}
+.login-box h1 {
+  font-size:26px;
+  font-weight:900;
+  margin-bottom:8px;
+  letter-spacing:-0.6px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.login-box p {
+  color:var(--text-dim);
+  font-size:13px;
+  margin-bottom:24px;
+}
+.login-box .input-wrap {
+  position:relative;
+  margin-bottom:12px;
+}
+.login-box input {
+  width:100%;
+  padding:15px 18px 15px 46px;
+  background:rgba(0,0,0,0.4);
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  color:var(--text);
+  font-size:15px;
+  font-weight:500;
+  outline:none;
+  font-family:inherit;
+  transition:all 0.25s var(--ease);
+}
+.login-box input:focus {
+  border-color:var(--primary);
+  background:rgba(0,0,0,0.6);
+  box-shadow:0 0 0 4px rgba(139,92,246,0.15);
+}
+.login-box input::placeholder { color:var(--muted); }
+.login-box .input-icon {
+  position:absolute;
+  left:16px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--muted);
+  pointer-events:none;
+  transition:color 0.2s;
+}
+.login-box input:focus ~ .input-icon { color:var(--primary-2); }
+.login-box button {
+  width:100%;
+  padding:15px;
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  border-radius:14px;
+  color:white;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 8px 24px var(--primary-glow);
+  transition:all 0.25s var(--spring);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  position:relative;
+  overflow:hidden;
+}
+.login-box button::before {
+  content:"";
+  position:absolute;
+  top:0; left:-100%;
+  width:100%; height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition:left 0.6s;
+}
+.login-box button:hover::before { left:100%; }
+.login-box button:hover {
+  transform:translateY(-2px);
+  box-shadow:0 12px 32px var(--primary-glow);
+}
+.login-box button:active { transform:scale(0.96); }
+.login-box button [data-lucide] {
+  width:16px;
+  height:16px;
+  stroke-width:2.5;
+}
+
+/* ============ DASHBOARD ============ */
+#dashboard { display:none; }
+#dashboard.active { display:block; animation:fadeIn 0.4s var(--ease); }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.header-title { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.header h1 {
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:-0.5px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.header h1 [data-lucide] {
+  width:22px;
+  height:22px;
+  stroke-width:2.4;
+  color:var(--primary-2);
+}
+.header h1 span {
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.header-sub {
+  font-size:11px;
+  color:var(--muted);
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.live-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 8px var(--success);
+  animation:pulse 1.5s infinite;
+  position:relative;
+}
+.live-dot::after {
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  border:1.5px solid var(--success);
+  opacity:0.5;
+  animation:ping 2s ease-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+@keyframes ping {
+  0% { transform:scale(1); opacity:0.6; }
+  100% { transform:scale(2.5); opacity:0; }
+}
+
+.header-actions { display:flex; gap:6px; flex-shrink:0; }
+.btn {
+  padding:9px 14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all 0.25s var(--spring);
+  white-space:nowrap;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.btn [data-lucide] {
+  width:15px;
+  height:15px;
+  stroke-width:2.4;
+}
+.btn:hover {
+  background:rgba(255,255,255,0.1);
+  transform:translateY(-2px);
+  border-color:rgba(255,255,255,0.15);
+}
+.btn:active { transform:scale(0.94); }
+.btn.primary {
+  background:linear-gradient(135deg, var(--primary), var(--accent));
+  border:none;
+  box-shadow:0 6px 16px var(--primary-glow);
+}
+.btn.danger {
+  background:rgba(239,68,68,0.15);
+  border-color:rgba(239,68,68,0.3);
+  color:var(--danger);
+}
+.btn.danger:hover {
+  background:rgba(239,68,68,0.25);
+  box-shadow:0 6px 16px rgba(239,68,68,0.3);
+}
+.btn .label { display:inline; }
+
+/* ============ STAT CARDS ============ */
+.stats-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:10px;
+  margin-bottom:16px;
+}
+.stat-card {
+  background:rgba(22,22,32,0.75);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  transition:all 0.35s var(--spring);
+  position:relative;
+  overflow:hidden;
+  animation:statIn 0.5s var(--spring) backwards;
+}
+.stat-card:nth-child(1) { animation-delay:0.05s; }
+.stat-card:nth-child(2) { animation-delay:0.1s; }
+.stat-card:nth-child(3) { animation-delay:0.15s; }
+.stat-card:nth-child(4) { animation-delay:0.2s; }
+.stat-card:nth-child(5) { animation-delay:0.25s; }
+.stat-card:nth-child(6) { animation-delay:0.3s; }
+.stat-card:nth-child(7) { animation-delay:0.35s; }
+.stat-card:nth-child(8) { animation-delay:0.4s; }
+@keyframes statIn {
+  from { opacity:0; transform:translateY(16px) scale(0.92); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.stat-card::before {
+  content:"";
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background:linear-gradient(90deg, var(--primary), var(--accent));
+  opacity:0;
+  transition:opacity 0.3s;
+}
+.stat-card:hover::before { opacity:1; }
+.stat-card:hover {
+  transform:translateY(-4px);
+  box-shadow:0 12px 32px rgba(0,0,0,0.4), 0 0 24px var(--primary-glow);
+  border-color:rgba(139,92,246,0.3);
+}
+.stat-label {
+  font-size:10px;
+  font-weight:700;
+  color:var(--text-dim);
+  text-transform:uppercase;
+  letter-spacing:0.8px;
+  margin-bottom:6px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.stat-label [data-lucide] {
+  width:11px;
+  height:11px;
+  stroke-width:2.5;
+  color:var(--primary-2);
+}
+.stat-value {
+  font-size:24px;
+  font-weight:900;
+  letter-spacing:-0.8px;
+  line-height:1;
+  background:linear-gradient(135deg, #fff, var(--primary-2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.stat-value.live::after {
+  content:"";
+  display:inline-block;
+  width:7px; height:7px;
+  background:var(--success);
+  border-radius:50%;
+  margin-left:6px;
+  vertical-align:middle;
+  animation:pulse 1.5s infinite;
+  box-shadow:0 0 10px var(--success);
+}
+.stat-value.danger {
+  background:linear-gradient(135deg, #fff, var(--danger));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* ============ SECTION ============ */
+.section {
+  background:rgba(22,22,32,0.75);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:14px;
+  animation:sectionIn 0.5s var(--spring) backwards;
+  animation-delay:0.4s;
+}
+@keyframes sectionIn {
+  from { opacity:0; transform:translateY(16px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.section h2 {
+  font-size:14px;
+  font-weight:800;
+  margin-bottom:14px;
+  letter-spacing:-0.2px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.section h2 [data-lucide] {
+  width:16px;
+  height:16px;
+  stroke-width:2.4;
+  color:var(--primary-2);
+}
+.badge-count {
+  font-size:10px;
+  font-weight:700;
+  background:rgba(139,92,246,0.15);
+  color:var(--primary-2);
+  padding:3px 8px;
+  border-radius:8px;
+  letter-spacing:0.3px;
+}
+
+/* ============ CHART ============ */
+.chart-wrap {
+  overflow-x:auto;
+  margin:0 -4px;
+  padding:0 4px 4px;
+}
+.chart {
+  display:flex;
+  align-items:flex-end;
+  gap:3px;
+  height:120px;
+  padding:8px 0;
+  border-bottom:1px solid var(--border);
+  min-width:100%;
+}
+.chart-bar {
+  flex:1;
+  min-width:8px;
+  background:linear-gradient(180deg, var(--primary), var(--accent));
+  border-radius:3px 3px 0 0;
+  min-height:3px;
+  position:relative;
+  transition:all 0.3s var(--ease);
+  cursor:pointer;
+  animation:barGrow 0.7s var(--spring) backwards;
+  transform-origin:bottom;
+}
+@keyframes barGrow {
+  from { transform:scaleY(0); opacity:0; }
+  to { transform:scaleY(1); opacity:1; }
+}
+.chart-bar:hover {
+  filter:brightness(1.3);
+  transform:scaleY(1.05);
+}
+.chart-bar::after {
+  content:attr(data-value);
+  position:absolute;
+  bottom:100%;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:10px;
+  font-weight:700;
+  background:var(--surface-2);
+  padding:3px 6px;
+  border-radius:6px;
+  margin-bottom:4px;
+  opacity:0;
+  transition:opacity 0.2s;
+  white-space:nowrap;
+  pointer-events:none;
+  border:1px solid var(--border);
+  color:var(--text);
+}
+.chart-bar:hover::after { opacity:1; }
+.chart-labels {
+  display:flex;
+  gap:3px;
+  font-size:9px;
+  color:var(--muted);
+  font-weight:600;
+  padding-top:6px;
+}
+.chart-labels span {
+  flex:1;
+  min-width:8px;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+}
+
+/* ============ TABLE ============ */
+.table-wrap {
+  overflow-x:auto;
+  margin:0 -16px;
+  padding:0 16px;
+}
+.table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+  min-width:500px;
+}
+.table th {
+  text-align:left;
+  padding:9px 8px;
+  font-size:10px;
+  font-weight:700;
+  color:var(--text-dim);
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.table td {
+  padding:10px 8px;
+  border-bottom:1px solid var(--border);
+  color:var(--text);
+  font-weight:500;
+  white-space:nowrap;
+}
+.table tr:last-child td { border-bottom:none; }
+.table tr {
+  transition:background 0.2s;
+}
+.table tr:hover td {
+  background:rgba(255,255,255,0.02);
+}
+
+.pill {
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:8px;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+}
+.pill.owner { background:rgba(139,92,246,0.15); color:var(--primary-2); }
+.pill.member { background:rgba(16,185,129,0.15); color:var(--success); }
+.pill.active { background:rgba(16,185,129,0.15); color:var(--success); }
+.pill.paused { background:rgba(245,158,11,0.15); color:var(--warning); }
+.pill.mobile { background:rgba(236,72,153,0.15); color:var(--accent); }
+.pill.desktop { background:rgba(59,130,246,0.15); color:#60A5FA; }
+
+/* ============ ROOM CARDS ============ */
+.rooms-list {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.room-card {
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  transition:all 0.3s var(--ease);
+  animation:roomIn 0.45s var(--spring) backwards;
+}
+@keyframes roomIn {
+  from { opacity:0; transform:translateY(12px) scale(0.96); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.room-card:hover {
+  border-color:rgba(139,92,246,0.4);
+  background:rgba(255,255,255,0.05);
+  transform:translateY(-2px);
+  box-shadow:0 12px 32px rgba(0,0,0,0.4), 0 0 20px var(--primary-glow);
+}
+.room-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.room-id-wrap { min-width:0; flex:1; }
+.room-id {
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:-0.2px;
+  color:var(--text);
+  word-break:break-all;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.room-id [data-lucide] {
+  width:14px;
+  height:14px;
+  color:var(--primary-2);
+  flex-shrink:0;
+}
+.room-owner {
+  font-size:11px;
+  color:var(--text-dim);
+  margin-top:4px;
+  font-weight:500;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.room-owner [data-lucide] {
+  width:12px;
+  height:12px;
+  stroke-width:2.4;
+  color:var(--warning);
+  flex-shrink:0;
+}
+.room-actions {
+  display:flex;
+  gap:6px;
+  flex-shrink:0;
+}
+.room-info {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.room-stat {
+  background:rgba(0,0,0,0.2);
+  border-radius:10px;
+  padding:8px 10px;
+  text-align:center;
+  transition:all 0.25s var(--ease);
+}
+.room-stat:hover {
+  background:rgba(139,92,246,0.1);
+}
+.room-stat-label {
+  font-size:9px;
+  color:var(--muted);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  margin-bottom:3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+.room-stat-label [data-lucide] {
+  width:10px;
+  height:10px;
+  stroke-width:2.5;
+}
+.room-stat-value {
+  font-size:14px;
+  font-weight:800;
+  color:var(--text);
+  letter-spacing:-0.3px;
+}
+.room-track {
+  margin-top:10px;
+  padding:8px 10px;
+  background:rgba(139,92,246,0.08);
+  border-radius:10px;
+  border:1px solid rgba(139,92,246,0.15);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+  font-weight:600;
+}
+.room-track-icon {
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+}
+.room-track-icon [data-lucide] {
+  width:14px;
+  height:14px;
+  color:var(--primary-2);
+}
+.room-track-text {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  flex:1;
+  min-width:0;
+}
+.room-track-playing {
+  font-size:10px;
+  color:var(--success);
+  font-weight:700;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  gap:3px;
+}
+.room-track-playing [data-lucide] {
+  width:10px;
+  height:10px;
+  fill:currentColor;
+  animation:pulse 1.5s infinite;
+}
+.room-track-paused {
+  font-size:10px;
+  color:var(--warning);
+  font-weight:700;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  gap:3px;
+}
+.room-track-paused [data-lucide] {
+  width:10px;
+  height:10px;
+  fill:currentColor;
+}
+.room-users {
+  font-size:11px;
+  color:var(--text-dim);
+  margin-top:10px;
+  font-weight:500;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.room-users [data-lucide] {
+  width:12px;
+  height:12px;
+  stroke-width:2.4;
+}
+
+/* ============ DATA CARD (mobile) ============ */
+.card-list {
+  display:none;
+  flex-direction:column;
+  gap:8px;
+}
+.data-card {
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  animation:userIn 0.4s var(--spring) backwards;
+  transition:all 0.25s var(--ease);
+}
+.data-card:hover {
+  background:rgba(255,255,255,0.05);
+  border-color:rgba(139,92,246,0.3);
+  transform:translateY(-2px);
+}
+@keyframes userIn {
+  from { opacity:0; transform:translateY(10px) scale(0.96); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+.data-card-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+.data-card-label {
+  color:var(--text-dim);
+  font-weight:600;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  flex-shrink:0;
+}
+.data-card-value {
+  color:var(--text);
+  font-weight:700;
+  text-align:right;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  min-width:0;
+}
+.data-card-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:4px;
+  gap:8px;
+}
+.data-card-name {
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:-0.2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* ============ EMPTY ============ */
+.empty {
+  text-align:center;
+  color:var(--muted);
+  padding:30px 20px;
+  font-size:12px;
+  font-weight:500;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+.empty-icon {
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  background:rgba(139,92,246,0.1);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  animation:emptyFloat 3s ease-in-out infinite;
+}
+.empty-icon [data-lucide] {
+  width:22px;
+  height:22px;
+  stroke-width:2;
+  color:var(--muted);
+}
+@keyframes emptyFloat {
+  0%,100% { transform:translateY(0); }
+  50% { transform:translateY(-6px); }
+}
+
+/* ============ TOAST ============ */
+.toast {
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%) translateY(30px) scale(0.9);
+  background:rgba(22,22,32,0.95);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  color:var(--text);
+  padding:12px 18px;
+  border-radius:100px;
+  font-size:12px;
+  font-weight:700;
+  opacity:0;
+  transition:all 0.35s var(--spring);
+  z-index:1000;
+  pointer-events:none;
+  border:1px solid var(--border);
+  max-width:88vw;
+  text-align:center;
+  box-shadow:0 12px 32px rgba(0,0,0,0.6);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.toast [data-lucide] {
+  width:14px;
+  height:14px;
+  stroke-width:2.5;
+  flex-shrink:0;
+}
+.toast.show {
+  opacity:1;
+  transform:translateX(-50%) translateY(0) scale(1);
+}
+.toast.success { border-color:rgba(16,185,129,0.4); }
+.toast.success [data-lucide] { color:var(--success); }
+.toast.error { border-color:rgba(239,68,68,0.4); }
+.toast.error [data-lucide] { color:var(--danger); }
+
+/* ============ MODAL ============ */
+.modal {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.8);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  z-index:900;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.modal.active { display:flex; animation:fadeIn 0.25s var(--ease); }
+.modal-box {
+  background:var(--surface);
+  border-radius:22px;
+  padding:24px;
+  max-width:380px;
+  width:100%;
+  border:1px solid var(--border);
+  box-shadow:0 24px 60px rgba(0,0,0,0.7);
+  animation:modalIn 0.4s var(--spring);
+}
+@keyframes modalIn {
+  from { transform:translateY(24px) scale(0.92); opacity:0; }
+  to { transform:translateY(0) scale(1); opacity:1; }
+}
+.modal-box h3 {
+  font-size:17px;
+  font-weight:800;
+  margin-bottom:10px;
+  letter-spacing:-0.3px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.modal-box h3 [data-lucide] {
+  width:20px;
+  height:20px;
+  stroke-width:2.4;
+  color:var(--danger);
+}
+.modal-box p {
+  color:var(--text-dim);
+  font-size:13px;
+  margin-bottom:20px;
+  line-height:1.6;
+}
+.modal-box p strong { color:var(--text); }
+.modal-actions { display:flex; gap:8px; }
+.modal-actions button {
+  flex:1;
+  padding:13px;
+  border-radius:12px;
+  border:none;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all 0.2s var(--spring);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.modal-actions button [data-lucide] {
+  width:15px;
+  height:15px;
+  stroke-width:2.5;
+}
+.modal-actions button:active { transform:scale(0.94); }
+.btn-cancel {
+  background:rgba(255,255,255,0.06);
+  color:var(--text);
+  border:1px solid var(--border);
+}
+.btn-cancel:hover { background:rgba(255,255,255,0.1); }
+.btn-confirm {
+  background:linear-gradient(135deg, var(--danger), #DC2626);
+  color:white;
+  box-shadow:0 8px 20px rgba(239,68,68,0.4);
+}
+.btn-confirm:hover {
+  transform:translateY(-2px);
+  box-shadow:0 12px 28px rgba(239,68,68,0.5);
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+  .container { padding:18px 12px; }
+  .header h1 { font-size:18px; }
+  .header h1 [data-lucide] { width:18px; height:18px; }
+  .stat-card { padding:12px; }
+  .stat-value { font-size:20px; }
+  .stats-grid { grid-template-columns:repeat(2, 1fr); gap:8px; }
+  .section { padding:12px; }
+  .section h2 { font-size:13px; margin-bottom:12px; }
+  .chart { height:100px; }
+  .table-wrap { display:none; }
+  .card-list { display:flex; }
+}
+
+@media (max-width: 480px) {
+  .header { flex-direction:column; align-items:flex-start; gap:19px; }
+  .header-actions { width:100%; }
+  .header-actions .btn { flex:1; justify-content:center; }
+  .stats-grid { grid-template-columns:repeat(2, 1fr); }
+  .stat-label { font-size:9px; }
+  .stat-value { font-size:18px; }
+  .chart { height:80px; gap:2px; }
+  .chart-bar { min-width:6px; }
+  .chart-labels span { font-size:8px; }
+  .login-box { padding:24px 20px; }
+  .login-box h1 { font-size:22px; }
+  .room-info { grid-template-columns:repeat(2, 1fr); }
+}
+
+@media (max-width: 360px) {
+  .stats-grid { gap:6px; }
+  .stat-card { padding:10px; }
+  .stat-value { font-size:16px; }
+  .header-actions .btn .label { display:none; }
+  .header-actions .btn { padding:9px 12px; }
+}
+
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb {
+  background:rgba(255,255,255,0.1);
+  border-radius:3px;
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <i data-lucide="shield-check"></i>
+    </div>
+    <h1>Admin Panel</h1>
+    <p>Music Sync — Owner access only</p>
+    <div class="input-wrap">
+      <input type="password" id="adminPass" placeholder="Enter password" autocomplete="off" />
+      <span class="input-icon"><i data-lucide="lock"></i></span>
+    </div>
+    <button onclick="login()">
+      <i data-lucide="log-in"></i>
+      <span>Sign In</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard" class="container">
+  <div class="header">
+    <div class="header-title">
+      <h1>
+        <i data-lucide="bar-chart-3"></i>
+        <span>Admin Dashboard</span>
+      </h1>
+      <div class="header-sub">
+        <span class="live-dot"></span>
+        <span id="lastUpdate">Auto-refresh: ON</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="loadStats()">
+        <i data-lucide="refresh-cw"></i>
+        <span class="label">Refresh</span>
+      </button>
+      <button class="btn" onclick="logout()">
+        <i data-lucide="log-out"></i>
+        <span class="label">Logout</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="calendar"></i>Today's Visits</div>
+      <div class="stat-value" id="todayVisits">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="trending-up"></i>Total Visits</div>
+      <div class="stat-value" id="totalVisits">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="user-check"></i>Unique Users</div>
+      <div class="stat-value" id="uniqueUsers">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="zap"></i>Active Now</div>
+      <div class="stat-value live" id="activeNow">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="home"></i>Active Rooms</div>
+      <div class="stat-value" id="activeRooms">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="plus-circle"></i>Rooms Created</div>
+      <div class="stat-value" id="roomsCreated">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="trash-2"></i>Rooms Deleted</div>
+      <div class="stat-value danger" id="roomsDeleted">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i data-lucide="music"></i>Songs Played</div>
+      <div class="stat-value" id="songsPlayed">0</div>
+    </div>
+  </div>
+
+  <!-- ACTIVE ROOMS -->
+  <div class="section">
+    <h2>
+      <i data-lucide="home"></i>
+      Active Rooms
+      <span class="badge-count" id="roomsCount">0</span>
+    </h2>
+    <div class="rooms-list" id="roomsList"></div>
+  </div>
+
+  <!-- WEEK CHART -->
+  <div class="section">
+    <h2><i data-lucide="trending-up"></i>Last 7 Days</h2>
+    <div class="chart-wrap">
+      <div class="chart" id="weekChart"></div>
+      <div class="chart-labels" id="weekLabels"></div>
+    </div>
+  </div>
+
+  <!-- HOUR CHART -->
+  <div class="section">
+    <h2><i data-lucide="clock"></i>Today's 24 Hours</h2>
+    <div class="chart-wrap">
+      <div class="chart" id="hourChart"></div>
+      <div class="chart-labels" id="hourLabels"></div>
+    </div>
+  </div>
+
+  <!-- ACTIVE SESSIONS -->
+  <div class="section">
+    <h2>
+      <i data-lucide="users"></i>
+      Active Sessions
+      <span class="badge-count" id="activeCount">0</span>
+    </h2>
+    <div class="table-wrap" id="activeTableWrap"></div>
+    <div class="card-list" id="activeCardList"></div>
+  </div>
+
+  <!-- RECENT VISITS -->
+  <div class="section">
+    <h2>
+      <i data-lucide="history"></i>
+      Recent Visits
+      <span class="badge-count">Last 30</span>
+    </h2>
+    <div class="table-wrap" id="recentTableWrap"></div>
+    <div class="card-list" id="recentCardList"></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" class="modal">
+  <div class="modal-box">
+    <h3>
+      <i data-lucide="alert-triangle"></i>
+      Confirm Action
+    </h3>
+    <p id="confirmText">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">
+        <i data-lucide="x"></i>
+        <span>Cancel</span>
+      </button>
+      <button class="btn-confirm" id="confirmBtn">
+        <i data-lucide="trash-2"></i>
+        <span>Delete</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <i data-lucide="check-circle"></i>
+  <span id="toastText"></span>
+</div>
+
+<script>
+let adminPassword = '';
+let refreshInterval = null;
+let confirmAction = null;
+
+/* ============ ICON REFRESH ============ */
+function refreshIcons() {
+  if (window.lucide) lucide.createIcons();
+}
+
+/* ============ LOGIN ============ */
+function login() {
+  const pass = document.getElementById('adminPass').value.trim();
+  if (!pass) { alert('Please enter password'); return; }
+
+  fetch('/api/admin/stats?password=' + encodeURIComponent(pass))
+    .then(r => {
+      if (r.status === 401) { alert('Invalid password'); throw new Error('unauth'); }
+      return r.json();
+    })
+    .then(data => {
+      adminPassword = pass;
+      localStorage.setItem('adminPass', pass);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboard').classList.add('active');
+      renderStats(data);
+      updateLastUpdate();
+      refreshIcons();
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(loadStats, 10000);
+    })
+    .catch(() => {});
+}
+
+function logout() {
+  localStorage.removeItem('adminPass');
+  if (refreshInterval) clearInterval(refreshInterval);
+  window.location.href = '/';
+}
+
+function loadStats() {
+  if (!adminPassword) return;
+  fetch('/api/admin/stats?password=' + encodeURIComponent(adminPassword))
+    .then(r => {
+      if (r.status === 401) { logout(); throw new Error('unauth'); }
+      return r.json();
+    })
+    .then(data => {
+      renderStats(data);
+      updateLastUpdate();
+    })
+    .catch(() => {});
+}
+
+function updateLastUpdate() {
+  const el = document.getElementById('lastUpdate');
+  const t = new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  el.textContent = 'Updated: ' + t;
+}
+
+/* ============ RENDER ============ */
+function renderStats(data) {
+  document.getElementById('todayVisits').textContent = data.todayVisits;
+  document.getElementById('totalVisits').textContent = data.totalVisits;
+  document.getElementById('uniqueUsers').textContent = data.uniqueUsers;
+  document.getElementById('activeNow').textContent = data.activeNow;
+  document.getElementById('activeRooms').textContent = data.activeRooms;
+  document.getElementById('roomsCreated').textContent = data.roomsCreated;
+  document.getElementById('roomsDeleted').textContent = data.roomsDeleted;
+  document.getElementById('songsPlayed').textContent = data.songsPlayed;
+  document.getElementById('activeCount').textContent = data.activeNow;
+  document.getElementById('roomsCount').textContent = data.activeRooms;
+
+  renderWeekChart(data.last7Days);
+  renderHourChart(data.hourly);
+  renderRooms(data.roomsList);
+  renderActiveSessions(data.activeSessions);
+  renderRecentVisits(data.recentVisits);
+  refreshIcons();
+}
+
+function renderWeekChart(days) {
+  const chart = document.getElementById('weekChart');
+  const labels = document.getElementById('weekLabels');
+  const max = Math.max(...days.map(d => d.count), 1);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  chart.innerHTML = days.map((d, i) => {
+    const h = Math.max(3, (d.count / max) * 100);
+    return `<div class="chart-bar" style="height:${h}%;animation-delay:${i*40}ms" data-value="${d.count}"></div>`;
+  }).join('');
+
+  labels.innerHTML = days.map(d => {
+    const date = new Date(d.date);
+    return `<span>${dayNames[date.getDay()]}</span>`;
+  }).join('');
+}
+
+function renderHourChart(hours) {
+  const chart = document.getElementById('hourChart');
+  const labels = document.getElementById('hourLabels');
+  const max = Math.max(...hours.map(h => h.count), 1);
+
+  chart.innerHTML = hours.map((h, i) => {
+    const height = Math.max(3, (h.count / max) * 100);
+    return `<div class="chart-bar" style="height:${height}%;animation-delay:${i*20}ms" data-value="${h.count}"></div>`;
+  }).join('');
+
+  labels.innerHTML = hours.map((h, i) => {
+    if (i % 3 === 0) {
+      const label = h.hour === 0 ? '12a' : h.hour < 12 ? h.hour + 'a' : h.hour === 12 ? '12p' : (h.hour - 12) + 'p';
+      return `<span>${label}</span>`;
+    }
+    return `<span></span>`;
+  }).join('');
+}
+
+/* ============ ROOMS ============ */
+function renderRooms(roomsList) {
+  const container = document.getElementById('roomsList');
+
+  if (!roomsList || roomsList.length === 0) {
+    container.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon"><i data-lucide="home"></i></div>
+        <div>No active rooms right now</div>
+      </div>`;
+    refreshIcons();
+    return;
+  }
+
+  roomsList.sort((a, b) => b.userCount - a.userCount);
+
+  container.innerHTML = roomsList.map((r, i) => {
+    const ageStr = r.age < 1 ? 'Just now' :
+                   r.age < 60 ? r.age + ' min ago' :
+                   Math.floor(r.age/60) + 'h ' + (r.age%60) + 'm ago';
+    const trackHtml = r.currentTrack ? `
+      <div class="room-track">
+        <span class="room-track-icon"><i data-lucide="music"></i></span>
+        <span class="room-track-text">${esc(r.currentTrack.title)} — ${esc(r.currentTrack.artist)}</span>
+        <span class="${r.isPlaying ? 'room-track-playing' : 'room-track-paused'}">
+          <i data-lucide="${r.isPlaying ? 'play' : 'pause'}"></i>
+          ${r.isPlaying ? 'PLAYING' : 'PAUSED'}
+        </span>
+      </div>
+    ` : '';
+    const usersPreview = r.users.map(u => esc(u.name)).join(', ');
+
+    return `
+      <div class="room-card" style="animation-delay:${i*60}ms">
+        <div class="room-head">
+          <div class="room-id-wrap">
+            <div class="room-id"><i data-lucide="hash"></i>${esc(r.roomId)}</div>
+            <div class="room-owner">
+              <i data-lucide="crown"></i>
+              Owner: <strong>${esc(r.ownerName)}</strong> · Created ${ageStr}
+            </div>
+          </div>
+          <div class="room-actions">
+            <button class="btn danger" onclick="confirmDeleteRoom('${esc(r.roomId)}', '${esc(r.ownerName)}')">
+              <i data-lucide="trash-2"></i>
+              <span>Delete</span>
+            </button>
+          </div>
+        </div>
+        <div class="room-info">
+          <div class="room-stat">
+            <div class="room-stat-label"><i data-lucide="users"></i>Users</div>
+            <div class="room-stat-value">${r.userCount}</div>
+          </div>
+          <div class="room-stat">
+            <div class="room-stat-label"><i data-lucide="clock"></i>Pending</div>
+            <div class="room-stat-value">${r.pendingCount}</div>
+          </div>
+          <div class="room-stat">
+            <div class="room-stat-label"><i data-lucide="message-circle"></i>Messages</div>
+            <div class="room-stat-value">${r.messageCount}</div>
+          </div>
+        </div>
+        ${trackHtml}
+        ${usersPreview ? `<div class="room-users"><i data-lucide="users"></i>${usersPreview}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  refreshIcons();
+}
+
+function confirmDeleteRoom(roomId, ownerName) {
+  document.getElementById('confirmText').innerHTML =
+    `Delete room <strong>${esc(roomId)}</strong>?<br><br>
+    Owner: <strong>${esc(ownerName)}</strong><br>
+    All users will be disconnected. This cannot be undone.`;
+  confirmAction = () => deleteRoom(roomId);
+  document.getElementById('confirmModal').classList.add('active');
+  refreshIcons();
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('active');
+  confirmAction = null;
+}
+
+document.getElementById('confirmBtn').addEventListener('click', () => {
+  if (confirmAction) confirmAction();
+  closeConfirm();
+});
+
+async function deleteRoom(roomId) {
+  try {
+    const res = await fetch('/api/admin/deleteRoom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: adminPassword, roomId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Room deleted successfully', 'success');
+      loadStats();
+    } else {
+      showToast(data.error || 'Failed to delete', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+/* ============ ACTIVE SESSIONS ============ */
+function renderActiveSessions(sessions) {
+  const tableWrap = document.getElementById('activeTableWrap');
+  const cardList = document.getElementById('activeCardList');
+
+  if (!sessions || sessions.length === 0) {
+    const emptyHtml = `
+      <div class="empty">
+        <div class="empty-icon"><i data-lucide="moon"></i></div>
+        <div>No users online right now</div>
+      </div>`;
+    tableWrap.innerHTML = emptyHtml;
+    cardList.innerHTML = emptyHtml;
+    refreshIcons();
+    return;
+  }
+
+  tableWrap.innerHTML = `
+    <table class="table">
+      <thead><tr><th>Name</th><th>Room</th><th>Role</th><th>Duration</th></tr></thead>
+      <tbody>
+        ${sessions.map(s => {
+          const min = Math.floor((Date.now() - s.joinedAt) / 60000);
+          const dur = min < 1 ? 'Just now' : min + ' min';
+          return `<tr>
+            <td><strong>${esc(s.name)}</strong></td>
+            <td>${esc(s.roomId)}</td>
+            <td><span class="pill ${s.role}">${s.role.toUpperCase()}</span></td>
+            <td>${dur}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  cardList.innerHTML = sessions.map((s, i) => {
+    const min = Math.floor((Date.now() - s.joinedAt) / 60000);
+    const dur = min < 1 ? 'Just now' : min + ' min ago';
+    return `
+      <div class="data-card" style="animation-delay:${i*60}ms">
+        <div class="data-card-head">
+          <div class="data-card-name">${esc(s.name)}</div>
+          <span class="pill ${s.role}">${s.role.toUpperCase()}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Room</span>
+          <span class="data-card-value">${esc(s.roomId)}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Duration</span>
+          <span class="data-card-value">${dur}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  refreshIcons();
+}
+
+/* ============ RECENT VISITS ============ */
+function renderRecentVisits(visits) {
+  const tableWrap = document.getElementById('recentTableWrap');
+  const cardList = document.getElementById('recentCardList');
+
+  if (!visits || visits.length === 0) {
+    const emptyHtml = `
+      <div class="empty">
+        <div class="empty-icon"><i data-lucide="inbox"></i></div>
+        <div>No visits yet</div>
+      </div>`;
+    tableWrap.innerHTML = emptyHtml;
+    cardList.innerHTML = emptyHtml;
+    refreshIcons();
+    return;
+  }
+
+  tableWrap.innerHTML = `
+    <table class="table">
+      <thead><tr><th>Time</th><th>Name</th><th>Room</th><th>Device</th></tr></thead>
+      <tbody>
+        ${visits.map(v => {
+          const time = new Date(v.time).toLocaleString('en-IN', {
+            day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
+          });
+          const isMobile = /mobile|android|iphone|ipad/i.test(v.userAgent || '');
+          const device = isMobile ? 'Mobile' : 'Desktop';
+          const deviceClass = isMobile ? 'mobile' : 'desktop';
+          return `<tr>
+            <td>${time}</td>
+            <td><strong>${esc(v.name)}</strong></td>
+            <td>${esc(v.roomId)}</td>
+            <td><span class="pill ${deviceClass}">${device}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  cardList.innerHTML = visits.map((v, i) => {
+    const time = new Date(v.time).toLocaleString('en-IN', {
+      day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
+    });
+    const isMobile = /mobile|android|iphone|ipad/i.test(v.userAgent || '');
+    const device = isMobile ? 'Mobile' : 'Desktop';
+    const deviceClass = isMobile ? 'mobile' : 'desktop';
+    return `
+      <div class="data-card" style="animation-delay:${i*40}ms">
+        <div class="data-card-head">
+          <div class="data-card-name">${esc(v.name)}</div>
+          <span class="pill ${deviceClass}">${device}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Room</span>
+          <span class="data-card-value">${esc(v.roomId)}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Time</span>
+          <span class="data-card-value">${time}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  refreshIcons();
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+/* ============ TOAST ============ */
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  const txt = document.getElementById('toastText');
+  const icon = t.querySelector('[data-lucide]');
+  txt.textContent = msg;
+  if (icon) {
+    icon.setAttribute('data-lucide', type === 'error' ? 'x-circle' : 'check-circle');
+  }
+  t.className = 'toast show ' + (type || '');
+  refreshIcons();
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => {
+    t.classList.remove('show');
+  }, 2500);
+}
+
+/* ============ AUTO LOGIN ============ */
+window.addEventListener('load', () => {
+  refreshIcons();
+  const saved = localStorage.getItem('adminPass');
+  if (saved) {
+    document.getElementById('adminPass').value = saved;
+    login();
+  }
+});
+
+document.getElementById('adminPass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>
