@@ -262,7 +262,6 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ===== LOCATION SHARE =====
   socket.on('shareLocation', ({ roomId, location }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -273,7 +272,6 @@ io.on('connection', (socket) => {
     console.log(`📍 Location shared in ${roomId} by ${socket.userName}`);
   });
 
-  // ===== CHAT PRESENCE =====
   socket.on('chatPresence', ({ roomId, active }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -293,7 +291,6 @@ io.on('connection', (socket) => {
     console.log(`💬 Chat presence: ${user.name} is ${active ? 'IN' : 'OUT'}`);
   });
 
-  // ===== TYPING =====
   socket.on('typing', ({ roomId, isTyping }) => {
     const room = rooms[roomId];
     if (!room) return;
