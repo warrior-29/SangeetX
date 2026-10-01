@@ -3670,8 +3670,15 @@ window.addEventListener('appinstalled', () => {
 
 /* ===== PWA SERVICE WORKER ===== */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then((reg) => console.log('SW registered:', reg.scope))
+  navigator.serviceWorker.register('/sw.js?v=2')
+    .then((reg) => {
+      console.log('SW registered:', reg.scope);
+      
+      // Update check karo
+      reg.addEventListener('updatefound', () => {
+        console.log('🔄 SW update found');
+      });
+    })
     .catch((err) => console.log('SW failed:', err));
 }
 
