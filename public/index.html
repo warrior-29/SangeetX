@@ -532,14 +532,26 @@ input:checked + .slider:before { transform:translateX(16px); }
   border-color:rgba(139,92,246,0.3);
 }
 
+/* ===== TYPING INDICATOR — FIXED ===== */
 .typing-indicator {
-  padding:6px 14px 8px; display:flex; align-items:center; gap:8px;
-  font-size:11px; color:var(--text-dim); font-weight:600;
-  background:var(--surface); border-top:1px solid var(--border);
+  padding:6px 14px 8px;
+  display:none;
+  align-items:center;
+  gap:8px;
+  font-size:11px;
+  color:var(--text-dim);
+  font-weight:600;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  flex-shrink:0;         /* ✅ FIX: collapse nahi hoga */
+  min-height:28px;
   animation:typingIn 0.3s var(--ease);
 }
+.typing-indicator.show {
+  display:flex;          /* ✅ FIX: class-based show */
+}
 @keyframes typingIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-.typing-dots { display:flex; gap:3px; align-items:center; }
+.typing-dots { display:flex; gap:3px; align-items:center; flex-shrink:0; }
 .typing-dots span {
   width:5px; height:5px; border-radius:50%;
   background:var(--primary-2);
@@ -550,6 +562,12 @@ input:checked + .slider:before { transform:translateX(16px); }
 @keyframes typingBounce {
   0%,60%,100% { transform:translateY(0); opacity:0.4; }
   30% { transform:translateY(-4px); opacity:1; }
+}
+#typingText {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  min-width:0;
 }
 
 .chat-messages {
@@ -917,7 +935,7 @@ input:checked + .slider:before { transform:translateX(16px); }
     <p class="chat-empty">No messages yet</p>
   </div>
 
-  <div class="typing-indicator" id="typingIndicator" style="display:none;">
+  <div class="typing-indicator" id="typingIndicator">
     <div class="typing-dots"><span></span><span></span><span></span></div>
     <span id="typingText">Someone is typing...</span>
   </div>
@@ -995,8 +1013,15 @@ let locationShared = false;
 let isOnline = navigator.onLine;
 let messageQueue = [];
 
-let typingTimer = null;
+/* ✅ TYPING — Map based */
+const typingUsers = new Map();  // userName -> timeoutId
 let isTyping = false;
+let typingTimer = null;
+
+/* ✅ PERFECT NEGOTIATION FLAGS */
+let makingOffer = false;
+let ignoreOffer = false;
+let isSettingRemoteAnswerPending = false;
 
 let audioContext = null;
 let analyser = null;
@@ -1155,7 +1180,6 @@ function getSavedSession(){
     const data=localStorage.getItem('musicSyncSession');
     if(!data)return null;
     const session=JSON.parse(data);
-    // ✅ 24 hours wapas
     if(Date.now()-session.savedAt>24*60*60*1000){
       localStorage.removeItem('musicSyncSession');
       return null;
@@ -1482,8 +1506,6 @@ function initSocket(){
 
   socket.on('pttState',({userName:fromName,isTalking:talk})=>{
     if(talk){
-      showToast(`${fromName} is speaking...`);
-      // ✅ Full duplex — music volume sirf thoda kam
       if(!audio.paused)audio.volume=0.4;
     }else audio.volume=1;
   });
@@ -1512,7 +1534,9 @@ function initSocket(){
     renderChatPresence(users);
   });
 
+  /* ✅ TYPING — improved handler */
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{
+    console.log(`⌨️ ${typer} ${typingNow ? 'is' : 'stopped'} typing`);
     updateTypingIndicator(typer,typingNow);
   });
 }
@@ -1647,13 +1671,14 @@ document.getElementById('closeChat').addEventListener('click',()=>{
 
   if(socket&&socket.connected){
     socket.emit('chatPresence',{roomId,active:false});
-    socket.emit('typing',{roomId,isTyping:false});
+    socket.emit('typing',{roomId,isTyping:false,userName});
   }
 
   clearTimeout(typingTimer);
   isTyping=false;
+  typingUsers.forEach(t=>clearTimeout(t));
   typingUsers.clear();
-  document.getElementById('typingIndicator').style.display='none';
+  renderTypingIndicator();
 });
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
@@ -1664,20 +1689,23 @@ document.getElementById('chatInput').addEventListener('keydown',(e)=>{
     sendChat();
     clearTimeout(typingTimer);
     isTyping=false;
-    if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false});
+    if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
   }
 });
 
+/* ✅ TYPING — send events */
 document.getElementById('chatInput').addEventListener('input',(e)=>{
   if(!socket||!socket.connected)return;
   if(!isTyping){
     isTyping=true;
-    socket.emit('typing',{roomId,isTyping:true});
+    socket.emit('typing',{roomId,isTyping:true,userName});
+    console.log('📤 Started typing');
   }
   clearTimeout(typingTimer);
   typingTimer=setTimeout(()=>{
     isTyping=false;
-    socket.emit('typing',{roomId,isTyping:false});
+    socket.emit('typing',{roomId,isTyping:false,userName});
+    console.log('📤 Stopped typing (timeout)');
   },1500);
 });
 
@@ -1689,7 +1717,7 @@ function sendChat(){
 
   clearTimeout(typingTimer);
   isTyping=false;
-  if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false});
+  if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
 
   if(!isOnline||!socket||!socket.connected){
     messageQueue.push({text,time:Date.now(),roomId});
@@ -1759,37 +1787,48 @@ function renderChatPresence(users){
   `).join('');
 }
 
-const typingUsers=new Set();
-let typingClearTimer=null;
-
+/* ✅ TYPING — Map-based update (FIXED) */
 function updateTypingIndicator(userName,isTypingNow){
-  if(isTypingNow)typingUsers.add(userName);
-  else typingUsers.delete(userName);
+  if(isTypingNow){
+    if(typingUsers.has(userName)){
+      clearTimeout(typingUsers.get(userName));
+    }
+    const timer = setTimeout(() => {
+      typingUsers.delete(userName);
+      renderTypingIndicator();
+    }, 4000);
+    typingUsers.set(userName, timer);
+  } else {
+    if(typingUsers.has(userName)){
+      clearTimeout(typingUsers.get(userName));
+      typingUsers.delete(userName);
+    }
+  }
+  renderTypingIndicator();
+}
 
+function renderTypingIndicator(){
   const indicator=document.getElementById('typingIndicator');
   const text=document.getElementById('typingText');
-
+  
+  if(!indicator || !text) return;
+  
   if(typingUsers.size===0){
-    indicator.style.display='none';
+    indicator.classList.remove('show');
     return;
   }
-
-  indicator.style.display='flex';
-
-  if(typingUsers.size===1){
-    text.textContent=`${Array.from(typingUsers)[0]} is typing...`;
-  }else if(typingUsers.size===2){
-    const arr=Array.from(typingUsers);
-    text.textContent=`${arr[0]} and ${arr[1]} are typing...`;
-  }else{
-    text.textContent=`${typingUsers.size} people are typing...`;
+  
+  indicator.classList.add('show');
+  
+  const names = Array.from(typingUsers.keys());
+  
+  if(names.length===1){
+    text.textContent = names[0] + ' is typing...';
+  } else if(names.length===2){
+    text.textContent = names[0] + ' and ' + names[1] + ' are typing...';
+  } else {
+    text.textContent = names.length + ' people are typing...';
   }
-
-  clearTimeout(typingClearTimer);
-  typingClearTimer=setTimeout(()=>{
-    typingUsers.clear();
-    indicator.style.display='none';
-  },3000);
 }
 
 document.getElementById('shareBtn').addEventListener('click',async()=>{
@@ -1820,19 +1859,16 @@ window.addEventListener('load',()=>{
     showToast('Room code auto-filled — enter your name');
   }
 
-  // ✅ AUTO SESSION RESTORE — 24 hours, URL clean rakhta hai
+  /* ✅ AUTO SESSION RESTORE — 24h, URL clean */
   const savedSession=getSavedSession();
-  if(savedSession&&!r){  // URL me ?room= nahi ho toh hi restore karo
+  if(savedSession&&!r){
     setTimeout(()=>{
       roomId=savedSession.roomId;
       userName=savedSession.userName;
       isOwner=savedSession.isOwner;
-
-      // ✅ URL se ?room= hatao agar hai toh
       if(window.location.search.includes('room=')){
         window.history.replaceState({},'',window.location.pathname);
       }
-
       joinScreen.classList.remove('active');
       mainScreen.classList.add('active');
       initSocket();
@@ -2131,7 +2167,6 @@ async function updateMicState(){
   const pttIcon=pttButton.querySelector('[data-lucide]');
 
   if(alwaysOnEnabled&&localStream){
-    // ✅ Full duplex — dono simultaneously bol sakte hain
     localStream.getAudioTracks().forEach(t=>t.enabled=true);
     pttButton.disabled=true;
     pttButton.classList.remove('enabled','talking');
@@ -2217,34 +2252,69 @@ async function setupMic(){
     try{ps=await navigator.permissions.query({name:'microphone'});}catch(e){}
     if(ps&&ps.state==='denied'){showMicBanner();throw new Error('Denied');}
 
-    // ✅ Full duplex audio constraints
     localStream=await navigator.mediaDevices.getUserMedia({
       audio:{
         echoCancellation:true,
         noiseSuppression:true,
         autoGainControl:true,
         sampleRate:48000,
-        channelCount:1,
-        latency:0.01
+        channelCount:1
       }
     });
     localStream.getAudioTracks().forEach(t=>t.enabled=true);
-    console.log('🎤 Mic ready (full duplex)');
+    console.log('🎤 Mic ready');
     hideMicBanner();
 
     if(socket&&socket.connected){
-      if(!peerConnection)createPeerConnection();
-      setTimeout(async()=>{
-        if(!peerConnection)return;
-        if(peerConnection.signalingState!=='stable'){console.log('⏭️ Skip offer');return;}
-        if(peerConnection.getReceivers().some(r=>r.track)){console.log('⏭️ Already connected');return;}
+      if(!peerConnection){
+        createPeerConnection();
+      } else if(localStream){
+        const senders = peerConnection.getSenders();
+        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+        if(!audioSender){
+          localStream.getTracks().forEach(track=>{
+            track.contentHint = 'speech';
+            peerConnection.addTrack(track, localStream);
+          });
+        }
+      }
+      
+      setTimeout(async () => {
+        if(!peerConnection) return;
+        
+        const hasRemoteTrack = peerConnection.getReceivers().some(r => r.track);
+        if(hasRemoteTrack){
+          console.log('⏭️ Already receiving, skip offer');
+          return;
+        }
+        
+        if(peerConnection.signalingState !== 'stable'){
+          console.log('⏭️ Not stable, skip offer');
+          return;
+        }
+        
+        // Polite peer: alphabetically chhota naam = polite (offer nahi bhejta)
+        const myName = (userName || '').toLowerCase();
+        const partnerName = (window._lastVoiceFromName || '').toLowerCase();
+        const isPolite = myName && partnerName ? (myName > partnerName) : false;
+        
+        if(isPolite){
+          console.log('⏭️ Polite peer, waiting for offer');
+          return;
+        }
+        
         try{
+          makingOffer = true;
           const offer=await peerConnection.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:false});
           await peerConnection.setLocalDescription(offer);
           socket.emit('voiceSignal',{roomId,signal:{type:'offer',sdp:offer.sdp}});
           console.log('📤 Offer sent');
-        }catch(e){console.log('Offer err:',e);}
-      },800);
+        }catch(e){
+          console.log('Offer err:',e);
+        } finally {
+          makingOffer = false;
+        }
+      }, 1000);
     }
   }catch(e){
     console.log('Mic error:',e);
@@ -2265,11 +2335,13 @@ function releaseMic(){
 
 function createPeerConnection(){
   if(peerConnection)return;
+  
   peerConnection=new RTCPeerConnection({
     iceServers:[
       {urls:'stun:stun.l.google.com:19302'},
       {urls:'stun:stun1.l.google.com:19302'},
-      {urls:'stun:stun2.l.google.com:19302'}
+      {urls:'stun:stun2.l.google.com:19302'},
+      {urls:'stun:global.stun.twilio.com:3478'}
     ],
     iceCandidatePoolSize:10,
     bundlePolicy:'max-bundle',
@@ -2285,13 +2357,17 @@ function createPeerConnection(){
 
   peerConnection.ontrack=(e)=>{
     console.log('📥 Remote track from:',window._lastVoiceFromName);
-    const remote=new Audio();
-    remote.srcObject=e.streams[0];
-    remote.autoplay=true;remote.playsInline=true;remote.volume=1.0;
+    const remote = new Audio();
+    remote.srcObject = e.streams[0];
+    remote.autoplay = true;
+    remote.playsInline = true;
+    remote.volume = 1.0;
 
     const tryPlay=()=>{
-      remote.play().catch((err)=>{
-        console.log('Autoplay blocked');
+      remote.play().then(()=>{
+        console.log('✅ Remote audio playing');
+      }).catch((err)=>{
+        console.log('Autoplay blocked:',err.message);
         const unlock=()=>{
           remote.play().then(()=>{
             console.log('✅ Audio unlocked');
@@ -2307,12 +2383,12 @@ function createPeerConnection(){
 
     const remoteName=window._lastVoiceFromName||'Unknown';
     const remoteId=window._lastVoiceFromId||('remote-'+Date.now());
-    const key=remoteId+'-'+Date.now();
-    remoteAudios.set(key,{audio:remote,userName:remoteName});
-
+    const key=remoteId;
+    
+    remoteAudios.set(key,{audio:remote,userName:remoteName,remoteId});
+    
     const isUserMuted=mutedUsers.has(remoteName.toLowerCase());
     remote.muted=muteAll||isUserMuted;
-    showToast(`🎤 ${remoteName} connected`,'success');
   };
 
   peerConnection.onicecandidate=(e)=>{
@@ -2322,11 +2398,15 @@ function createPeerConnection(){
   };
 
   peerConnection.onconnectionstatechange=()=>{
-    console.log('🔗 State:',peerConnection.connectionState);
+    console.log('🔗 Connection:',peerConnection.connectionState);
     if(peerConnection.connectionState==='failed'){
-      console.log('Connection failed, restarting...');
+      console.log('🔄 Restarting ICE...');
       peerConnection.restartIce();
     }
+  };
+  
+  peerConnection.oniceconnectionstatechange=()=>{
+    console.log('❄️ ICE:',peerConnection.iceConnectionState);
   };
 }
 
@@ -2337,33 +2417,73 @@ async function handleVoiceSignal(signal){
   try{
     if(signal.type==='offer'){
       console.log('📥 Offer received');
-      if(peerConnection.signalingState!=='stable'){
-        console.log('⚠️ Not stable, skipping');
+      
+      const offerCollision = 
+        makingOffer || 
+        peerConnection.signalingState !== 'stable';
+      
+      const myName = (userName || '').toLowerCase();
+      const partnerName = (window._lastVoiceFromName || '').toLowerCase();
+      const isPolite = myName && partnerName ? (myName > partnerName) : false;
+      
+      ignoreOffer = !isPolite && offerCollision;
+      
+      if(ignoreOffer){
+        console.log('⏭️ Ignoring offer (impolite collision)');
         return;
       }
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({type:'offer',sdp:signal.sdp}));
-      const answer=await peerConnection.createAnswer();
+      
+      if(offerCollision){
+        console.log('🔙 Rolling back local offer');
+        await peerConnection.setLocalDescription({type:'rollback'});
+      }
+      
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({type:'offer',sdp:signal.sdp})
+      );
+      
+      if(localStream && peerConnection.getSenders().length === 0){
+        localStream.getTracks().forEach(track=>{
+          track.contentHint = 'speech';
+          peerConnection.addTrack(track, localStream);
+        });
+      }
+      
+      const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       socket.emit('voiceSignal',{roomId,signal:{type:'answer',sdp:answer.sdp}});
       console.log('📤 Answer sent');
-    }else if(signal.type==='answer'){
+      
+    } else if(signal.type==='answer'){
       console.log('📥 Answer received');
-      if(peerConnection.signalingState!=='have-local-offer'){
+      
+      if(peerConnection.signalingState !== 'have-local-offer'){
         console.log('⚠️ Not expecting answer');
         return;
       }
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({type:'answer',sdp:signal.sdp}));
-    }else if(signal.type==='ice'){
-      if(peerConnection.remoteDescription&&peerConnection.remoteDescription.type){
-        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
-      }else{
-        if(!window._iceQueue)window._iceQueue=[];
+      
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({type:'answer',sdp:signal.sdp})
+      );
+      
+    } else if(signal.type==='ice'){
+      if(peerConnection.remoteDescription && peerConnection.remoteDescription.type){
+        try{
+          await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        }catch(e){
+          if(!ignoreOffer) console.log('ICE error:', e.message);
+        }
+      } else {
+        if(!window._iceQueue) window._iceQueue = [];
         window._iceQueue.push(signal.candidate);
       }
     }
-    if(peerConnection.remoteDescription&&window._iceQueue){
+    
+    if(peerConnection.remoteDescription && peerConnection.remoteDescription.type && window._iceQueue){
       for(const c of window._iceQueue){
-        try{await peerConnection.addIceCandidate(new RTCIceCandidate(c));}catch(e){}
+        try{
+          await peerConnection.addIceCandidate(new RTCIceCandidate(c));
+        }catch(e){}
       }
       window._iceQueue=[];
     }
