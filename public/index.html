@@ -1639,6 +1639,16 @@ input:checked + .slider:before { transform:translateX(16px); }
 </div>
 
 
+<!-- MIC PERMISSION BANNER -->
+<div class="mic-banner" id="micBanner">
+  <i data-lucide="mic-off"></i>
+  <div class="mic-banner-text">
+    <strong>Microphone blocked</strong>
+    Click 🔒 in URL bar → Allow Microphone → Refresh
+  </div>
+  <button class="mic-banner-close" onclick="hideMicBanner()">✕</button>
+</div>
+
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
 
@@ -2336,6 +2346,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 });
 
 window.addEventListener('load', () => {
+  checkMicPermission();
   loadMuteState();
   updateMuteAllButton();
   
