@@ -1384,6 +1384,15 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.success { border-color:rgba(16,185,129,0.4); }
 .toast.success [data-lucide] { color:var(--success); }
 
+/* ===== MIC PERMISSION BANNER ===== */
+.mic-banner { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-100px); background:rgba(239,68,68,0.95); backdrop-filter:blur(20px); color:white; padding:12px 18px; border-radius:14px; font-size:12px; font-weight:700; z-index:400; max-width:90vw; display:flex; align-items:center; gap:10px; box-shadow:0 12px 32px rgba(239,68,68,0.4); transition:all 0.4s var(--spring); border:1px solid rgba(255,255,255,0.2); }
+.mic-banner.show { transform:translateX(-50%) translateY(0); }
+.mic-banner [data-lucide] { width:16px; height:16px; stroke-width:2.5; flex-shrink:0; }
+.mic-banner-text { flex:1; line-height:1.4; min-width:0; }
+.mic-banner-text strong { display:block; font-size:11px; opacity:0.9; margin-bottom:2px; font-weight:600; }
+.mic-banner-close { background:rgba(255,255,255,0.2); border:none; color:white; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.mic-banner-close:active { background:rgba(255,255,255,0.35); }
+
 /* RESPONSIVE */
 @media (max-height:700px) {
   .album-art { width:min(42vw, 155px); }
@@ -1629,6 +1638,14 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
+<div class="mic-banner" id="micBanner">
+  <i data-lucide="mic-off"></i>
+  <div class="mic-banner-text">
+    <strong>Microphone blocked</strong>
+    Click 🔒 in URL bar → Allow Microphone → Refresh
+  </div>
+  <button class="mic-banner-close" onclick="hideMicBanner()">✕</button>
+</div>  
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous"></audio>
 
