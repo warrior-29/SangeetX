@@ -48,7 +48,6 @@ function recordVisit(name, roomId, userAgent) {
   analytics.hourlyVisits[hourKey] = (analytics.hourlyVisits[hourKey] || 0) + 1;
 }
 
-// ===== ADMIN AUTH HELPER =====
 function isAdmin(password) {
   return password === ADMIN_PASSWORD;
 }
@@ -93,8 +92,8 @@ app.get('/api/admin/stats', (req, res) => {
         artist: room.state.track.artist
       } : null,
       isPlaying: room.state.isPlaying,
-      users: room.users.map(u => ({ 
-        id: u.id, 
+      users: room.users.map(u => ({
+        id: u.id,
         name: u.name,
         blocked: u.blocked || { chat: false, play: false, voice: false }
       }))
@@ -120,7 +119,6 @@ app.get('/api/admin/stats', (req, res) => {
   });
 });
 
-// ===== ADMIN: DELETE ROOM =====
 app.post('/api/admin/deleteRoom', (req, res) => {
   const { password, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -151,11 +149,10 @@ app.post('/api/admin/deleteRoom', (req, res) => {
   delete blockedUsers[roomId];
   analytics.roomsDeleted++;
 
-  console.log(`🗑️ Admin deleted room: ${roomId}`);
+  console.log('🗑️ Admin deleted room:', roomId);
   res.json({ success: true, message: 'Room deleted' });
 });
 
-// ===== ADMIN: KICK USER =====
 app.post('/api/admin/kickUser', (req, res) => {
   const { password, roomId, userId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -183,7 +180,6 @@ app.post('/api/admin/kickUser', (req, res) => {
   res.json({ success: true, message: user.name + ' kicked' });
 });
 
-// ===== ADMIN: BLOCK USER ACTION =====
 app.post('/api/admin/blockAction', (req, res) => {
   const { password, roomId, userId, action, block } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -208,7 +204,6 @@ app.post('/api/admin/blockAction', (req, res) => {
   res.json({ success: true, blocked: user.blocked });
 });
 
-// ===== ADMIN: DELETE CHAT MESSAGE =====
 app.post('/api/admin/deleteMessage', (req, res) => {
   const { password, roomId, messageId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -225,7 +220,6 @@ app.post('/api/admin/deleteMessage', (req, res) => {
   res.json({ success: true });
 });
 
-// ===== ADMIN: GET ROOM CHAT =====
 app.get('/api/admin/roomChat', (req, res) => {
   const { password, roomId } = req.query;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -240,7 +234,6 @@ app.get('/api/admin/roomChat', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Connected:', socket.id);
 
-  // ===== CREATE ROOM =====
   socket.on('createRoom', ({ roomId, userName }) => {
     if (rooms[roomId]) {
       socket.emit('createRoomResult', {
@@ -254,9 +247,9 @@ io.on('connection', (socket) => {
       ownerId: socket.id,
       ownerName: userName,
       createdAt: Date.now(),
-      users: [{ 
-        id: socket.id, 
-        name: userName, 
+      users: [{
+        id: socket.id,
+        name: userName,
         lastActive: Date.now(),
         blocked: { chat: false, play: false, voice: false }
       }],
@@ -283,10 +276,9 @@ io.on('connection', (socket) => {
     socket.emit('blockedList', blockedUsers[roomId]);
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(rooms[roomId]));
 
-    console.log(`${userName} created room ${roomId}`);
+    console.log(userName + ' created room ' + roomId);
   });
 
-  // ===== REQUEST TO JOIN =====
   socket.on('requestJoin', ({ roomId, userName }) => {
     const room = rooms[roomId];
     if (!room) {
@@ -323,7 +315,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ===== APPROVE =====
   socket.on('approveJoin', ({ roomId, userId }) => {
     const room = rooms[roomId];
     if (!room || room.ownerId !== socket.id) return;
@@ -331,8 +322,8 @@ io.on('connection', (socket) => {
     if (!pending) return;
 
     room.pending = room.pending.filter(p => p.id !== userId);
-    room.users.push({ 
-      ...pending, 
+    room.users.push({
+      ...pending,
       lastActive: Date.now(),
       blocked: { chat: false, play: false, voice: false }
     });
@@ -353,7 +344,6 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ===== DENY =====
   socket.on('denyJoin', ({ roomId, userId }) => {
     const room = rooms[roomId];
     if (!room || room.ownerId !== socket.id) return;
@@ -369,7 +359,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== ROOM OWNER: REMOVE USER =====
   socket.on('removeUser', ({ roomId, userId }) => {
     const room = rooms[roomId];
     if (!room || room.ownerId !== socket.id) return;
@@ -385,7 +374,6 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ===== UPDATE STATE (with permission check) =====
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -394,7 +382,6 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
 
-    // Check play permission
     if (user.blocked && user.blocked.play) {
       socket.emit('permissionDenied', { action: 'play', message: 'You are blocked from controlling playback' });
       return;
@@ -431,7 +418,6 @@ io.on('connection', (socket) => {
     if (user) user.lastActive = Date.now();
   });
 
-  // ===== CHAT MESSAGE (with permission check) =====
   socket.on('chatMessage', ({ roomId, text, mentions }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -439,7 +425,6 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
 
-    // Check chat permission
     if (user.blocked && user.blocked.chat) {
       socket.emit('permissionDenied', { action: 'chat', message: 'You are blocked from chatting' });
       return;
@@ -462,7 +447,6 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chatMessage', msg);
   });
 
-  // ===== VOICE SIGNALING (with permission check) =====
   socket.on('voiceSignal', ({ roomId, signal }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -488,18 +472,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('voiceActivity', ({ roomId, isSpeaking }) => {
-    const room = rooms[roomId];
-    if (!room) return;
-    const user = room.users.find(u => u.id === socket.id);
-    if (user && user.blocked && user.blocked.voice) return;
-
-    socket.to(roomId).emit('partnerVoiceActivity', {
-      userName: socket.userName, isSpeaking
-    });
-  });
-
-  // ===== REACTIONS =====
   socket.on('reaction', ({ roomId, emoji }) => {
     const room = rooms[roomId];
     if (room) {
@@ -512,12 +484,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ===== SYNC =====
   socket.on('syncPing', ({ roomId, clientTime, position }) => {
     socket.emit('syncPong', { clientTime, serverTime: Date.now() });
   });
 
-  // ===== MOOD =====
   socket.on('moodUpdate', ({ roomId, mood, emoji, text, color }) => {
     const room = rooms[roomId];
     if (room) {
@@ -527,7 +497,6 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  // ===== DISCONNECT =====
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     const pendingRoom = socket.pendingRoom;
@@ -544,30 +513,27 @@ io.on('connection', (socket) => {
       const room = rooms[roomId];
       room.users = room.users.filter(u => u.id !== socket.id);
 
-      // Owner disconnect - room 30 min tak zinda rahega
       if (room.ownerId === socket.id) {
         room.ownerOnline = false;
-        io.to(roomId).emit('ownerOffline', { 
-          message: 'Owner is offline. Room will stay active for 30 minutes.' 
+        io.to(roomId).emit('ownerOffline', {
+          message: 'Owner is offline. Room will stay active for 30 minutes.'
         });
-        
-        // 30 min baad room delete
+
         room.deleteTimer = setTimeout(() => {
           if (rooms[roomId] && rooms[roomId].ownerId === socket.id) {
             io.to(roomId).emit('roomClosed', { message: 'Room expired' });
             delete rooms[roomId];
           }
         }, 30 * 60 * 1000);
-        
+
         return;
       }
-      
+
       io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
     }
   });
 });
 
-// ===== HELPER =====
 function getUsersWithStatus(room) {
   const now = Date.now();
   return room.users.map(u => ({
