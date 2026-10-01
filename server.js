@@ -291,14 +291,23 @@ io.on('connection', (socket) => {
     console.log(`💬 Chat presence: ${user.name} is ${active ? 'IN' : 'OUT'}`);
   });
 
-  socket.on('typing', ({ roomId, isTyping }) => {
+  // ===== TYPING — IMPROVED =====
+  socket.on('typing', ({ roomId, isTyping, userName: clientName }) => {
     const room = rooms[roomId];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
+    
+    // Fallback name
+    const name = user.name || socket.userName || clientName || 'Someone';
+    
     socket.to(roomId).emit('userTyping', {
-      userName: user.name, userId: socket.id, isTyping: !!isTyping
+      userName: name,
+      userId: socket.id,
+      isTyping: !!isTyping
     });
+    
+    console.log(`⌨️ ${name} ${isTyping ? 'is' : 'stopped'} typing in ${roomId}`);
   });
 
   socket.on('updateState', ({ roomId, newState }) => {
