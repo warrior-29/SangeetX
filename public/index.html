@@ -1426,7 +1426,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 <div id="joinScreen" class="screen active">
   <div class="join-box">
     <div class="join-logo"><i data-lucide="music-2"></i></div>
-    <h1>Music Sync</h1>
+    <h1>Music To</h1>
     <p class="subtitle">Listen together, from anywhere</p>
 
     <div class="input-wrap">
@@ -1644,9 +1644,10 @@ input:checked + .slider:before { transform:translateX(16px); }
   <i data-lucide="mic-off"></i>
   <div class="mic-banner-text">
     <strong>Microphone blocked</strong>
-    Click 🔒 in URL bar → Allow Microphone → Refresh
+    <span style="font-size:10px;opacity:0.9;font-weight:500;">Allow mic to speak</span>
   </div>
-  <button class="mic-banner-close" onclick="hideMicBanner()">✕</button>
+  <button onclick="requestMicPermission()" style="background:white;color:#EF4444;font-weight:800;width:auto;padding:0 12px;border-radius:8px;height:28px;border:none;cursor:pointer;font-size:11px;flex-shrink:0;">Allow</button>
+  <button onclick="hideMicBanner()" style="background:rgba(255,255,255,0.25);border:none;color:white;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
 </div>
 
 <div id="reactionLayer" class="reaction-layer"></div>
@@ -3027,22 +3028,60 @@ function hideMicBanner() {
   if (banner) banner.classList.remove('show');
 }
 
+/* ===== REQUEST MIC PERMISSION (button click) ===== */
+async function requestMicPermission() {
+  try {
+    // Try to get mic
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Agar mil gaya, permission granted
+    stream.getTracks().forEach(t => t.stop());
+    micPermissionState = 'granted';
+    hideMicBanner();
+    showToast('✅ Mic allowed! Now toggle PTT again', 'success');
+  } catch (e) {
+    // Permission denied
+    micPermissionState = 'denied';
+    showMicBanner();
+    showToast('❌ Mic blocked. Check browser settings.', 'error');
+  }
+}
+
+/* ===== CHECK IF MIC USABLE (before PTT) ===== */
+function ensureMicPermission() {
+  if (micPermissionState === 'denied') {
+    // Denied — banner dikhao
+    showMicBanner();
+    showToast('🎤 Enable mic to speak', 'error');
+    return false;
+  }
+  if (micPermissionState === 'granted') {
+    return true;
+  }
+  // 'prompt' state — browser khud popup dikhayega
+  return true;
+}
+
+let micPermissionState = 'prompt';  // 'granted' | 'denied' | 'prompt'
+
 async function checkMicPermission() {
   try {
     const status = await navigator.permissions.query({ name: 'microphone' });
-    if (status.state === 'denied') {
-      showMicBanner();
-    }
+    micPermissionState = status.state;
+    
+    // Banner abhi mat dikhao — sirf state save karo
+    // Banner dikhega jab user mic use karega
+    
     status.onchange = () => {
+      micPermissionState = status.state;
       if (status.state === 'granted') {
         hideMicBanner();
         showToast('✅ Mic permission granted', 'success');
-      } else if (status.state === 'denied') {
-        showMicBanner();
       }
+      // Denied par bhi banner abhi mat dikhao
     };
   } catch (e) {
-    // Permissions API not supported
+    // Permissions API not supported — assume prompt
+    micPermissionState = 'prompt';
   }
 }
 
