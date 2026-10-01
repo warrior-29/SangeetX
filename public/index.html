@@ -396,6 +396,47 @@ body::before {
   50% { transform:scale(1.15); }
 }
 
+/* ============ DISTANCE METER ============ */
+.distance-meter {
+  display:none;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  font-size:10px;
+  font-weight:700;
+  padding:6px 14px;
+  background:linear-gradient(135deg, rgba(236,72,153,0.12), rgba(139,92,246,0.12));
+  border:1px solid rgba(236,72,153,0.25);
+  border-radius:100px;
+  color:var(--accent);
+  flex-shrink:0;
+  animation:distanceIn 0.6s var(--spring);
+  backdrop-filter:blur(10px);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
+}
+.distance-meter.active { display:flex; }
+@keyframes distanceIn {
+  from { opacity:0; transform:scale(0.8); }
+  to { opacity:1; transform:scale(1); }
+}
+.distance-meter [data-lucide] {
+  width:12px; height:12px;
+  stroke-width:2.5;
+  color:var(--accent);
+  flex-shrink:0;
+}
+.distance-heart {
+  animation:heartBeat 1.5s ease-in-out infinite;
+  flex-shrink:0;
+}
+@keyframes heartBeat {
+  0%,100% { transform:scale(1); }
+  50% { transform:scale(1.25); }
+}
+
 /* ============ PLAYER SECTION ============ */
 .player-section {
   flex:1;
@@ -1259,6 +1300,10 @@ input:checked + .slider:before { transform:translateX(16px); }
   border-bottom-left-radius:5px;
   border:1px solid var(--border);
 }
+.chat-msg.pending {
+  opacity:0.6;
+  border:1px dashed rgba(255,255,255,0.3);
+}
 .chat-msg-name {
   font-size:9px;
   font-weight:800;
@@ -1383,6 +1428,8 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.error [data-lucide] { color:var(--danger); }
 .toast.success { border-color:rgba(16,185,129,0.4); }
 .toast.success [data-lucide] { color:var(--success); }
+.toast.warning { border-color:rgba(245,158,11,0.4); }
+.toast.warning [data-lucide] { color:var(--warning); }
 
 /* ===== MIC PERMISSION BANNER (TOP) ===== */
 .mic-banner {
@@ -1426,6 +1473,55 @@ input:checked + .slider:before { transform:translateX(16px); }
   flex-shrink:0;
 }
 .mic-banner-close:active { background:rgba(255,255,255,0.35); }
+
+/* ===== OFFLINE BANNER ===== */
+.offline-banner {
+  position:fixed;
+  top:max(60px, calc(env(safe-area-inset-top) + 60px));
+  left:50%;
+  transform:translateX(-50%) translateY(-120px);
+  background:rgba(245,158,11,0.95);
+  backdrop-filter:blur(20px);
+  color:white;
+  padding:8px 16px;
+  border-radius:100px;
+  font-size:11px;
+  font-weight:700;
+  z-index:390;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  box-shadow:0 8px 24px rgba(245,158,11,0.4);
+  transition:all 0.4s var(--spring);
+  pointer-events:none;
+  opacity:0;
+  max-width:90vw;
+}
+.offline-banner.show {
+  transform:translateX(-50%) translateY(0);
+  opacity:1;
+}
+.offline-banner [data-lucide] {
+  width:14px; height:14px;
+  stroke-width:2.5;
+  flex-shrink:0;
+}
+.offline-banner span:not(.offline-count) {
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.offline-count {
+  background:white;
+  color:#F59E0B;
+  font-size:10px;
+  font-weight:800;
+  padding:2px 7px;
+  border-radius:100px;
+  min-width:18px;
+  text-align:center;
+  flex-shrink:0;
+}
 
 /* ===== PWA INSTALL BANNER (BOTTOM) ===== */
 .install-banner {
@@ -1531,6 +1627,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   .status { max-width:140px; font-size:10px; padding:6px 10px; }
   .icon-btn { width:34px; height:34px; }
   .icon-btn [data-lucide] { width:15px; height:15px; }
+  .distance-meter { font-size:9px; padding:5px 10px; }
 }
 @media (min-width:768px) {
   .album-art { width:min(28vw, 260px); }
@@ -1614,6 +1711,13 @@ input:checked + .slider:before { transform:translateX(16px); }
         <i data-lucide="share-2"></i>
       </button>
     </div>
+  </div>
+
+  <!-- DISTANCE METER -->
+  <div class="distance-meter" id="distanceMeter">
+    <i data-lucide="map-pin"></i>
+    <span id="distanceText">Calculating...</span>
+    <span class="distance-heart">❤️</span>
   </div>
 
   <div class="player-section">
@@ -1759,7 +1863,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-
 <!-- MIC PERMISSION BANNER -->
 <div class="mic-banner" id="micBanner">
   <i data-lucide="mic-off"></i>
@@ -1769,6 +1872,13 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
   <button onclick="requestMicPermission()" style="background:white;color:#EF4444;font-weight:800;width:auto;padding:0 12px;border-radius:8px;height:28px;border:none;cursor:pointer;font-size:11px;flex-shrink:0;">Allow</button>
   <button onclick="hideMicBanner()" class="mic-banner-close">✕</button>
+</div>
+
+<!-- OFFLINE BANNER -->
+<div class="offline-banner" id="offlineBanner">
+  <i data-lucide="wifi-off"></i>
+  <span>Offline — messages will queue</span>
+  <span class="offline-count" id="offlineCount" style="display:none;">0</span>
 </div>
 
 <div id="reactionLayer" class="reaction-layer"></div>
@@ -1802,12 +1912,23 @@ let unreadMessages = 0;
 let chatOpen = false;
 let audio = document.getElementById('audioPlayer');
 let myPermissions = { chat: false, play: false, voice: false };
-let micPermissionState = 'prompt';  // 'granted' | 'denied' | 'prompt'
+let micPermissionState = 'prompt';
 
 /* ===== VOICE MUTE STATE (per-device) ===== */
 const mutedUsers = new Set();
 const remoteAudios = new Map();
 let muteAll = false;
+
+/* ===== DISTANCE SYNC STATE ===== */
+let myLocation = null;
+let partnerLocation = null;
+let distanceKm = 0;
+let locationShared = false;
+
+/* ===== OFFLINE FIRST STATE ===== */
+let isOnline = navigator.onLine;
+let messageQueue = [];
+let audioCacheReady = false;
 
 /* ===== AUDIO ===== */
 let audioContext = null;
@@ -2073,6 +2194,237 @@ function loadMuteState() {
   } catch (e) {}
 }
 
+/* ============================================================
+   DISTANCE SYNC
+   ============================================================ */
+async function getMyLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+      },
+      (err) => {
+        console.log('Location denied:', err.message);
+        resolve(null);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+    );
+  });
+}
+
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c);
+}
+
+// Approximate city name — bina API ke
+function getApproxLocation(lat, lng) {
+  const cities = [
+    { name: 'Delhi', lat: 28.6139, lng: 77.2090 },
+    { name: 'Mumbai', lat: 19.0760, lng: 72.8777 },
+    { name: 'Bangalore', lat: 12.9716, lng: 77.5946 },
+    { name: 'Kolkata', lat: 22.5726, lng: 88.3639 },
+    { name: 'Chennai', lat: 13.0827, lng: 80.2707 },
+    { name: 'Hyderabad', lat: 17.3850, lng: 78.4867 },
+    { name: 'Pune', lat: 18.5204, lng: 73.8567 },
+    { name: 'Jaipur', lat: 26.9124, lng: 75.7873 },
+    { name: 'Lucknow', lat: 26.8467, lng: 80.9462 },
+    { name: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
+    { name: 'Surat', lat: 21.1702, lng: 72.8311 },
+    { name: 'Kanpur', lat: 26.4499, lng: 80.3319 },
+    { name: 'Nagpur', lat: 21.1458, lng: 79.0882 },
+    { name: 'Indore', lat: 22.7196, lng: 75.8577 },
+    { name: 'Bhopal', lat: 23.2599, lng: 77.4126 },
+    { name: 'Patna', lat: 25.5941, lng: 85.1376 },
+    { name: 'Varanasi', lat: 25.3176, lng: 82.9739 },
+    { name: 'Agra', lat: 27.1767, lng: 78.0081 },
+    { name: 'Noida', lat: 28.5355, lng: 77.3910 },
+    { name: 'Gurgaon', lat: 28.4595, lng: 77.0266 },
+    { name: 'Chandigarh', lat: 30.7333, lng: 76.7794 },
+    { name: 'Goa', lat: 15.2993, lng: 74.1240 },
+    { name: 'Kochi', lat: 9.9312, lng: 76.2673 },
+    { name: 'Guwahati', lat: 26.1445, lng: 91.7362 },
+    { name: 'Ranchi', lat: 23.3441, lng: 85.3096 },
+    { name: 'Raipur', lat: 21.2514, lng: 81.6296 },
+    { name: 'Dehradun', lat: 30.3165, lng: 78.0322 },
+    { name: 'Shimla', lat: 31.1048, lng: 77.1734 },
+    { name: 'Jodhpur', lat: 26.2389, lng: 73.0243 },
+    { name: 'Udaipur', lat: 24.5854, lng: 73.7125 }
+  ];
+  
+  let nearest = cities[0];
+  let minDist = Infinity;
+  
+  cities.forEach(city => {
+    const d = Math.sqrt(Math.pow(city.lat - lat, 2) + Math.pow(city.lng - lng, 2));
+    if (d < minDist) {
+      minDist = d;
+      nearest = city;
+    }
+  });
+  
+  return nearest.name;
+}
+
+function updateDistanceDisplay() {
+  if (!myLocation || !partnerLocation) return;
+  
+  distanceKm = calculateDistance(
+    myLocation.lat, myLocation.lng,
+    partnerLocation.lat, partnerLocation.lng
+  );
+  
+  const myCity = getApproxLocation(myLocation.lat, myLocation.lng);
+  const partnerCity = getApproxLocation(partnerLocation.lat, partnerLocation.lng);
+  
+  const meter = document.getElementById('distanceMeter');
+  const text = document.getElementById('distanceText');
+  
+  if (distanceKm < 5) {
+    text.textContent = `${myCity} · Same city! 🏙️`;
+  } else if (distanceKm < 100) {
+    text.textContent = `${myCity} ↔ ${partnerCity} · ${distanceKm} km`;
+  } else {
+    text.textContent = `${myCity} ↔ ${partnerCity} · ${distanceKm.toLocaleString()} km apart`;
+  }
+  
+  meter.classList.add('active');
+  refreshIcons();
+}
+
+async function shareLocation() {
+  if (locationShared) return;
+  
+  const loc = await getMyLocation();
+  if (!loc) {
+    console.log('📍 Location not available');
+    return;
+  }
+  
+  myLocation = loc;
+  locationShared = true;
+  
+  if (socket && socket.connected) {
+    socket.emit('shareLocation', { roomId, location: loc });
+    console.log('📍 Location shared:', loc);
+  }
+  
+  if (partnerLocation) updateDistanceDisplay();
+}
+
+function showDistanceHeart() {
+  if (distanceKm < 100) return;
+  if (!currentTrack) return;
+  
+  const layer = document.getElementById('reactionLayer');
+  const el = document.createElement('div');
+  el.className = 'floating-emoji';
+  el.textContent = '❤️';
+  el.style.left = '50%';
+  el.style.bottom = '30%';
+  el.style.fontSize = '60px';
+  el.style.transform = 'translateX(-50%)';
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+/* ============================================================
+   OFFLINE FIRST
+   ============================================================ */
+window.addEventListener('online', () => {
+  isOnline = true;
+  hideOfflineBanner();
+  showToast('✅ Back online!', 'success');
+  if (socket && !socket.connected) socket.connect();
+  setTimeout(flushMessageQueue, 1000);
+});
+
+window.addEventListener('offline', () => {
+  isOnline = false;
+  showOfflineBanner();
+  showToast('📴 Offline — messages will queue', 'warning');
+});
+
+function showOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (banner) {
+    banner.classList.add('show');
+    refreshIcons();
+  }
+  updateOfflineCount();
+}
+
+function hideOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (banner) banner.classList.remove('show');
+}
+
+function updateOfflineCount() {
+  const count = document.getElementById('offlineCount');
+  if (!count) return;
+  if (messageQueue.length > 0) {
+    count.textContent = messageQueue.length;
+    count.style.display = 'inline-block';
+  } else {
+    count.style.display = 'none';
+  }
+}
+
+function flushMessageQueue() {
+  if (messageQueue.length === 0) return;
+  if (!socket || !socket.connected) return;
+  
+  console.log(`📤 Sending ${messageQueue.length} queued messages...`);
+  
+  const toSend = [...messageQueue];
+  messageQueue = [];
+  updateOfflineCount();
+  
+  toSend.forEach(msg => {
+    socket.emit('chatMessage', { 
+      roomId: msg.roomId || roomId, 
+      text: msg.text, 
+      mentions: [],
+      queuedAt: msg.time
+    });
+  });
+  
+  showToast(`✅ ${toSend.length} messages sent`, 'success');
+}
+
+// Song caching for offline
+async function cacheSongForOffline(track) {
+  if (!track || !track.audioUrl) return;
+  if (!('caches' in window)) return;
+  
+  try {
+    const cache = await caches.open('sangeetx-songs-v1');
+    const existing = await cache.match(track.audioUrl);
+    if (existing) return;
+    
+    // Background me fetch + cache
+    fetch(track.audioUrl).then(res => {
+      if (res.ok) cache.put(track.audioUrl, res.clone());
+    }).catch(() => {});
+  } catch (e) {
+    console.log('Cache failed:', e.message);
+  }
+}
+
 /* ===== INIT ===== */
 document.getElementById('createRoomBtn').addEventListener('click', () => {
   const name = document.getElementById('userNameInput').value.trim();
@@ -2100,6 +2452,16 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
 function initSocket() {
   socket = io();
 
+  socket.on('connect', () => {
+    isOnline = true;
+    hideOfflineBanner();
+    setTimeout(flushMessageQueue, 800);
+    // Re-share location on reconnect
+    if (roomId && userName && locationShared) {
+      setTimeout(shareLocation, 1500);
+    }
+  });
+
   socket.on('createRoomResult', (r) => {
     if (r.success) {
       isOwner = true;
@@ -2108,6 +2470,7 @@ function initSocket() {
       startActivityPing();
       startSyncCheck();
       showToast('Room created! Share the link', 'success');
+      setTimeout(shareLocation, 2000);
     } else showToast(r.message || 'Failed to create room', 'error');
   });
 
@@ -2122,6 +2485,7 @@ function initSocket() {
       isOwner = r.isOwner || false;
       startActivityPing();
       startSyncCheck();
+      setTimeout(shareLocation, 2000);
     } else {
       waitingScreen.classList.remove('active');
       joinScreen.classList.add('active');
@@ -2148,46 +2512,53 @@ function initSocket() {
   });
   socket.on('ownerOffline', ({ message }) => { showToast(message); });
   socket.on('permissionDenied', ({ message }) => { showToast(message, 'error'); });
-  socket.on('disconnect', () => { document.getElementById('connectionDot').classList.remove('online', 'idle'); });
+  
+  socket.on('disconnect', () => { 
+    document.getElementById('connectionDot').classList.remove('online', 'idle');
+    if (!navigator.onLine) {
+      isOnline = false;
+      showOfflineBanner();
+    }
+  });
 
   socket.on('usersUpdate', (users) => { renderUsers(users); updatePartnerStatus(users); });
   socket.on('stateSync', (state) => applyRemoteState(state));
 
   socket.on('heartbeat', ({ position, isPlaying }) => {
-  if (!currentTrack) return;
-  
-  if (isPlaying && audio.paused) {
-    audio.play().catch(() => {});
-  }
-  if (!isPlaying && !audio.paused) {
-    audio.pause();
-  }
-  
-  if (!isPlaying) return;
-  
-  const drift = audio.currentTime - position;
-  const absDrift = Math.abs(drift);
-  
-  if (absDrift < 0.3) {
-    audio.playbackRate = 1.0;
-  } else if (absDrift < 2.0) {
-    if (drift > 0) {
-      audio.playbackRate = 0.97;
-    } else {
-      audio.playbackRate = 1.03;
+    if (!currentTrack) return;
+    
+    if (isPlaying && audio.paused) {
+      audio.play().catch(() => {});
+    }
+    if (!isPlaying && !audio.paused) {
+      audio.pause();
     }
     
-    clearTimeout(window._rateResetTimeout);
-    window._rateResetTimeout = setTimeout(() => {
-      if (audio.playbackRate !== 1.0) {
-        audio.playbackRate = 1.0;
+    if (!isPlaying) return;
+    
+    const drift = audio.currentTime - position;
+    const absDrift = Math.abs(drift);
+    
+    if (absDrift < 0.3) {
+      audio.playbackRate = 1.0;
+    } else if (absDrift < 2.0) {
+      if (drift > 0) {
+        audio.playbackRate = 0.97;
+      } else {
+        audio.playbackRate = 1.03;
       }
-    }, 3000);
-  } else {
-    audio.currentTime = position;
-    audio.playbackRate = 1.0;
-  }
-});
+      
+      clearTimeout(window._rateResetTimeout);
+      window._rateResetTimeout = setTimeout(() => {
+        if (audio.playbackRate !== 1.0) {
+          audio.playbackRate = 1.0;
+        }
+      }, 3000);
+    } else {
+      audio.currentTime = position;
+      audio.playbackRate = 1.0;
+    }
+  });
 
   socket.on('syncPong', ({ clientTime }) => {
     const rtt = Date.now() - clientTime;
@@ -2209,6 +2580,23 @@ function initSocket() {
     meter.style.background = color + '15';
   });
 
+  // ===== DISTANCE SYNC SOCKET EVENTS =====
+  socket.on('partnerLocation', ({ location }) => {
+    if (!location || !location.lat || !location.lng) return;
+    partnerLocation = location;
+    console.log('📍 Partner location received:', location);
+    updateDistanceDisplay();
+  });
+
+  // ===== OFFLINE QUEUE CONFIRMATION =====
+  socket.on('chatMessage', (msg) => {
+    renderChat([msg], false);
+    if (!chatOpen && msg.userId !== socket.id) {
+      unreadMessages++;
+      updateChatBadge();
+    }
+  });
+
   socket.on('voiceSignal', async ({ signal, from, userName: fromName }) => {
     window._lastVoiceFromId = from;
     window._lastVoiceFromName = fromName;
@@ -2228,13 +2616,6 @@ function initSocket() {
   });
 
   socket.on('chatHistory', (m) => renderChat(m, true));
-  socket.on('chatMessage', (msg) => {
-    renderChat([msg], false);
-    if (!chatOpen && msg.userId !== socket.id) {
-      unreadMessages++;
-      updateChatBadge();
-    }
-  });
 
   socket.on('messageDeleted', ({ messageId }) => {
     const el = document.querySelector(`[data-msg-id="${messageId}"]`);
@@ -2407,6 +2788,33 @@ function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
+  
+  // OFFLINE QUEUE LOGIC
+  if (!isOnline || !socket || !socket.connected) {
+    messageQueue.push({
+      text,
+      time: Date.now(),
+      roomId
+    });
+    updateOfflineCount();
+    showOfflineBanner();
+    showToast(`📴 Queued (${messageQueue.length})`);
+    
+    // Local echo — dikhao jaise bheja
+    const localMsg = {
+      id: 'local-' + Date.now(),
+      userId: socket?.id || 'me',
+      userName: userName || 'You',
+      text,
+      time: Date.now(),
+      pending: true
+    };
+    renderChat([localMsg], false);
+    
+    input.value = '';
+    return;
+  }
+  
   socket.emit('chatMessage', { roomId, text, mentions: [] });
   input.value = '';
 }
@@ -2421,14 +2829,14 @@ function renderChat(messages, replace) {
   const emptyMsg = box.querySelector('.chat-empty');
   if (emptyMsg) emptyMsg.remove();
   messages.forEach(m => {
-    const mine = m.userId === socket.id;
+    const mine = m.userId === socket?.id || m.pending;
     const div = document.createElement('div');
-    div.className = 'chat-msg ' + (mine ? 'mine' : 'theirs');
+    div.className = 'chat-msg ' + (mine ? 'mine' : 'theirs') + (m.pending ? ' pending' : '');
     div.dataset.msgId = m.id;
     const time = new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     div.innerHTML = `
       ${!mine ? `<div class="chat-msg-name">${esc(m.userName)}</div>` : ''}
-      <div>${esc(m.text)}</div>
+      <div>${esc(m.text)}${m.pending ? ' ⏳' : ''}</div>
       <div class="chat-msg-time">${time}</div>
     `;
     box.appendChild(div);
@@ -2462,11 +2870,16 @@ window.addEventListener('load', () => {
   loadMuteState();
   updateMuteAllButton();
   
+  // Initial online state check
+  if (!navigator.onLine) {
+    isOnline = false;
+    showOfflineBanner();
+  }
+  
   const params = new URLSearchParams(window.location.search);
   const r = params.get('room');
   if (r) {
     document.getElementById('roomIdInput').value = r;
-    // Auto-focus name input
     setTimeout(() => {
       document.getElementById('userNameInput').focus();
     }, 300);
@@ -2559,6 +2972,9 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   audio.crossOrigin = 'anonymous';
   audio.load();
 
+  // Cache for offline
+  cacheSongForOffline(track);
+
   const setPositionOnMetadata = () => {
     try {
       audio.currentTime = position || 0;
@@ -2594,6 +3010,11 @@ async function loadTrack(track, position = 0, autoPlay = false) {
 
   updatePlayIcon();
   startHeartbeat();
+
+  // Distance heart animation
+  if (distanceKm > 100) {
+    setTimeout(showDistanceHeart, 800);
+  }
 
   if ('mediaSession' in navigator && track) {
     try {
@@ -2680,6 +3101,7 @@ function fmt(s) {
 
 function broadcastState(partial) {
   if (isRemoteUpdate) return;
+  if (!socket || !socket.connected) return;
   socket.emit('updateState', {
     roomId,
     newState: {
@@ -2694,7 +3116,7 @@ function broadcastState(partial) {
 function startHeartbeat() {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
   heartbeatInterval = setInterval(() => {
-    if (currentTrack && !audio.paused) {
+    if (currentTrack && !audio.paused && socket && socket.connected) {
       socket.emit('heartbeat', { 
         roomId, 
         position: audio.currentTime, 
@@ -2725,6 +3147,12 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 async function searchSongs(query) {
   const results = document.getElementById('searchResults');
+  
+  if (!isOnline) {
+    results.innerHTML = '<p class="search-hint">📴 Search needs internet</p>';
+    return;
+  }
+  
   results.innerHTML = '<p class="search-hint">Searching...</p>';
   try {
     const res = await fetch('/api/search?q=' + encodeURIComponent(query));
@@ -2756,10 +3184,12 @@ function selectSong(song) {
   searchModal.classList.remove('active');
   document.getElementById('searchInput').value = '';
   loadTrack(song, 0, true);
-  socket.emit('updateState', {
-    roomId,
-    newState: { track: song, position: 0, isPlaying: true }
-  });
+  if (socket && socket.connected) {
+    socket.emit('updateState', {
+      roomId,
+      newState: { track: song, position: 0, isPlaying: true }
+    });
+  }
   showToast('▶ ' + song.title, 'success');
 }
 
@@ -3101,7 +3531,9 @@ document.querySelectorAll('.reaction-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const emoji = btn.dataset.emoji;
     showFloatingEmoji(emoji);
-    socket.emit('reaction', { roomId, emoji });
+    if (socket && socket.connected) {
+      socket.emit('reaction', { roomId, emoji });
+    }
     if (navigator.vibrate) navigator.vibrate(20);
   });
 });
@@ -3124,7 +3556,7 @@ function showToast(msg, type) {
     toast.className = 'toast';
     document.body.appendChild(toast);
   }
-  const iconName = type === 'error' ? 'x-circle' : (type === 'success' ? 'check-circle' : 'info');
+  const iconName = type === 'error' ? 'x-circle' : (type === 'success' ? 'check-circle' : (type === 'warning' ? 'alert-triangle' : 'info'));
   toast.innerHTML = `<i data-lucide="${iconName}"></i><span>${esc(msg)}</span>`;
   toast.className = 'toast show ' + (type || '');
   refreshIcons();
@@ -3134,7 +3566,6 @@ function showToast(msg, type) {
 
 /* ===== MIC PERMISSION BANNER ===== */
 function showMicBanner() {
-  // Agar install banner khula hai toh mic banner skip karo
   if (document.getElementById('installBanner')) return;
   
   const banner = document.getElementById('micBanner');
@@ -3149,7 +3580,6 @@ function hideMicBanner() {
   if (banner) banner.classList.remove('show');
 }
 
-/* ===== REQUEST MIC PERMISSION (button click) ===== */
 async function requestMicPermission() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -3181,14 +3611,12 @@ async function checkMicPermission() {
   }
 }
 
-/* ===== PWA INSTALL PROMPT (BOTTOM BANNER) ===== */
+/* ===== PWA INSTALL PROMPT ===== */
 let deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  
-  // Delay 2 sec — page settle hone do
   setTimeout(() => showInstallBanner(), 2000);
 });
 
