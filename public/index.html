@@ -2862,13 +2862,33 @@ function releaseMic() {
 
 function createPeerConnection() {
   if (peerConnection) return;
-  peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+  
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' }
+    ],
+    iceCandidatePoolSize: 10
+  });
+  
+  // Add all tracks ONCE
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+  }
   
   peerConnection.ontrack = (e) => {
+    console.log('📥 Remote track received from:', window._lastVoiceFromName);
     const remote = new Audio();
     remote.srcObject = e.streams[0];
-    remote.play().catch(() => {});
+    remote.autoplay = true;
+    remote.playsInline = true;
+    remote.play().catch((err) => {
+      console.log('Play failed, retrying after user interaction:', err);
+      document.addEventListener('click', () => remote.play().catch(() => {}), { once: true });
+    });
 
     const remoteName = window._lastVoiceFromName || 'Unknown';
     const remoteId = window._lastVoiceFromId || ('remote-' + Date.now());
@@ -2881,31 +2901,78 @@ function createPeerConnection() {
   };
   
   peerConnection.onicecandidate = (e) => {
-    if (e.candidate) socket.emit('voiceSignal', { roomId, signal: { type: 'ice', candidate: e.candidate } });
+    if (e.candidate) {
+      socket.emit('voiceSignal', { 
+        roomId, 
+        signal: { type: 'ice', candidate: e.candidate } 
+      });
+    }
   };
-  peerConnection.onnegotiationneeded = async () => {
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    socket.emit('voiceSignal', { roomId, signal: { type: 'offer', sdp: offer.sdp } });
+  
+  peerConnection.onconnectionstatechange = () => {
+    console.log('🔗 Connection state:', peerConnection.connectionState);
+    if (peerConnection.connectionState === 'failed') {
+      console.log('Connection failed, restarting...');
+      peerConnection.restartIce();
+    }
+  };
+  
+  peerConnection.oniceconnectionstatechange = () => {
+    console.log('❄️ ICE state:', peerConnection.iceConnectionState);
   };
 }
 
 async function handleVoiceSignal(signal) {
-  if (!localStream) return;
+  if (!localStream) {
+    console.log('⚠️ No local stream yet, ignoring signal');
+    return;
+  }
   if (myPermissions.voice) return;
   if (!peerConnection) createPeerConnection();
+  
   try {
     if (signal.type === 'offer') {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: signal.sdp }));
+      console.log('📥 Offer received');
+      await peerConnection.setRemoteDescription(new RTCSessionDescription({ 
+        type: 'offer', 
+        sdp: signal.sdp 
+      }));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      socket.emit('voiceSignal', { roomId, signal: { type: 'answer', sdp: answer.sdp } });
+      socket.emit('voiceSignal', { 
+        roomId, 
+        signal: { type: 'answer', sdp: answer.sdp } 
+      });
+      console.log('📤 Answer sent');
     } else if (signal.type === 'answer') {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.sdp }));
+      console.log('📥 Answer received');
+      await peerConnection.setRemoteDescription(new RTCSessionDescription({ 
+        type: 'answer', 
+        sdp: signal.sdp 
+      }));
     } else if (signal.type === 'ice') {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      console.log('❄️ ICE candidate received');
+      if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      } else {
+        if (!window._iceQueue) window._iceQueue = [];
+        window._iceQueue.push(signal.candidate);
+        console.log('ICE queued:', window._iceQueue.length);
+      }
     }
-  } catch (e) {}
+    
+    // Process queued ICE candidates
+    if (peerConnection.remoteDescription && window._iceQueue) {
+      for (const cand of window._iceQueue) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {}
+      }
+      window._iceQueue = [];
+    }
+  } catch (e) {
+    console.log('Signal handling error:', e);
+  }
 }
 
 document.querySelectorAll('.reaction-btn').forEach(btn => {
