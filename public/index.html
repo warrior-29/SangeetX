@@ -1644,7 +1644,7 @@ input:checked + .slider:before { transform:translateX(16px); }
     <strong>Microphone blocked</strong>
     Click 🔒 in URL bar → Allow Microphone → Refresh
   </div>
-  <button class="mic-banner-close" onclick="hideMicBanner()">✕</button>
+  <button class="mic-banner-close" onclick="document.getElementById('micBanner').classList.remove('show')">✕</button>
 </div>  
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
