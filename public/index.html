@@ -2408,6 +2408,8 @@ function updatePlayIcon() {
 
 async function loadTrack(track, position = 0, autoPlay = false) {
   currentTrack = track;
+  
+  // Update UI
   document.getElementById('songTitle').textContent = track.title;
   document.getElementById('songArtist').textContent = track.artist;
 
@@ -2417,36 +2419,82 @@ async function loadTrack(track, position = 0, autoPlay = false) {
     : `<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
 
+  // Dynamic background + mood
   if (track.image) updateDynamicBackground(track.image);
   updateMood(track.title, track.artist);
 
-  audio.src = track.audioUrl;
-  audio.currentTime = position || 0;
-  audio.crossOrigin = 'anonymous';
+  // Reset playback rate (agar pichle drift se set tha)
+  audio.playbackRate = 1.0;
 
+  // Set audio source
+  audio.src = track.audioUrl;
+  audio.crossOrigin = 'anonymous';
+  audio.load();
+
+  // Position set AFTER metadata loads (accurate seek)
+  const setPositionOnMetadata = () => {
+    try {
+      audio.currentTime = position || 0;
+    } catch (e) {
+      console.log('Seek failed:', e);
+    }
+    audio.removeEventListener('loadedmetadata', setPositionOnMetadata);
+  };
+  audio.addEventListener('loadedmetadata', setPositionOnMetadata);
+
+  // Auto-play if needed
   if (autoPlay) {
     try {
       initAudioContext();
       await audio.play();
-      if (audioContext?.state === 'suspended') await audioContext.resume();
+      
+      if (audioContext?.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
       art.classList.add('playing');
       document.getElementById('waveformLive').classList.add('active');
       startWaveform();
       startBeatDetection();
-    } catch (e) {}
+    } catch (e) {
+      console.log('Autoplay failed:', e.message);
+      // Retry on user interaction
+      document.addEventListener('click', () => {
+        if (audio.paused && currentTrack) {
+          audio.play().catch(() => {});
+        }
+      }, { once: true });
+    }
   }
+
+  // Update play icon
   updatePlayIcon();
+
+  // Start heartbeat for sync
   startHeartbeat();
 
-  // Media Session
+  // Update Media Session (lock screen controls)
   if ('mediaSession' in navigator && track) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title || 'Unknown',
-      artist: track.artist || 'Unknown',
-      album: 'Music Sync',
-      artwork: track.image ? [{ src: track.image, sizes: '512x512', type: 'image/jpeg' }] : []
-    });
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title || 'Unknown',
+        artist: track.artist || 'Unknown',
+        album: 'Music Sync',
+        artwork: track.image ? [
+          { src: track.image, sizes: '96x96', type: 'image/jpeg' },
+          { src: track.image, sizes: '128x128', type: 'image/jpeg' },
+          { src: track.image, sizes: '192x192', type: 'image/jpeg' },
+          { src: track.image, sizes: '256x256', type: 'image/jpeg' },
+          { src: track.image, sizes: '384x384', type: 'image/jpeg' },
+          { src: track.image, sizes: '512x512', type: 'image/jpeg' }
+        ] : []
+      });
+    } catch (e) {
+      console.log('MediaSession update failed:', e);
+    }
   }
+
+  console.log('🎵 Track loaded:', track.title, 'at', position + 's, autoplay:', autoPlay);
 }
 
 document.getElementById('playBtn').addEventListener('click', () => {
