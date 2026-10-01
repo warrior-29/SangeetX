@@ -1681,6 +1681,7 @@ let unreadMessages = 0;
 let chatOpen = false;
 let audio = document.getElementById('audioPlayer');
 let myPermissions = { chat: false, play: false, voice: false };
+let micPermissionState = 'prompt';  // 'granted' | 'denied' | 'prompt'
 
 /* ===== VOICE MUTE STATE (per-device) ===== */
 const mutedUsers = new Set();      // Specific users muted (by lowercase name)
@@ -3074,23 +3075,6 @@ async function requestMicPermission() {
     showToast('❌ Mic blocked. Check browser settings.', 'error');
   }
 }
-
-/* ===== CHECK IF MIC USABLE (before PTT) ===== */
-function ensureMicPermission() {
-  if (micPermissionState === 'denied') {
-    // Denied — banner dikhao
-    showMicBanner();
-    showToast('🎤 Enable mic to speak', 'error');
-    return false;
-  }
-  if (micPermissionState === 'granted') {
-    return true;
-  }
-  // 'prompt' state — browser khud popup dikhayega
-  return true;
-}
-
-let micPermissionState = 'prompt';  // 'granted' | 'denied' | 'prompt'
 
 async function checkMicPermission() {
   try {
