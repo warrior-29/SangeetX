@@ -41,18 +41,6 @@ const AUTO_DJ_PLAYLIST = [
   'Muskurane Arijit Singh'
 ];
 
-// ✅ Silent ambient music (15% volume via isQuiet flag)
-const SILENT_AMBIENT_TRACK = {
-  id: 'ambient-silent-default',
-  title: '🎧 Chill Vibes',
-  artist: 'SangeetX Radio',
-  duration: 99999,
-  image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
-  audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
-  isQuiet: true,
-  volume: 0.15
-};
-
 let autoDjIndex = 0;
 
 const SIMILAR_ARTISTS = {
@@ -134,32 +122,6 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 30000);
 
-// ✅ Start ambient music
-function startAmbientMusic() {
-  const room = rooms[GLOBAL_ROOM_ID];
-  if (!room) return;
-  if (room.state.track && !room.state.isAmbient) return;
-
-  room.state = {
-    track: { ...SILENT_AMBIENT_TRACK },
-    position: 0,
-    isPlaying: true,
-    playedBy: null,
-    playedByName: '🎧 SangeetX Radio',
-    autoDj: false,
-    isAmbient: true,
-    lastUpdated: Date.now()
-  };
-
-  console.log('🎧 Ambient music started (volume: 15%)');
-  io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-  io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-    track: room.state.track,
-    reason: 'ambient',
-    playedBy: '🎧 SangeetX Radio'
-  });
-}
-
 function recordVisit(name, roomId, userAgent) {
   const now = new Date();
   const dateKey = now.toISOString().slice(0, 10);
@@ -174,7 +136,6 @@ function recordVisit(name, roomId, userAgent) {
 
 function isAdmin(password) { return password === ADMIN_PASSWORD; }
 
-// ✅ Approx location helper (server-side, for Global Map)
 function getApproxLocation(lat, lng) {
   const cities = [
     {name:'Delhi',lat:28.6139,lng:77.2090},{name:'Mumbai',lat:19.0760,lng:72.8777},
@@ -232,8 +193,7 @@ app.get('/api/global/stats', (req, res) => {
       artist: room.state.track.artist,
       isPlaying: room.state.isPlaying,
       playedBy: room.state.playedByName,
-      autoDj: room.state.autoDj,
-      isAmbient: room.state.isAmbient || false
+      autoDj: room.state.autoDj
     } : null,
     announcement: currentAnnouncement,
     createdAt: room.createdAt
@@ -274,8 +234,7 @@ app.get('/api/admin/stats', (req, res) => {
         title: room.state.track.title,
         artist: room.state.track.artist,
         playedBy: room.state.playedByName,
-        autoDj: room.state.autoDj,
-        isAmbient: room.state.isAmbient || false
+        autoDj: room.state.autoDj
       } : null,
       isPlaying: room.state.isPlaying,
       users: room.users.map(u => ({
@@ -357,23 +316,21 @@ app.get('/api/admin/blockedList', (req, res) => {
   });
 });
 
+// ✅ FIXED: Kick user — robust
 app.post('/api/admin/kickUser', (req, res) => {
   const { password, userId, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
   
   console.log(`👢 Kick request: userId=${userId}, roomId=${roomId}`);
   
-  // ✅ Try to find socket
   let s = io.sockets.sockets.get(userId);
   
-  // ✅ Agar userId se nahi mila, room me dhoondo
   if (!s && roomId && rooms[roomId]) {
     const room = rooms[roomId];
     const user = room.users.find(u => u.id === userId || u.name === userId);
     if (user) {
       s = io.sockets.sockets.get(user.id);
       if (!s) {
-        // User already disconnected, just remove from room
         room.users = room.users.filter(u => u.id !== user.id);
         io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
         return res.json({ success: true });
@@ -383,7 +340,6 @@ app.post('/api/admin/kickUser', (req, res) => {
   
   if (s) {
     s.emit('kicked', { message: 'Admin removed you' });
-    // Remove from room immediately
     if (roomId && rooms[roomId]) {
       const room = rooms[roomId];
       room.users = room.users.filter(u => u.id !== s.id);
@@ -572,7 +528,6 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Parallel API search — no 502
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
@@ -809,7 +764,6 @@ async function playNextSong(reason = 'auto', user = null) {
   const currentIsAmbient = room.state.isAmbient || false;
   const currentTrackId = room.state.track?.id;
 
-  // ✅ Sirf tab "context" try karo jab current track real ho
   if (!currentIsAmbient && currentTrackId && currentTrackId !== 'ambient-silent-default') {
     if (reason === 'skip') {
       nextSong = await getSkipSong(room.state.track, playedHistory);
@@ -818,35 +772,28 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // ✅ Auto DJ fallback — 5 retries
+  // ✅ Auto DJ fallback — 3 retries, 500ms delay
   if (!nextSong) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
-      console.log(`🎵 Auto DJ attempt ${i+1}/5: ${songName}`);
+      console.log(`🎵 Auto DJ attempt ${i+1}/3: ${songName}`);
       nextSong = await searchSong(songName);
       if (nextSong) {
         console.log(`✅ Auto DJ got: ${nextSong.title}`);
         break;
       }
-      if (i < 4) await new Promise(r => setTimeout(r, 800));
+      if (i < 2) await new Promise(r => setTimeout(r, 500));
     }
   }
 
-  // ✅ If still null → keep ambient, retry
+  // ✅ If still null → retry in 10s (no ambient)
   if (!nextSong) {
-    console.error('❌ playNextSong: all APIs failed');
-    if (!room.state.isAmbient) {
-      startAmbientMusic();
-    }
-    setTimeout(() => {
-      console.log('🔄 Retry playNextSong in 5s...');
-      playNextSong(reason, user);
-    }, 5000);
+    console.error('❌ playNextSong: all APIs failed, retrying in 10s');
+    setTimeout(() => playNextSong(reason, user), 10000);
     return;
   }
 
-  // ✅ History update
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track && !room.state.isAmbient && room.state.track.id !== nextSong.id) {
     room.playedHistory.push(room.state.track.id);
@@ -863,7 +810,6 @@ async function playNextSong(reason = 'auto', user = null) {
     playedByName = user.name;
   }
 
-  // ✅ SET NEW STATE
   room.state = {
     track: nextSong,
     position: 0,
@@ -877,7 +823,6 @@ async function playNextSong(reason = 'auto', user = null) {
 
   console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
 
-  // ✅ Emit to all clients
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: nextSong,
@@ -886,23 +831,15 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ Aggressive Auto DJ
+// ✅ Song end check — no ambient
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
 
     if (!room.state.track || !room.state.isPlaying) {
-      const lastAttempt = room._lastAutoDjAttempt || 0;
-      if (Date.now() - lastAttempt < 10000) return;
-      room._lastAutoDjAttempt = Date.now();
-
-      console.log(`🎧 No song playing — starting ambient`);
-      startAmbientMusic();
       return;
     }
-
-    if (room.state.isAmbient) return;
 
     const duration = room.state.track.duration || 0;
     const position = room.state.position || 0;
@@ -923,7 +860,6 @@ function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || !room.state.isPlaying) return;
-    if (room.state.isAmbient) return;
 
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
@@ -936,13 +872,8 @@ function startPositionUpdater() {
 }
 
 function startAutoDj() {
-  setTimeout(() => {
-    const room = rooms[GLOBAL_ROOM_ID];
-    if (room && !room.state.track) {
-      console.log('🎧 Initial ambient music start');
-      startAmbientMusic();
-    }
-  }, 2000);
+  // ✅ No auto-start — user plays first song
+  console.log('🎵 Auto DJ: Waiting for user to play a song...');
 }
 
 io.on('connection', (socket) => {
@@ -1026,11 +957,9 @@ io.on('connection', (socket) => {
 
     if (room.state.track && room.state.isPlaying) {
       let currentPosition = room.state.position || 0;
-      if (!room.state.isAmbient) {
-        const lastUpdated = room.state.lastUpdated || Date.now();
-        const elapsed = (Date.now() - lastUpdated) / 1000;
-        currentPosition = (room.state.position || 0) + elapsed;
-      }
+      const lastUpdated = room.state.lastUpdated || Date.now();
+      const elapsed = (Date.now() - lastUpdated) / 1000;
+      currentPosition = (room.state.position || 0) + elapsed;
 
       socket.emit('stateSync', {
         track: room.state.track,
@@ -1038,7 +967,6 @@ io.on('connection', (socket) => {
         isPlaying: true,
         playedByName: room.state.playedByName,
         autoDj: room.state.autoDj,
-        isAmbient: room.state.isAmbient || false,
         lastUpdated: Date.now()
       });
 
@@ -1048,29 +976,7 @@ io.on('connection', (socket) => {
         playedBy: room.state.playedByName
       });
 
-      console.log(`🔄 Synced ${userName} to ${room.state.isAmbient ? 'ambient' : 'position ' + currentPosition.toFixed(1) + 's'}`);
-    }
-    else {
-      console.log(`🎧 No song — starting ambient for ${userName}`);
-      startAmbientMusic();
-      setTimeout(() => {
-        if (room.state.track) {
-          socket.emit('stateSync', {
-            track: room.state.track,
-            position: 0,
-            isPlaying: true,
-            playedByName: room.state.playedByName,
-            autoDj: room.state.autoDj,
-            isAmbient: room.state.isAmbient || false,
-            lastUpdated: Date.now()
-          });
-          socket.emit('songChanged', {
-            track: room.state.track,
-            reason: 'sync',
-            playedBy: room.state.playedByName
-          });
-        }
-      }, 500);
+      console.log(`🔄 Synced ${userName} to position ${currentPosition.toFixed(1)}s`);
     }
 
     socket.emit('chatHistory', room.messages);
@@ -1138,7 +1044,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-    socket.on('requestNext', async ({ roomId }) => {
+  socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1157,10 +1063,8 @@ io.on('connection', (socket) => {
       message: `⏭️ Next song`
     });
 
-    // ✅ Force reset isAmbient so playNextSong runs
     const wasAmbient = room.state.isAmbient;
     if (wasAmbient) {
-      // ✅ Skip "next from context" if ambient — direct Auto DJ
       room.state.isAmbient = false;
     }
 
@@ -1270,7 +1174,7 @@ io.on('connection', (socket) => {
 
     let currentPosition = room.state.position || 0;
 
-    if (room.state.track && room.state.isPlaying && !room.state.isAmbient) {
+    if (room.state.track && room.state.isPlaying) {
       const lastUpdated = room.state.lastUpdated || Date.now();
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
@@ -1288,7 +1192,6 @@ io.on('connection', (socket) => {
       isPlaying: room.state.isPlaying,
       playedByName: room.state.playedByName,
       autoDj: room.state.autoDj,
-      isAmbient: room.state.isAmbient || false,
       lastUpdated: Date.now()
     });
 
@@ -1308,7 +1211,6 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
     if (user.blocked && user.blocked.play) return;
-    if (room.state.isAmbient) return;
     room.state.position = position;
     room.state.isPlaying = isPlaying;
     room.state.lastUpdated = Date.now();
@@ -1417,7 +1319,6 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  // ✅ shareLocation with timezone
   socket.on('shareLocation', ({ roomId, location, timezone }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1431,7 +1332,6 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerLocation', { location, userId: socket.id, userName: user?.name });
   });
 
-  // ✅ Global Listeners Request
   socket.on('requestGlobalListeners', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1464,7 +1364,7 @@ io.on('connection', (socket) => {
       totalListeners: listeners.reduce((sum, l) => sum + l.userCount, 0)
     });
 
-    console.log(`🌍 Global listeners requested: ${listeners.length} cities, ${listeners.reduce((s, l) => s + l.userCount, 0)} users`);
+    console.log(`🌍 Global listeners: ${listeners.length} cities, ${listeners.reduce((s, l) => s + l.userCount, 0)} users`);
   });
 
   socket.on('syncPing', ({ roomId, clientTime }) => {
@@ -1573,7 +1473,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
-  console.log('🎧 Starting ambient music...');
+  console.log('🎵 Auto DJ: Waiting for user to play a song...');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
