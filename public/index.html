@@ -346,12 +346,18 @@ body::before {
   padding: 0; transition: transform 0.25s var(--spring);
 }
 .ctrl-btn.play::before {
-  content: ""; position: absolute; top: 50%; left: 50%;
-  width: 40px; height: 40px; border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  transform: translate(-50%, -50%);
-  z-index: 1; pointer-events: none;
-  backdrop-filter: blur(4px);
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 31px;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 20%);
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
 }
 .ctrl-btn.play svg,
 .ctrl-btn.play [data-lucide] {
