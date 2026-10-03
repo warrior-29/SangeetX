@@ -762,19 +762,19 @@ input:checked + .slider:before { transform:translateX(16px); }
 
 /* -------- MESSAGE BUBBLES — WATER BUBBLE STYLE (EXACT REFERENCE) -------- */
 .chat-msg {
-  padding: 9px 14px 8px 14px;
-  border-radius: 16px;
-  font-size: 15px;
-  line-height: 1.42;
-  word-wrap: break-word;
-  font-weight: 400;
-  position: relative;
-  display: block;
-  min-width: 70px;
-  max-width: 100%;
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  overflow: hidden;
+    padding: 9px 14px 8px 14px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.42;
+    word-wrap: break-word;
+    font-weight: 400;
+    position: relative;
+    display: block;
+    min-width: 70px;
+    max-width: 100%;
+    backdrop-filter: blur(0px) saturate(100%);
+    -webkit-backdrop-filter: blur(0px) saturate(100%);
+    overflow: hidden;
 }
 
 /* Water bubble shine — top highlight (subtle) */
@@ -802,12 +802,10 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 
 .chat-msg.mine {
-  background: rgba(75, 35, 130, 0.28);
-  color: #FFFFFF;
-  border: 1px solid rgba(180, 140, 255, 0.10);
-  box-shadow: 
-    0 1px 1px rgba(255, 255, 255, 0.10) inset,
-    0 2px 8px rgba(0, 0, 0, 0.15);
+    background: rgb(75 35 130 / 2%);
+    color: #FFFFFF;
+    border: 1px solid rgb(180 140 255 / 8%);
+    box-shadow: 0 1px 1px rgba(255, 255, 255, 0.10) inset, 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .chat-msg.theirs {
