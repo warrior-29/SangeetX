@@ -1715,6 +1715,15 @@ function updatePlayedBy(playedByName, reason) {
   if (!badge || !text) return;
   if (!playedByName) { badge.classList.remove('active'); return; }
   badge.classList.add('active');
+  // ✅ NAYA: Ambient case
+  if (reason === 'ambient' || playedByName === '🎧 SangeetX Radio') {
+    text.textContent = '🎧 Chill Vibes';
+    badge.classList.remove('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'radio');
+    refreshIcons();
+    return;
+  }
   if (reason === 'auto' || playedByName === '🎵 Auto DJ') {
     text.textContent = '🎵 Auto DJ';
     badge.classList.add('auto');
@@ -2118,21 +2127,29 @@ function initSocket(){
     applyRemoteState(state);
   });
 
-  socket.on('songChanged', ({ track, reason, playedBy }) => {
-    if (reason === 'sync') {
-      const syncPos = lastKnownPosition || 0;
-      loadTrack(track, syncPos, true);
-      updatePlayedBy(playedBy, 'user');
-      return;
-    }
+ socket.on('songChanged', ({ track, reason, playedBy }) => {
+  if (reason === 'sync') {
+    const syncPos = lastKnownPosition || 0;
+    loadTrack(track, syncPos, true);
+    updatePlayedBy(playedBy, 'user');
+    return;
+  }
+
+  // ✅ Ambient track ke liye koi toast nahi
+  if (reason === 'ambient' || track.isQuiet) {
     loadTrack(track, 0, true);
-    updatePlayedBy(playedBy, reason);
-    
-    if (reason === 'auto') showToast('🎵 Auto-playing next');
-    else if (reason === 'next' && playedBy) showToast(`${playedBy} played next`);
-    else if (reason === 'skip' && playedBy) showToast(`${playedBy} skipped 🎲`);
-    else if (reason === 'admin') showToast(`👑 Admin changed the song`);
-  });
+    updatePlayedBy(playedBy, 'ambient');
+    return;
+  }
+
+  loadTrack(track, 0, true);
+  updatePlayedBy(playedBy, reason);
+  
+  if (reason === 'auto') showToast('🎵 Auto next');
+  else if (reason === 'next') showToast(`⏭️ Next`);
+  else if (reason === 'skip') showToast(`🎲 Skipped`);
+  else if (reason === 'admin') showToast(`👑 Admin changed`);
+});
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
 
@@ -2712,6 +2729,14 @@ async function loadTrack(track,position=0,autoPlay=false){
     ?`<img src="${track.image}" alt="" crossorigin="anonymous">`
     :`<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
+  // ✅ NAYA: Ambient track ke liye low volume
+  if (track.isQuiet) {
+    audio.volume = 0.15;   // ✅ 15% — halka background music
+    console.log('🎧 Ambient track loaded — volume set to 15%');
+  } else {
+    audio.volume = 1.0;    // ✅ Full volume for real songs
+    console.log('🎵 Real song loaded — volume 100%');
+  }
   if(track.image)updateDynamicBackground(track.image);
   updateMood(track.title,track.artist);
   audio.playbackRate=1.0;
