@@ -658,6 +658,10 @@ body::before {
   background:rgba(239,68,68,0.15);
   color:var(--danger);
 }
+.room-user-tag.muted {
+  background:rgba(245,158,11,0.15);
+  color:var(--warning);
+}
 .room-user-actions {
   display:flex;
   gap:4px;
@@ -927,6 +931,8 @@ body::before {
 .toast.success [data-lucide] { color:var(--success); }
 .toast.error { border-color:rgba(239,68,68,0.4); }
 .toast.error [data-lucide] { color:var(--danger); }
+.toast.info { border-color:rgba(139,92,246,0.4); }
+.toast.info [data-lucide] { color:var(--primary-2); }
 
 /* MODAL */
 .modal {
@@ -1388,6 +1394,7 @@ function renderRooms(roomsList) {
                 <span class="room-user-name">${esc(u.name)}</span>
                 ${isOwner ? '<span class="room-user-tag owner">OWNER</span>' : ''}
                 ${isBlocked ? '<span class="room-user-tag blocked">BLOCKED</span>' : ''}
+                ${u.globallyMuted ? '<span class="room-user-tag muted">MUTED</span>' : ''}
               </div>
               <div class="room-user-actions">
                 ${!isOwner ? `
@@ -1405,6 +1412,12 @@ function renderRooms(roomsList) {
                     onclick="toggleBlock('${esc(r.roomId)}', '${u.id}', 'voice', ${!(u.blocked && u.blocked.voice)})"
                     title="Voice permission">
                     <i data-lucide="mic"></i>
+                  </button>
+                  <button class="perm-btn ${u.globallyMuted ? 'blocked' : ''}" 
+                    onclick="toggleGlobalMute('${u.id}', '${esc(u.name)}', ${!u.globallyMuted})"
+                    title="${u.globallyMuted ? 'Unmute globally' : 'Mute globally'}"
+                    style="background:${u.globallyMuted ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.1)'};color:${u.globallyMuted ? 'var(--danger)' : 'var(--primary-2)'}">
+                    <i data-lucide="${u.globallyMuted ? 'volume-x' : 'volume-2'}"></i>
                   </button>
                   <button class="perm-btn" 
                     onclick="kickUser('${esc(r.roomId)}', '${u.id}', '${esc(u.name)}')"
@@ -1434,6 +1447,14 @@ function renderRooms(roomsList) {
             <button class="btn small" onclick="openChatViewer('${esc(r.roomId)}')">
               <i data-lucide="message-circle"></i>
               <span>Chat</span>
+            </button>
+            <button class="btn small" onclick="openForceSkip()" style="background:rgba(139,92,246,0.15);color:var(--primary-2);border-color:rgba(139,92,246,0.3)">
+              <i data-lucide="skip-forward"></i>
+              <span>Force Skip</span>
+            </button>
+            <button class="btn small primary" onclick="openAnnounce()">
+              <i data-lucide="megaphone"></i>
+              <span>Announce</span>
             </button>
             <button class="btn small danger" onclick="confirmDeleteRoom('${esc(r.roomId)}', '${esc(r.ownerName)}')">
               <i data-lucide="trash-2"></i>
@@ -1535,6 +1556,96 @@ async function kickUser(roomId, userId, userName) {
     if (data.success) {
       showToast(`${userName} kicked`, 'success');
       loadStats();
+    } else {
+      showToast(data.error || 'Failed', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+/* ============ GLOBAL MUTE ============ */
+async function toggleGlobalMute(userId, userName, mute) {
+  if (!confirm(`${mute ? 'Mute' : 'Unmute'} ${userName} globally?\n\nAll users will hear them ${mute ? 'silent' : 'again'}.`)) return;
+  
+  try {
+    const res = await fetch('/api/admin/globalMute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: adminPassword,
+        userId: userId,
+        mute: mute
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast(`${userName} ${mute ? 'muted' : 'unmuted'} globally`, 'success');
+      loadStats();
+    } else {
+      showToast(data.error || 'Failed', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+/* ============ FORCE SKIP ============ */
+function openForceSkip() {
+  const query = prompt('Enter song name (or leave empty for Auto DJ next):');
+  if (query === null) return; // Cancel
+  
+  forceSkip(query.trim());
+}
+
+async function forceSkip(searchQuery) {
+  try {
+    showToast('🎵 Loading song...', 'info');
+    
+    const res = await fetch('/api/admin/forceSkip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: adminPassword,
+        searchQuery: searchQuery || ''
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast(`👑 Force skipped to: ${data.track.title}`, 'success');
+      loadStats();
+    } else {
+      showToast(data.error || 'Song not found', 'error');
+    }
+  } catch (e) {
+    showToast('Network error', 'error');
+  }
+}
+
+/* ============ ANNOUNCE ============ */
+function openAnnounce() {
+  const message = prompt('Enter announcement message (max 300 chars):');
+  if (message === null || !message.trim()) return;
+  
+  sendAnnounce(message.trim().slice(0, 300));
+}
+
+async function sendAnnounce(message) {
+  try {
+    const res = await fetch('/api/admin/announce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: adminPassword,
+        message: message
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      showToast('📢 Announcement sent to all users', 'success');
     } else {
       showToast(data.error || 'Failed', 'error');
     }
@@ -1748,7 +1859,7 @@ function showToast(msg, type) {
   const icon = t.querySelector('[data-lucide]');
   txt.textContent = msg;
   if (icon) {
-    icon.setAttribute('data-lucide', type === 'error' ? 'x-circle' : 'check-circle');
+    icon.setAttribute('data-lucide', type === 'error' ? 'x-circle' : (type === 'info' ? 'info' : 'check-circle'));
   }
   t.className = 'toast show ' + (type || '');
   refreshIcons();
