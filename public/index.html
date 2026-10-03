@@ -2363,10 +2363,14 @@ function initSocket(){
       return;
     }
 
+    console.log(`🎵 songChanged: ${track.title} (${reason})`);
+
     if (reason === 'sync') {
       const syncPos = lastKnownPosition || 0;
       loadTrack(track, syncPos, true);
       updatePlayedBy(playedBy, 'user');
+      // ✅ Force icon update
+      setTimeout(() => updatePlayIcon(), 100);
       return;
     }
 
@@ -2374,17 +2378,21 @@ function initSocket(){
     if (reason === 'ambient' || track.isQuiet) {
       loadTrack(track, 0, true);
       updatePlayedBy(playedBy, 'ambient');
+      setTimeout(() => updatePlayIcon(), 100);
       return;
     }
 
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
     
+    // ✅ Force icon update after load
+    setTimeout(() => updatePlayIcon(), 200);
+    
     if (reason === 'auto') showToast('🎵 Auto next');
     else if (reason === 'next') showToast(`⏭️ Next`);
     else if (reason === 'skip') showToast(`🎲 Skipped`);
     else if (reason === 'admin') showToast(`👑 Admin changed`);
-  });
+});
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
 
