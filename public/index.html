@@ -1876,6 +1876,10 @@ let deferredPrompt = null;
 let globalMap = null;
 let mapMarkers = [];
 
+// ✅ Next/Prev loading state
+let isLoadingNext = false;
+let isLoadingPrev = false;
+
 const SESSION_VALIDITY_MS = 30 * 1000;
 let sessionRefreshInterval = null;
 
@@ -2616,6 +2620,7 @@ function initSocket(){
     setTimeout(() => updatePlayIcon(), 200);
     if (reason === 'auto') showToast('🎵 Auto next');
     else if (reason === 'next') showToast(`⏭️ Next`);
+    else if (reason === 'prev') showToast(`⏮️ Previous`);
     else if (reason === 'skip') showToast(`🎲 Skipped`);
     else if (reason === 'admin') showToast(`👑 Admin changed`);
   });
@@ -2708,6 +2713,29 @@ function initSocket(){
   socket.on('chatPresenceUpdate',({users})=>{renderChatPresence(users);});
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{updateTypingIndicator(typer,typingNow);});
   socket.on('autoDjTrack', ({ track }) => { loadTrack(track, 0, true); updatePlayedBy('🎵 Auto DJ', 'auto'); });
+
+  // ✅ ACK handlers — next/prev loading state reset
+  socket.on('nextAck', ({ status, track }) => {
+    isLoadingNext = false;
+    const btn = document.getElementById('nextBtn');
+    if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+    if (status === 'success' || status === 'fallback') {
+      showToast(`⏭️ ${track || 'Next'}`, 'success');
+    } else {
+      showToast('⏭️ Next failed', 'error');
+    }
+  });
+
+  socket.on('prevAck', ({ status, track }) => {
+    isLoadingPrev = false;
+    const btn = document.getElementById('prevBtn');
+    if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+    if (status === 'success' || status === 'fallback') {
+      showToast(`⏮️ ${track || 'Previous'}`, 'success');
+    } else {
+      showToast('⏮️ No previous song', 'warning');
+    }
+  });
 
   socket.on('globalMuteState', ({ muted }) => {
     if (muted) {
@@ -3070,7 +3098,6 @@ function renderChat(messages,replace){
     const row = document.createElement('div');
     row.className = 'chat-msg-row ' + (mine ? 'mine' : 'theirs');
     const time = new Date(m.time).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
-    /* DYNAMIC SENDER NAME: uses m.userName for others, "You" for own */
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
     row.innerHTML = `
   <div class="chat-msg-sender">
@@ -3413,6 +3440,7 @@ document.getElementById('forwardBtn').addEventListener('click', () => {
   showToast('⏩ +10s');
 });
 
+// ✅ PREV — with loading indicator + ACK
 document.getElementById('prevBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -3420,17 +3448,31 @@ document.getElementById('prevBtn').addEventListener('click', () => {
     audio.currentTime = 0;
     broadcastState({ isPlaying: true, position: 0 });
     showToast('⏮️ Restarted');
-  } else {
-    if (socket && socket.connected) socket.emit('requestPrev', { roomId });
-    showToast('⏮️ Previous');
+    return;
   }
+  if (!socket || !socket.connected) { showToast('Not connected', 'error'); return; }
+  if (isLoadingPrev) { showToast('⏳ Already loading...'); return; }
+
+  isLoadingPrev = true;
+  const btn = document.getElementById('prevBtn');
+  btn.style.opacity = '0.5';
+  btn.style.pointerEvents = 'none';
+  showToast('⏮️ Loading previous...');
+  socket.emit('requestPrev', { roomId });
 });
 
-document.getElementById('nextBtn').addEventListener('click',()=>{
-  if(!socket||!socket.connected){showToast('Not connected','error');return;}
-  if(myPermissions.play){showToast('You are blocked','error');return;}
-  socket.emit('requestNext',{roomId});
-  showToast('⏭️ Next');
+// ✅ NEXT — with loading indicator + ACK
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (!socket || !socket.connected) { showToast('Not connected', 'error'); return; }
+  if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
+  if (isLoadingNext) { showToast('⏳ Already loading...'); return; }
+
+  isLoadingNext = true;
+  const btn = document.getElementById('nextBtn');
+  btn.style.opacity = '0.5';
+  btn.style.pointerEvents = 'none';
+  showToast('⏭️ Loading next...');
+  socket.emit('requestNext', { roomId });
 });
 
 /* ============ PROGRESS BAR ============ */
@@ -3938,10 +3980,25 @@ function setupMediaSession() {
     }
   });
   navigator.mediaSession.setActionHandler('nexttrack', () => {
-    if (socket && socket.connected) socket.emit('requestNext', { roomId });
+    if (!socket || !socket.connected) return;
+    if (isLoadingNext) return;
+    isLoadingNext = true;
+    const btn = document.getElementById('nextBtn');
+    if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+    socket.emit('requestNext', { roomId });
   });
   navigator.mediaSession.setActionHandler('previoustrack', () => {
-    if (audio.currentTime > 3) audio.currentTime = 0;
+    if (audio.currentTime > 3) {
+      audio.currentTime = 0;
+      broadcastState({ isPlaying: true, position: 0 });
+      return;
+    }
+    if (!socket || !socket.connected) return;
+    if (isLoadingPrev) return;
+    isLoadingPrev = true;
+    const btn = document.getElementById('prevBtn');
+    if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+    socket.emit('requestPrev', { roomId });
   });
 }
 document.addEventListener('click', setupMediaSession, { once: true });
