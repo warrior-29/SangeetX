@@ -919,6 +919,96 @@ input:checked + .slider:before { transform:translateX(16px); }
   flex-shrink:0;
 }
 
+/* ============ ADMIN ANNOUNCE BANNER ============ */
+.admin-announce-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, rgba(139,92,246,0.98), rgba(236,72,153,0.98));
+  backdrop-filter: blur(20px);
+  border-bottom: 2px solid rgba(255,255,255,0.3);
+  padding: 16px 20px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(139,92,246,0.5);
+  transform: translateY(-100%);
+  transition: transform 0.5s var(--spring);
+  animation: announcePulse 2s ease-in-out infinite;
+}
+.admin-announce-banner.show {
+  transform: translateY(0);
+}
+@keyframes announcePulse {
+  0%,100% { box-shadow: 0 8px 32px rgba(139,92,246,0.5); }
+  50% { box-shadow: 0 8px 48px rgba(236,72,153,0.7); }
+}
+.announce-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: announceIconShake 1s ease-in-out infinite;
+}
+@keyframes announceIconShake {
+  0%,100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+.announce-icon [data-lucide] {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.5;
+  color: white;
+}
+.announce-text {
+  flex: 1;
+  min-width: 0;
+  color: white;
+}
+.announce-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+.announce-message {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.announce-close {
+  background: rgba(255,255,255,0.25);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s var(--spring);
+}
+.announce-close [data-lucide] {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+.announce-close:active {
+  transform: scale(0.9);
+  background: rgba(255,255,255,0.4);
+}
+
 @keyframes rippleAnim {
   to { transform:scale(4); opacity:0; }
 }
@@ -1289,6 +1379,8 @@ const mutedUsers = new Set();
 const remoteAudios = new Map();
 let muteAll = false;
 
+let globalMutedByAdmin = false;
+
 let myLocation = null;
 let partnerLocation = null;
 let distanceKm = 0;
@@ -1461,6 +1553,11 @@ function updatePlayedBy(playedByName, reason) {
     badge.classList.remove('auto');
     const icon = badge.querySelector('[data-lucide]');
     if (icon) icon.setAttribute('data-lucide', 'shuffle');
+  } else if (reason === 'admin') {
+    text.textContent = `👑 Admin changed`;
+    badge.classList.remove('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'crown');
   } else {
     text.textContent = `Played by ${playedByName}`;
     badge.classList.remove('auto');
@@ -1606,10 +1703,10 @@ function saveSession(){
 function clearSession(){localStorage.removeItem('musicSyncSession');}
 
 /* ============ MUTE ============ */
-function toggleMuteUser(userName){
-  const k=userName.toLowerCase();
-  if(mutedUsers.has(k)){mutedUsers.delete(k);showToast(`🔊 ${userName} unmuted`,'success');}
-  else{mutedUsers.add(k);showToast(`🔇 ${userName} muted`,'success');}
+function toggleMuteUser(name){
+  const k=name.toLowerCase();
+  if(mutedUsers.has(k)){mutedUsers.delete(k);showToast(`🔊 ${name} unmuted`,'success');}
+  else{mutedUsers.add(k);showToast(`🔇 ${name} muted`,'success');}
   saveMuteState();applyMuteState();renderUsers(window._currentUsers||[]);
 }
 function toggleMuteAll(){
@@ -1853,9 +1950,11 @@ function initSocket(){
     }
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
+    
     if (reason === 'auto') showToast('🎵 Auto-playing next');
     else if (reason === 'next' && playedBy) showToast(`${playedBy} played next`);
     else if (reason === 'skip' && playedBy) showToast(`${playedBy} skipped 🎲`);
+    else if (reason === 'admin') showToast(`👑 Admin changed the song`);
   });
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
@@ -1942,6 +2041,131 @@ function initSocket(){
   socket.on('chatPresenceUpdate',({users})=>{renderChatPresence(users);});
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{updateTypingIndicator(typer,typingNow);});
   socket.on('autoDjTrack', ({ track }) => { loadTrack(track, 0, true); updatePlayedBy('🎵 Auto DJ', 'auto'); });
+
+  /* ═══════════════════════════════════════════════
+     GLOBAL MUTE — Server se aane wala event
+     ═══════════════════════════════════════════════ */
+  socket.on('globalMuteState', ({ muted }) => {
+    if (muted) {
+      globalMutedByAdmin = true;
+      // PTT card block karo
+      const pttCard = document.getElementById('pttCard');
+      if (pttCard) pttCard.classList.add('blocked');
+      document.getElementById('pttToggle').disabled = true;
+      document.getElementById('alwaysOnToggle').disabled = true;
+      if (localStream) {
+        localStream.getAudioTracks().forEach(t => t.enabled = false);
+      }
+      showToast('🔇 You have been muted by admin', 'error');
+    } else {
+      globalMutedByAdmin = false;
+      const pttCard = document.getElementById('pttCard');
+      if (pttCard && !myPermissions.voice) {
+        pttCard.classList.remove('blocked');
+        document.getElementById('pttToggle').disabled = false;
+        document.getElementById('alwaysOnToggle').disabled = false;
+      }
+    }
+  });
+
+  socket.on('globalMuteUpdate', ({ userId, userName: mutedName, muted }) => {
+    // Sab users ke remote audio me mute karo
+    remoteAudios.forEach((entry) => {
+      if (entry.userName === mutedName) {
+        entry.audio.muted = muted || muteAll;
+      }
+    });
+    
+    // Toast dikhao
+    if (muted) {
+      showToast(`🔇 ${mutedName} muted by admin`, 'warning');
+    } else {
+      showToast(`🔊 ${mutedName} unmuted by admin`, 'success');
+    }
+    
+    // Local storage me bhi add karo (taaki refresh pe bhi rahe)
+    if (muted) {
+      mutedUsers.add(mutedName.toLowerCase());
+    } else {
+      mutedUsers.delete(mutedName.toLowerCase());
+    }
+    saveMuteState();
+  });
+
+  socket.on('youAreMuted', ({ muted, by }) => {
+    globalMutedByAdmin = muted;
+    if (muted) {
+      showToast(`🔇 You have been muted by ${by}`, 'error');
+      const pttCard = document.getElementById('pttCard');
+      if (pttCard) pttCard.classList.add('blocked');
+      document.getElementById('pttToggle').disabled = true;
+      document.getElementById('alwaysOnToggle').disabled = true;
+      if (localStream) {
+        localStream.getAudioTracks().forEach(t => t.enabled = false);
+      }
+    } else {
+      showToast(`🔊 You have been unmuted`, 'success');
+      const pttCard = document.getElementById('pttCard');
+      if (pttCard && !myPermissions.voice) {
+        pttCard.classList.remove('blocked');
+        document.getElementById('pttToggle').disabled = false;
+        document.getElementById('alwaysOnToggle').disabled = false;
+      }
+    }
+  });
+
+  /* ═══════════════════════════════════════════════
+     FORCE SKIP — Admin ne gaana badla
+     ═══════════════════════════════════════════════ */
+  socket.on('adminForceSkip', ({ track, message }) => {
+    console.log('👑 Admin force skip:', track.title);
+    showToast(`👑 ${message}`, 'warning');
+  });
+
+  // Ye 'songChanged' handler me already handle hoga
+  // reason: 'admin' ke saath
+
+  /* ═══════════════════════════════════════════════
+     ANNOUNCE — Admin ka message top pe
+     ═══════════════════════════════════════════════ */
+  socket.on('adminAnnounce', ({ message, time }) => {
+    showAdminAnnounce(message);
+  });
+}
+
+/* ============ ADMIN ANNOUNCE — Full-screen banner ============ */
+function showAdminAnnounce(message) {
+  // Purane remove
+  const existing = document.getElementById('adminAnnounceBanner');
+  if (existing) existing.remove();
+  
+  const banner = document.createElement('div');
+  banner.id = 'adminAnnounceBanner';
+  banner.className = 'admin-announce-banner';
+  banner.innerHTML = `
+    <div class="announce-icon">
+      <i data-lucide="megaphone"></i>
+    </div>
+    <div class="announce-text">
+      <div class="announce-label">👑 ADMIN ANNOUNCEMENT</div>
+      <div class="announce-message">${esc(message)}</div>
+    </div>
+    <button class="announce-close" onclick="this.parentElement.remove()">
+      <i data-lucide="x"></i>
+    </button>
+  `;
+  document.body.appendChild(banner);
+  refreshIcons();
+  
+  requestAnimationFrame(() => {
+    setTimeout(() => banner.classList.add('show'), 50);
+  });
+  
+  // 8 second baad auto-remove
+  setTimeout(() => {
+    banner.classList.remove('show');
+    setTimeout(() => banner.remove(), 500);
+  }, 8000);
 }
 
 /* ============ PERMISSIONS ============ */
