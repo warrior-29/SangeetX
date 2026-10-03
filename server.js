@@ -16,20 +16,15 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@8174902497';
 const GLOBAL_ROOM_ID = 'global';
 const rooms = {};
 
-// ===== BLOCK LISTS =====
 const BLOCKED_IPS = new Set();
 const BLOCKED_FINGERPRINTS = new Set();
-
-// ===== GLOBAL MUTES (username-based) =====
 const GLOBAL_MUTED_USERS = new Set();
 
-// ===== ANNOUNCEMENT STATE =====
-let currentAnnouncement = null; // { message, by, at, duration }
+let currentAnnouncement = null;
 
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 60 * 1000;
 
-// ===== AUTO DJ PLAYLIST =====
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
   'Tum Hi Ho Arijit Singh',
@@ -50,7 +45,6 @@ const AUTO_DJ_PLAYLIST = [
 
 let autoDjIndex = 0;
 
-// ===== SIMILAR ARTIST MAPPING =====
 const SIMILAR_ARTISTS = {
   'arijit singh': ['atif aslam', 'jubin nautiyal', 'sachet tandon', 'darshan raval'],
   'atif aslam': ['arijit singh', 'jubin nautiyal', 'sonu nigam'],
@@ -67,7 +61,6 @@ const analytics = {
   activeSessions: new Map(), dailyVisits: {}, hourlyVisits: {}
 };
 
-// ===== IP HELPER =====
 function getClientIP(socket) {
   const handshake = socket.handshake;
   const forwarded = handshake.headers['x-forwarded-for'];
@@ -96,7 +89,6 @@ function isBlocked(socket, fingerprint) {
   return { blocked: false };
 }
 
-// ===== GLOBAL MUTE HELPERS =====
 function isGloballyMuted(userName) {
   if (!userName) return false;
   return GLOBAL_MUTED_USERS.has(userName.toLowerCase());
@@ -144,7 +136,6 @@ function recordVisit(name, roomId, userAgent) {
 
 function isAdmin(password) { return password === ADMIN_PASSWORD; }
 
-// ===== WELCOME MESSAGES =====
 const WELCOME_MESSAGES = [
   "Kaise ho? Music sunte hain! 🎵",
   "Welcome! Aaj kya sunna hai?",
@@ -158,7 +149,6 @@ function getRandomWelcome() {
   return WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
 }
 
-// ===== GLOBAL STATS =====
 app.get('/api/global/stats', (req, res) => {
   ensureGlobalRoom();
   const room = rooms[GLOBAL_ROOM_ID];
@@ -180,7 +170,6 @@ app.get('/api/global/stats', (req, res) => {
   });
 });
 
-// ===== ADMIN ROUTES =====
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -250,7 +239,6 @@ app.get('/api/admin/stats', (req, res) => {
   });
 });
 
-// ===== ADMIN: BLOCK/UNBLOCK =====
 app.post('/api/admin/blockUser', (req, res) => {
   const { password, userId, ip, fingerprint, reason } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -344,10 +332,6 @@ app.get('/api/admin/roomChat', (req, res) => {
   res.json({ messages: room.messages });
 });
 
-/* ═══════════════════════════════════════════════════════════
-   ✅ FEATURE 1: GLOBAL MUTE
-   Admin kisi user ko sab ke liye mute kare (chat block)
-   ═══════════════════════════════════════════════════════════ */
 app.post('/api/admin/globalMute', (req, res) => {
   const { password, userId, mute } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -365,14 +349,12 @@ app.post('/api/admin/globalMute', (req, res) => {
 
   user.globallyMuted = !!mute;
 
-  // Sabko batao
   io.to(GLOBAL_ROOM_ID).emit('globalMuteUpdate', {
     userId: user.id,
     userName: user.name,
     muted: !!mute
   });
 
-  // Target user ko alag se
   const targetSocket = io.sockets.sockets.get(userId);
   if (targetSocket) {
     targetSocket.emit('youAreMuted', { muted: !!mute, by: '👑 Admin' });
@@ -393,10 +375,6 @@ app.get('/api/admin/globalMutedList', (req, res) => {
   });
 });
 
-/* ═══════════════════════════════════════════════════════════
-   ✅ FEATURE 2: FORCE SKIP
-   Admin directly gaana badle (search query ya Auto DJ next)
-   ═══════════════════════════════════════════════════════════ */
 app.post('/api/admin/forceSkip', async (req, res) => {
   const { password, searchQuery } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -451,10 +429,6 @@ app.post('/api/admin/forceSkip', async (req, res) => {
   res.json({ success: true, track });
 });
 
-/* ═══════════════════════════════════════════════════════════
-   ✅ FEATURE 3: ANNOUNCE
-   Admin sabko top banner pe message bheje
-   ═══════════════════════════════════════════════════════════ */
 app.post('/api/admin/announce', (req, res) => {
   const { password, message, duration } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -474,7 +448,6 @@ app.post('/api/admin/announce', (req, res) => {
 
   console.log(`📢 Admin announce: ${announceMsg} (${dur}ms)`);
 
-  // Auto-clear
   setTimeout(() => {
     if (currentAnnouncement && currentAnnouncement.at === currentAnnouncement.at &&
         Date.now() - currentAnnouncement.at >= dur - 200) {
@@ -494,10 +467,6 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', null);
   res.json({ success: true });
 });
-
-// ============================================================
-// 🎵 SONG SEARCH + AUTO-NEXT ENGINE
-// ============================================================
 
 async function searchSong(query) {
   try {
@@ -674,7 +643,6 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ Song end check — Auto DJ hamesha chale
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -718,7 +686,6 @@ function startSongEndCheck() {
   }, 3000);
 }
 
-// ✅ Position updater
 function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -734,7 +701,6 @@ function startPositionUpdater() {
   }, 2000);
 }
 
-// ✅ Auto DJ initial start
 function startAutoDj() {
   setTimeout(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -745,7 +711,6 @@ function startAutoDj() {
   }, 3000);
 }
 
-// ===== SOCKET.IO =====
 io.on('connection', (socket) => {
   const ip = getClientIP(socket);
   const fp = socket.handshake.auth?.fingerprint ||
@@ -764,7 +729,6 @@ io.on('connection', (socket) => {
     return;
   }
 
-  // ===== JOIN GLOBAL =====
   socket.on('joinGlobal', ({ userName, fingerprint }) => {
     ensureGlobalRoom();
     const room = rooms[GLOBAL_ROOM_ID];
@@ -820,10 +784,8 @@ io.on('connection', (socket) => {
       isOwner: false
     });
 
-    // ✅ Global mute state bhejo
     socket.emit('globalMuteState', { muted: isGloballyMuted(userName) });
 
-    // ✅ Current announcement bhejo
     if (currentAnnouncement) {
       socket.emit('adminAnnounce', currentAnnouncement);
     }
@@ -910,7 +872,6 @@ io.on('connection', (socket) => {
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
 
-  // ===== UPDATE STATE =====
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -945,7 +906,6 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ===== NEXT =====
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -968,7 +928,6 @@ io.on('connection', (socket) => {
     await playNextSong('next', user);
   });
 
-  // ===== SKIP =====
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -991,7 +950,6 @@ io.on('connection', (socket) => {
     await playNextSong('skip', user);
   });
 
-  // ===== SYNC STATE REQUEST =====
   socket.on('requestSyncState', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1028,7 +986,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ===== HEARTBEAT =====
   socket.on('heartbeat', ({ roomId, position, isPlaying }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1049,7 +1006,6 @@ io.on('connection', (socket) => {
     if (user) user.lastActive = Date.now();
   });
 
-  // ✅ Chat — Global Mute check
   socket.on('chatMessage', ({ roomId, text, mentions }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1057,13 +1013,11 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
 
-    // Blocked check
     if (user.blocked && user.blocked.chat) {
       socket.emit('permissionDenied', { action: 'chat', message: 'You are blocked' });
       return;
     }
 
-    // ✅ Global mute check
     if (isGloballyMuted(user.name)) {
       socket.emit('permissionDenied', {
         action: 'chat',
@@ -1160,7 +1114,6 @@ io.on('connection', (socket) => {
     socket.emit('syncPong', { clientTime, serverTime: Date.now() });
   });
 
-  // ===== DISCONNECT =====
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     analytics.activeSessions.delete(socket.id);
@@ -1215,7 +1168,6 @@ function getUsersWithStatus(room) {
   }));
 }
 
-// ===== SEARCH APIs =====
 async function searchFromSaavnDev(query) {
   const r = await axios.get(
     'https://saavn.dev/api/search/songs?query=' + encodeURIComponent(query) + '&limit=15',
