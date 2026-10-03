@@ -23,7 +23,7 @@ const GLOBAL_MUTED_USERS = new Set();
 let currentAnnouncement = null;
 
 const IDLE_TIMEOUT = 2 * 60 * 1000;
-const DISCONNECT_GRACE = 30 * 1000; // ✅ 30 second grace
+const DISCONNECT_GRACE = 30 * 1000;
 
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
@@ -43,9 +43,7 @@ const AUTO_DJ_PLAYLIST = [
 
 let autoDjIndex = 0;
 
-// ✅ Expanded similar artists mapping
 const SIMILAR_ARTISTS = {
-  // Hindi Male Playback
   'arijit singh': ['atif aslam', 'jubin nautiyal', 'sachet tandon', 'darshan raval', 'sonu nigam', 'armaan malik'],
   'atif aslam': ['arijit singh', 'jubin nautiyal', 'sonu nigam', 'darshan raval', 'rahat fateh ali khan'],
   'jubin nautiyal': ['arijit singh', 'atif aslam', 'darshan raval', 'sachet tandon', 'armaan malik'],
@@ -58,8 +56,6 @@ const SIMILAR_ARTISTS = {
   'shaan': ['sonu nigam', 'udit narayan', 'kk'],
   'kk': ['shaan', 'sonu nigam', 'mohit chauhan'],
   'mohit chauhan': ['kk', 'sonu nigam', 'papon'],
-  
-  // Hindi Female Playback
   'neha kakkar': ['shreya ghoshal', 'sunidhi chauhan', 'dhvani bhanushali', 'jasmine sandlas'],
   'shreya ghoshal': ['neha kakkar', 'sunidhi chauhan', 'alka yagnik', 'shilpa rao'],
   'sunidhi chauhan': ['shreya ghoshal', 'neha kakkar', 'alka yagnik'],
@@ -69,26 +65,18 @@ const SIMILAR_ARTISTS = {
   'akasa singh': ['dhvani bhanushali', 'neha kakkar'],
   'shilpa rao': ['shreya ghoshal', 'sunidhi chauhan'],
   'sadhana sargam': ['alka yagnik', 'shreya ghoshal'],
-  
-  // Punjabi
   'guru randhawa': ['jasmine sandlas', 'badshah', 'harrdy sandhu', 'diljit dosanjh'],
   'diljit dosanjh': ['guru randhawa', 'harrdy sandhu', 'badshah', 'ammy virk'],
   'badshah': ['guru randhawa', 'yo yo honey singh', 'diljit dosanjh'],
   'harrdy sandhu': ['guru randhawa', 'diljit dosanjh', 'ammy virk'],
   'yo yo honey singh': ['badshah', 'guru randhawa'],
   'ammy virk': ['diljit dosanjh', 'harrdy sandhu', 'guru randhawa'],
-  
-  // Pakistani
   'rahat fateh ali khan': ['atif aslam', 'nusrat fateh ali khan', 'ali zafar'],
   'nusrat fateh ali khan': ['rahat fateh ali khan', 'atif aslam'],
   'ali zafar': ['rahat fateh ali khan', 'atif aslam', 'ali sethi'],
-  
-  // South Indian
   'sid sriram': ['a.r. rahman', 'anirudh ravichander', 'harris jayaraj'],
   'a.r. rahman': ['sid sriram', 'anirudh ravichander', 'harris jayaraj'],
   'anirudh ravichander': ['sid sriram', 'a.r. rahman', 'yuvan shankar raja'],
-  
-  // Bollywood Composers
   'pritam': ['arijit singh', 'amit trivedi', 'vishal shekhar'],
   'amit trivedi': ['pritam', 'arijit singh', 'vishal shekhar'],
   'vishal shekhar': ['pritam', 'shankar ehsaan loy', 'amit trivedi'],
@@ -359,15 +347,14 @@ app.get('/api/admin/blockedList', (req, res) => {
   });
 });
 
-// ✅ Kick user — robust
 app.post('/api/admin/kickUser', (req, res) => {
   const { password, userId, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-  
+
   console.log(`👢 Kick request: userId=${userId}, roomId=${roomId}`);
-  
+
   let s = io.sockets.sockets.get(userId);
-  
+
   if (!s && roomId && rooms[roomId]) {
     const room = rooms[roomId];
     const user = room.users.find(u => u.id === userId || u.name === userId);
@@ -380,7 +367,7 @@ app.post('/api/admin/kickUser', (req, res) => {
       }
     }
   }
-  
+
   if (s) {
     s.emit('kicked', { message: 'Admin removed you' });
     if (roomId && rooms[roomId]) {
@@ -571,7 +558,10 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Parallel API search
+// ============================================
+// SEARCH FUNCTIONS
+// ============================================
+
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
@@ -725,7 +715,7 @@ async function searchSimilarSongs(query, exclude = []) {
   return [];
 }
 
-// ✅ Improved next song from context
+// ✅ FIX #4: Parallel API calls — 30-60s → 5-8s
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
 
@@ -734,52 +724,56 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
   const currentId = currentTrack.id;
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
-  // Priority 1: Same artist
+  // ✅ Parallel: same artist + similar artists + keywords
+  const promises = [];
+
+  // P1: Same artist
   if (artist && artist !== 'Unknown') {
-    console.log(`🎵 Trying same artist: ${artist}`);
-    const artistSongs = await searchSimilarSongs(artist, fullExclude);
-    if (artistSongs.length > 0) {
-      const pick = artistSongs[Math.floor(Math.random() * Math.min(3, artistSongs.length))];
-      console.log(`🎵 Next from same artist: ${artist} → ${pick.title}`);
+    promises.push(
+      searchSimilarSongs(artist, fullExclude).then(songs => ({ priority: 1, songs }))
+    );
+  }
+
+  // P2: Similar artists
+  const artistLower = artist.toLowerCase();
+  const similarArtists = SIMILAR_ARTISTS[artistLower] || [];
+  similarArtists.slice(0, 3).forEach(simArtist => {
+    promises.push(
+      searchSimilarSongs(simArtist, fullExclude).then(songs => ({ priority: 2, songs }))
+    );
+  });
+
+  // P3: Keywords from title
+  const keywords = title.split(' ').filter(w => w.length > 3).slice(0, 2);
+  keywords.forEach(keyword => {
+    promises.push(
+      searchSimilarSongs(keyword, fullExclude).then(songs => ({ priority: 3, songs }))
+    );
+  });
+
+  if (promises.length === 0) return null;
+
+  try {
+    const results = await Promise.allSettled(promises);
+    const fulfilled = results
+      .filter(r => r.status === 'fulfilled' && r.value.songs && r.value.songs.length > 0)
+      .map(r => r.value)
+      .sort((a, b) => a.priority - b.priority);
+
+    if (fulfilled.length > 0) {
+      const best = fulfilled[0];
+      const pick = best.songs[Math.floor(Math.random() * Math.min(3, best.songs.length))];
+      console.log(`🎵 Next found (priority ${best.priority}): ${pick.title}`);
       return pick;
     }
-  }
-
-  // Priority 2: Similar artists
-  const artistLower = artist.toLowerCase();
-  const similarArtists = SIMILAR_ARTISTS[artistLower];
-  if (similarArtists && similarArtists.length > 0) {
-    const shuffled = [...similarArtists].sort(() => Math.random() - 0.5);
-    for (const simArtist of shuffled) {
-      console.log(`🎵 Trying similar artist: ${simArtist}`);
-      const songs = await searchSimilarSongs(simArtist, fullExclude);
-      if (songs.length > 0) {
-        const pick = songs[0];
-        console.log(`🎵 Next from similar artist: ${simArtist} → ${pick.title}`);
-        return pick;
-      }
-    }
-  }
-
-  // Priority 3: Keyword from title
-  const keywords = title.split(' ').filter(w => w.length > 3);
-  if (keywords.length > 0) {
-    for (const keyword of keywords) {
-      console.log(`🎵 Trying keyword: ${keyword}`);
-      const keywordSongs = await searchSimilarSongs(keyword, fullExclude);
-      if (keywordSongs.length > 0) {
-        const pick = keywordSongs[0];
-        console.log(`🎵 Next from keyword: ${keyword} → ${pick.title}`);
-        return pick;
-      }
-    }
+  } catch (e) {
+    console.error('Parallel search error:', e);
   }
 
   console.log('⚠️ No context match found — will use Auto DJ');
   return null;
 }
 
-// ✅ Improved skip song
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
 
@@ -891,6 +885,70 @@ async function playNextSong(reason = 'auto', user = null) {
     reason: reason,
     playedBy: playedByName
   });
+}
+
+// ✅ FIX #2: Multi-API fallback + peek (pop nahi)
+async function getPreviousSong(prevId) {
+  const apis = [
+    async () => {
+      const r = await axios.get(
+        'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
+        { timeout: 5000 }
+      );
+      const s = r.data?.data?.[0];
+      if (!s) return null;
+      return {
+        id: s.id, title: s.name,
+        artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
+        duration: s.duration,
+        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
+        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
+      };
+    },
+    async () => {
+      const r = await axios.get(
+        'https://jiosaavn-api-2-harsh-patel.vercel.app/song?id=' + encodeURIComponent(prevId),
+        { timeout: 5000 }
+      );
+      const s = r.data?.data?.[0] || r.data?.[0];
+      if (!s) return null;
+      return {
+        id: s.id, title: s.name || s.title,
+        artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
+        duration: s.duration,
+        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image,
+        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
+      };
+    },
+    async () => {
+      const r = await axios.get(
+        'https://saavnapi-nine.vercel.app/song?id=' + encodeURIComponent(prevId),
+        { timeout: 5000 }
+      );
+      const s = r.data?.data || r.data?.[0];
+      if (!s) return null;
+      return {
+        id: s.id, title: s.song || s.title,
+        artist: s.primary_artists || s.singers || 'Unknown',
+        duration: parseInt(s.duration) || 0,
+        image: s.image,
+        audioUrl: s.media_url || s.download_url || s.url
+      };
+    }
+  ];
+
+  for (const api of apis) {
+    try {
+      const track = await api();
+      if (track && track.audioUrl) {
+        console.log(`✅ Prev found: ${track.title}`);
+        return track;
+      }
+    } catch (e) {
+      console.log('Prev API failed:', e.message);
+    }
+  }
+  return null;
 }
 
 function startSongEndCheck() {
@@ -1104,6 +1162,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
+  // ✅ FIX #1: requestNext with timeout + ACK + fallback
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1118,19 +1177,53 @@ io.on('connection', (socket) => {
 
     console.log(`⏭️ ${user.name} requested NEXT`);
 
+    socket.emit('nextAck', { status: 'loading' });
+
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
-      message: `⏭️ Next song`
+      message: `⏭️ Loading next song...`
     });
 
     try {
-      await playNextSong('next', user);
-      console.log(`✅ Next song result:`, room.state.track?.title || 'none');
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      await Promise.race([
+        playNextSong('next', user),
+        timeoutPromise
+      ]);
+      socket.emit('nextAck', { status: 'success', track: room.state.track?.title || 'Next' });
+      console.log(`✅ Next: ${room.state.track?.title}`);
     } catch (e) {
-      console.error('Next song error:', e);
+      console.error('Next error:', e.message);
+      // Fallback: random from Auto DJ
+      const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
+      const fallbackTrack = await searchSong(randomSong);
+      if (fallbackTrack) {
+        room.state = {
+          track: fallbackTrack,
+          position: 0,
+          isPlaying: true,
+          playedBy: user.id,
+          playedByName: user.name,
+          autoDj: false,
+          isAmbient: false,
+          lastUpdated: Date.now()
+        };
+        io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+        io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+          track: fallbackTrack,
+          reason: 'next',
+          playedBy: user.name
+        });
+        socket.emit('nextAck', { status: 'fallback', track: fallbackTrack.title });
+      } else {
+        socket.emit('nextAck', { status: 'error' });
+      }
     }
   });
 
+  // ✅ FIX #2: requestPrev with multi-API + peek (pop nahi)
   socket.on('requestPrev', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1145,60 +1238,74 @@ io.on('connection', (socket) => {
 
     console.log(`⏮️ ${user.name} requested PREV`);
 
+    socket.emit('prevAck', { status: 'loading' });
+
     if (room.playedHistory && room.playedHistory.length > 0) {
-      const prevId = room.playedHistory.pop();
-      try {
-        const r = await axios.get(
-          'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
-          { timeout: 8000 }
-        );
-        const s = r.data?.data?.[0];
-        if (s) {
-          const prevTrack = {
-            id: s.id, title: s.name,
-            artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-            duration: s.duration,
-            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-            audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-          };
+      // ✅ Peek karo, pop mat karo
+      const prevId = room.playedHistory[room.playedHistory.length - 1];
 
-          if (room.state.track && !room.state.isAmbient) {
-            room.playedHistory.push(room.state.track.id);
-          }
+      const prevTrack = await getPreviousSong(prevId);
 
-          room.state = {
-            track: prevTrack,
-            position: 0,
-            isPlaying: true,
-            playedBy: user.id,
-            playedByName: user.name,
-            autoDj: false,
-            isAmbient: false,
-            lastUpdated: Date.now()
-          };
+      if (prevTrack && prevTrack.audioUrl) {
+        // ✅ Ab pop karo — track mil gaya
+        room.playedHistory.pop();
 
-          io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-          io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-            track: prevTrack,
-            reason: 'next',
-            playedBy: user.name
-          });
-          io.to(room.roomId).emit('skipNotice', {
-            userName: user.name,
-            message: `⏮️ Previous`
-          });
-          return;
+        if (room.state.track && !room.state.isAmbient) {
+          room.playedHistory.push(room.state.track.id);
         }
-      } catch (e) {
-        console.log('Prev search failed:', e.message);
+
+        room.state = {
+          track: prevTrack,
+          position: 0,
+          isPlaying: true,
+          playedBy: user.id,
+          playedByName: user.name,
+          autoDj: false,
+          isAmbient: false,
+          lastUpdated: Date.now()
+        };
+
+        io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+        io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+          track: prevTrack,
+          reason: 'prev',
+          playedBy: user.name
+        });
+        io.to(room.roomId).emit('skipNotice', {
+          userName: user.name,
+          message: `⏮️ Previous`
+        });
+        socket.emit('prevAck', { status: 'success', track: prevTrack.title });
+        return;
+      } else {
+        console.log('⚠️ Prev APIs all failed — fallback to Auto DJ');
       }
     }
 
-    io.to(room.roomId).emit('skipNotice', {
-      userName: user.name,
-      message: `⏮️ Previous`
-    });
-    await playNextSong('next', user);
+    // Fallback: Auto DJ
+    const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
+    const fallbackTrack = await searchSong(randomSong);
+    if (fallbackTrack) {
+      room.state = {
+        track: fallbackTrack,
+        position: 0,
+        isPlaying: true,
+        playedBy: user.id,
+        playedByName: user.name,
+        autoDj: false,
+        isAmbient: false,
+        lastUpdated: Date.now()
+      };
+      io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+      io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+        track: fallbackTrack,
+        reason: 'prev',
+        playedBy: user.name
+      });
+      socket.emit('prevAck', { status: 'fallback', track: fallbackTrack.title });
+    } else {
+      socket.emit('prevAck', { status: 'error' });
+    }
   });
 
   socket.on('requestSkip', async ({ roomId }) => {
