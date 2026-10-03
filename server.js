@@ -371,7 +371,6 @@ async function searchSimilarSongs(query, exclude = []) {
   } catch (e) { return []; }
 }
 
-// ✅ Get next song based on context (artist/mood) — for NEXT button
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
   
@@ -410,7 +409,6 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
   return null;
 }
 
-// ✅ Get skip song — different from current
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
   
@@ -444,7 +442,6 @@ async function getSkipSong(currentTrack, playedHistory = []) {
   return await searchSong(songName);
 }
 
-// ✅ Play next song — reason: 'auto' | 'next' | 'skip'
 async function playNextSong(reason = 'auto', user = null) {
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return;
@@ -510,29 +507,40 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ Song end check — Auto DJ hamesha chalta rahe
+// ✅ UPDATED: Song end check — Auto DJ hamesha chale
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
     
-    // ✅ CASE 1: Koi user nahi + koi song nahi → Auto DJ chalu karo
+    // ✅ Case 1: Koi user nahi + koi song nahi → Auto DJ
     if (room.users.length === 0) {
       if (!room.state.track || !room.state.isPlaying) {
-        console.log(`🎵 No users — Auto DJ starting`);
+        console.log(`🎵 No users, no song — Auto DJ start`);
         await playNextSong('auto');
       }
       return;
     }
     
-    // ✅ CASE 2: Users hain lekin song nahi chal raha → Auto DJ
-    if (!room.state.track || !room.state.isPlaying) {
-      console.log(`🎵 No song playing — Auto DJ starting`);
+    // ✅ Case 2: Users hain lekin song nahi → Auto DJ
+    if (!room.state.track) {
+      console.log(`🎵 Users present, no track — Auto DJ start`);
       await playNextSong('auto');
       return;
     }
     
-    // ✅ CASE 3: Song chal raha hai — check if ended
+    // ✅ Case 3: Track hai lekin isPlaying false → chalao
+    if (room.state.track && !room.state.isPlaying) {
+      const lastUpdated = room.state.lastUpdated || Date.now();
+      const pausedFor = (Date.now() - lastUpdated) / 1000;
+      if (pausedFor > 10) {
+        console.log(`🎵 Track paused too long — Auto DJ next`);
+        await playNextSong('auto');
+      }
+      return;
+    }
+    
+    // ✅ Case 4: Song chal raha hai — check if ended
     const duration = room.state.track.duration || 0;
     const position = room.state.position || 0;
     const lastUpdated = room.state.lastUpdated || Date.now();
@@ -547,7 +555,7 @@ function startSongEndCheck() {
   }, 3000);
 }
 
-// ✅ Position updater — position accurate rahe
+// ✅ Position updater
 function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -556,13 +564,22 @@ function startPositionUpdater() {
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
     
-    // Agar 5 sec se zyada hogaya, matlab koi heartbeat nahi aayi
-    // toh manually position update karo
     if (elapsed > 5) {
       room.state.position = (room.state.position || 0) + elapsed;
       room.state.lastUpdated = Date.now();
     }
   }, 2000);
+}
+
+// ✅ Auto DJ initial start
+function startAutoDj() {
+  setTimeout(async () => {
+    const room = rooms[GLOBAL_ROOM_ID];
+    if (room && !room.state.track) {
+      console.log('🎵 Initial Auto DJ start');
+      await playNextSong('auto');
+    }
+  }, 3000);
 }
 
 // ===== SOCKET.IO =====
@@ -596,7 +613,7 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Direct join (silent approval)
+    // Direct join
     let existingUser = room.users.find(u => u.fingerprint === userFp);
     
     if (existingUser) {
@@ -639,41 +656,61 @@ io.on('connection', (socket) => {
       isOwner: false 
     });
     
-    // ✅ Sync current state with position
-    let currentPosition = room.state.position || 0;
+    // ✅ CASE 1: Song chal raha hai → same position sync
     if (room.state.track && room.state.isPlaying) {
+      let currentPosition = room.state.position || 0;
       const lastUpdated = room.state.lastUpdated || Date.now();
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
-    }
-    
-    socket.emit('stateSync', {
-      track: room.state.track,
-      position: currentPosition,
-      isPlaying: room.state.isPlaying,
-      playedByName: room.state.playedByName,
-      autoDj: room.state.autoDj,
-      lastUpdated: Date.now()
-    });
-    
-    socket.emit('chatHistory', room.messages);
-    
-    // ✅ Agar song already chal raha hai, toh songChanged bhi bhejo
-    if (room.state.track) {
+      
+      socket.emit('stateSync', {
+        track: room.state.track,
+        position: currentPosition,
+        isPlaying: true,
+        playedByName: room.state.playedByName,
+        autoDj: room.state.autoDj,
+        lastUpdated: Date.now()
+      });
+      
       socket.emit('songChanged', {
         track: room.state.track,
         reason: 'sync',
         playedBy: room.state.playedByName
       });
-    } else {
-      // ✅ Agar song nahi chal raha, Auto DJ start karo
+      
+      console.log(`🔄 Synced ${userName} to position ${currentPosition.toFixed(1)}s`);
+    } 
+    // ✅ CASE 2: Koi song nahi → Auto DJ turant start
+    else {
+      console.log(`🎵 No song playing — starting Auto DJ for ${userName}`);
+      
       setTimeout(async () => {
         const r = rooms[GLOBAL_ROOM_ID];
         if (r && (!r.state.track || !r.state.isPlaying)) {
           await playNextSong('auto');
+          
+          setTimeout(() => {
+            if (r.state.track) {
+              socket.emit('stateSync', {
+                track: r.state.track,
+                position: r.state.position || 0,
+                isPlaying: r.state.isPlaying,
+                playedByName: r.state.playedByName,
+                autoDj: r.state.autoDj,
+                lastUpdated: Date.now()
+              });
+              socket.emit('songChanged', {
+                track: r.state.track,
+                reason: 'sync',
+                playedBy: r.state.playedByName
+              });
+            }
+          }, 1500);
         }
-      }, 1000);
+      }, 500);
     }
+    
+    socket.emit('chatHistory', room.messages);
     
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
     io.to(GLOBAL_ROOM_ID).emit('globalStats', {
@@ -703,7 +740,7 @@ io.on('connection', (socket) => {
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
   
-  // ===== UPDATE STATE (User plays song) =====
+  // ===== UPDATE STATE =====
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -738,7 +775,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
   
-  // ===== NEXT BUTTON =====
+  // ===== NEXT =====
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -761,7 +798,7 @@ io.on('connection', (socket) => {
     await playNextSong('next', user);
   });
   
-  // ===== SKIP BUTTON =====
+  // ===== SKIP =====
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -789,7 +826,6 @@ io.on('connection', (socket) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     
-    // ✅ Actual position calculate karo
     let currentPosition = room.state.position || 0;
     
     if (room.state.track && room.state.isPlaying) {
@@ -797,7 +833,6 @@ io.on('connection', (socket) => {
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
       
-      // Duration check
       if (room.state.track.duration > 0 && currentPosition >= room.state.track.duration) {
         currentPosition = 0;
       }
@@ -1045,8 +1080,9 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
-  console.log('🎵 Auto DJ started');
+  console.log('🎵 Starting Auto DJ...');
   ensureGlobalRoom();
+  startAutoDj();
   startSongEndCheck();
   startPositionUpdater();
   console.log('🔐 Admin panel: /admin');
