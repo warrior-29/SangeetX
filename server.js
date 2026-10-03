@@ -52,6 +52,8 @@ const SILENT_AMBIENT_TRACK = {
   image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
   // ✅ Silent / very quiet ambient audio
   audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3'
+  isQuiet: true,
+  volume: 0.15
 };
 
 let autoDjIndex = 0;
