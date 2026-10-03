@@ -160,6 +160,36 @@ body::before {
 .sync-meter.drift { background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.25); color:var(--warning); }
 .sync-meter .sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:pulse 1.5s infinite; }
 
+/* ✅ AUDIO OUTPUT INDICATOR */
+.audio-output-badge {
+  display:none;
+  align-items:center;
+  gap:5px;
+  font-size:10px;
+  font-weight:700;
+  padding:5px 10px;
+  border-radius:100px;
+  background:rgba(59,130,246,0.12);
+  border:1px solid rgba(59,130,246,0.3);
+  color:#60A5FA;
+  flex-shrink:0;
+  transition:all 0.3s;
+  max-width:140px;
+  overflow:hidden;
+}
+.audio-output-badge.active { display:flex; }
+.audio-output-badge [data-lucide] {
+  width:12px;
+  height:12px;
+  stroke-width:2.5;
+  flex-shrink:0;
+}
+.audio-output-badge span {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 .topbar-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; }
 .icon-btn {
   background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--text);
@@ -532,7 +562,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   border-color:rgba(139,92,246,0.3);
 }
 
-/* ===== TYPING INDICATOR — FIXED ===== */
 .typing-indicator {
   padding:6px 14px 8px;
   display:none;
@@ -543,13 +572,11 @@ input:checked + .slider:before { transform:translateX(16px); }
   font-weight:600;
   background:var(--surface);
   border-top:1px solid var(--border);
-  flex-shrink:0;         /* ✅ FIX: collapse nahi hoga */
+  flex-shrink:0;
   min-height:28px;
   animation:typingIn 0.3s var(--ease);
 }
-.typing-indicator.show {
-  display:flex;          /* ✅ FIX: class-based show */
-}
+.typing-indicator.show { display:flex; }
 @keyframes typingIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 .typing-dots { display:flex; gap:3px; align-items:center; flex-shrink:0; }
 .typing-dots span {
@@ -748,6 +775,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   .icon-btn { width:34px; height:34px; }
   .icon-btn [data-lucide] { width:15px; height:15px; }
   .distance-meter { font-size:9px; padding:5px 10px; }
+  .audio-output-badge { font-size:9px; padding:4px 8px; max-width:100px; }
 }
 @media (min-width:768px) {
   .album-art { width:min(28vw, 260px); }
@@ -809,6 +837,9 @@ input:checked + .slider:before { transform:translateX(16px); }
       <span id="syncText">Synced</span>
     </div>
     <div class="topbar-actions">
+      <button class="icon-btn" id="audioOutputBtn" title="Audio Output" style="display:none;">
+        <i data-lucide="volume-2"></i>
+      </button>
       <button class="icon-btn" id="muteAllBtn" title="Mute All Voices"><i data-lucide="volume-2"></i></button>
       <button class="icon-btn" id="chatBtn" title="Chat">
         <i data-lucide="message-circle"></i>
@@ -817,6 +848,12 @@ input:checked + .slider:before { transform:translateX(16px); }
       <button class="icon-btn" id="usersBtn" title="Members"><i data-lucide="users"></i></button>
       <button class="icon-btn primary" id="shareBtn" title="Share"><i data-lucide="share-2"></i></button>
     </div>
+  </div>
+
+  <!-- ✅ AUDIO OUTPUT BADGE (jo device pe audio ja raha hai) -->
+  <div class="audio-output-badge" id="audioOutputBadge">
+    <i data-lucide="volume-2"></i>
+    <span id="audioOutputText">System Default</span>
   </div>
 
   <div class="distance-meter" id="distanceMeter">
@@ -1014,14 +1051,18 @@ let isOnline = navigator.onLine;
 let messageQueue = [];
 
 /* ✅ TYPING — Map based */
-const typingUsers = new Map();  // userName -> timeoutId
+const typingUsers = new Map();
 let isTyping = false;
 let typingTimer = null;
 
 /* ✅ PERFECT NEGOTIATION FLAGS */
 let makingOffer = false;
 let ignoreOffer = false;
-let isSettingRemoteAnswerPending = false;
+
+/* ✅ AUDIO OUTPUT — auto bluetooth routing */
+let currentVoiceSinkId = 'default';
+let currentMusicSinkId = 'default';
+let audioOutputDevices = [];
 
 let audioContext = null;
 let analyser = null;
@@ -1041,6 +1082,163 @@ function initAudioContext() {
     analyser.connect(audioContext.destination);
   } catch (e) {}
 }
+
+/* ============================================================
+   ✅ AUDIO OUTPUT — AUTO BLUETOOTH ROUTING
+   ============================================================ */
+
+// Bluetooth device detection
+function isBluetoothDevice(label) {
+  const l = (label || '').toLowerCase();
+  return l.includes('bluetooth') ||
+         l.includes('bt ') ||
+         l.includes(' bt') ||
+         l.includes('wireless') ||
+         l.includes('headphone') ||
+         l.includes('headset') ||
+         l.includes('buds') ||
+         l.includes('airpods') ||
+         l.includes('speaker') ||
+         l.includes('soundbar') ||
+         l.includes('jbl') ||
+         l.includes('boat') ||
+         l.includes('sony') ||
+         l.includes('bose') ||
+         l.includes('earbud');
+}
+
+async function detectAudioOutputDevices() {
+  try {
+    // Permission ke liye trigger
+    await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
+    
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devices.filter(d => d.kind === 'audiooutput');
+    audioOutputDevices = outputs;
+    
+    console.log('🔊 Available outputs:', outputs.map(d => d.label || 'unnamed'));
+    
+    return outputs;
+  } catch (err) {
+    console.log('Device enumeration failed:', err.message);
+    return [];
+  }
+}
+
+// Voice sink apply karo sabhi remote audios pe
+function applyVoiceSinkToAll() {
+  remoteAudios.forEach((entry, key) => {
+    if (entry.audio && entry.audio.setSinkId && currentVoiceSinkId) {
+      entry.audio.setSinkId(currentVoiceSinkId)
+        .then(() => console.log(`🎤 Voice ${entry.userName} → ${currentVoiceSinkId}`))
+        .catch(err => console.log('Voice sink error:', err.message));
+    }
+  });
+}
+
+// Naye audio pe sink apply karo
+function applyVoiceSinkToAudio(audioEl) {
+  if (!audioEl || !audioEl.setSinkId || !currentVoiceSinkId) return;
+  audioEl.setSinkId(currentVoiceSinkId)
+    .then(() => console.log('🎤 New voice →', currentVoiceSinkId))
+    .catch(err => console.log('New voice sink error:', err.message));
+}
+
+// Auto-detect best output (bluetooth priority)
+async function autoDetectAndRouteAudio() {
+  const outputs = await detectAudioOutputDevices();
+  
+  if (outputs.length === 0) {
+    console.log('⚠️ No output devices found');
+    return;
+  }
+  
+  // Find Bluetooth device
+  const btDevice = outputs.find(d => isBluetoothDevice(d.label));
+  
+  let selectedDeviceId = 'default';
+  let selectedLabel = 'System Default';
+  
+  if (btDevice) {
+    selectedDeviceId = btDevice.deviceId;
+    selectedLabel = btDevice.label || 'Bluetooth Speaker';
+    console.log('✅ Bluetooth found:', selectedLabel);
+  } else if (outputs.length > 0) {
+    // Fallback: default
+    selectedDeviceId = 'default';
+    selectedLabel = 'System Default';
+  }
+  
+  // ✅ Apply to voice
+  currentVoiceSinkId = selectedDeviceId;
+  applyVoiceSinkToAll();
+  
+  // ✅ Apply to music (agar setSinkId support ho)
+  if (audio.setSinkId) {
+    try {
+      await audio.setSinkId(selectedDeviceId);
+      currentMusicSinkId = selectedDeviceId;
+      console.log('🎵 Music →', selectedLabel);
+    } catch (err) {
+      console.log('Music sink error:', err.message);
+    }
+  }
+  
+  // ✅ Update UI
+  updateAudioOutputBadge(selectedLabel, btDevice ? true : false);
+  
+  return { deviceId: selectedDeviceId, label: selectedLabel, isBluetooth: !!btDevice };
+}
+
+// UI badge update
+function updateAudioOutputBadge(label, isBluetooth) {
+  const badge = document.getElementById('audioOutputBadge');
+  const text = document.getElementById('audioOutputText');
+  
+  if (!badge || !text) return;
+  
+  if (label && label !== 'System Default') {
+    text.textContent = label.length > 20 ? label.slice(0, 18) + '...' : label;
+    badge.classList.add('active');
+    
+    // Icon change
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) {
+      icon.setAttribute('data-lucide', isBluetooth ? 'bluetooth' : 'volume-2');
+    }
+    
+    // Color: bluetooth blue, else success
+    if (isBluetooth) {
+      badge.style.background = 'rgba(59,130,246,0.12)';
+      badge.style.borderColor = 'rgba(59,130,246,0.3)';
+      badge.style.color = '#60A5FA';
+    } else {
+      badge.style.background = 'rgba(16,185,129,0.12)';
+      badge.style.borderColor = 'rgba(16,185,129,0.25)';
+      badge.style.color = 'var(--success)';
+    }
+    
+    refreshIcons();
+  } else {
+    badge.classList.remove('active');
+  }
+}
+
+// ✅ Device change listener — Bluetooth connect/disconnect
+if (navigator.mediaDevices) {
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    console.log('🔌 Audio device changed — rescanning...');
+    const result = await autoDetectAndRouteAudio();
+    
+    if (result && result.isBluetooth) {
+      showToast(`🔊 ${result.label}`, 'success');
+    }
+  });
+}
+
+/* ============================================================
+   MOOD / DYNAMIC BG / WAVEFORM — (unchanged)
+   ============================================================ */
 
 const MOODS = {
   happy:{emoji:'😊',text:'Happy',color:'#F59E0B'},
@@ -1534,7 +1732,6 @@ function initSocket(){
     renderChatPresence(users);
   });
 
-  /* ✅ TYPING — improved handler */
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{
     console.log(`⌨️ ${typer} ${typingNow ? 'is' : 'stopped'} typing`);
     updateTypingIndicator(typer,typingNow);
@@ -1649,6 +1846,17 @@ document.getElementById('closeUsersBtn').addEventListener('click',()=>
   document.getElementById('usersPanel').classList.remove('active'));
 document.getElementById('muteAllBtn').addEventListener('click',toggleMuteAll);
 
+// ✅ Audio output button — manual rescan
+document.getElementById('audioOutputBtn')?.addEventListener('click', async () => {
+  showToast('🔊 Scanning audio devices...');
+  const result = await autoDetectAndRouteAudio();
+  if (result) {
+    showToast(`🔊 ${result.label}`, 'success');
+  } else {
+    showToast('No audio devices found', 'warning');
+  }
+});
+
 document.getElementById('chatBtn').addEventListener('click',()=>{
   chatOpen=true;unreadMessages=0;updateChatBadge();
   document.getElementById('chatPanel').classList.add('active');
@@ -1693,19 +1901,16 @@ document.getElementById('chatInput').addEventListener('keydown',(e)=>{
   }
 });
 
-/* ✅ TYPING — send events */
 document.getElementById('chatInput').addEventListener('input',(e)=>{
   if(!socket||!socket.connected)return;
   if(!isTyping){
     isTyping=true;
     socket.emit('typing',{roomId,isTyping:true,userName});
-    console.log('📤 Started typing');
   }
   clearTimeout(typingTimer);
   typingTimer=setTimeout(()=>{
     isTyping=false;
     socket.emit('typing',{roomId,isTyping:false,userName});
-    console.log('📤 Stopped typing (timeout)');
   },1500);
 });
 
@@ -1787,7 +1992,6 @@ function renderChatPresence(users){
   `).join('');
 }
 
-/* ✅ TYPING — Map-based update (FIXED) */
 function updateTypingIndicator(userName,isTypingNow){
   if(isTypingNow){
     if(typingUsers.has(userName)){
@@ -1844,12 +2048,30 @@ document.getElementById('shareBtn').addEventListener('click',async()=>{
   }
 });
 
-window.addEventListener('load',()=>{
+/* ===== LOAD HANDLER ===== */
+window.addEventListener('load', async () => {
   checkMicPermission();
   loadMuteState();
   updateMuteAllButton();
 
   if(!navigator.onLine){isOnline=false;showOfflineBanner();}
+
+  // ✅ Initial audio output detection
+  setTimeout(async () => {
+    console.log('🔊 Detecting audio outputs...');
+    await autoDetectAndRouteAudio();
+  }, 1500);
+
+  // ✅ Periodic check (bluetooth may connect later)
+  setInterval(async () => {
+    const devices = await detectAudioOutputDevices();
+    const btDevice = devices.find(d => isBluetoothDevice(d.label));
+    
+    if (btDevice && btDevice.deviceId !== currentVoiceSinkId) {
+      console.log('🔊 New bluetooth detected:', btDevice.label);
+      await autoDetectAndRouteAudio();
+    }
+  }, 5000);
 
   const params=new URLSearchParams(window.location.search);
   const r=params.get('room');
@@ -1859,7 +2081,6 @@ window.addEventListener('load',()=>{
     showToast('Room code auto-filled — enter your name');
   }
 
-  /* ✅ AUTO SESSION RESTORE — 24h, URL clean */
   const savedSession=getSavedSession();
   if(savedSession&&!r){
     setTimeout(()=>{
@@ -2265,12 +2486,13 @@ async function setupMic(){
     console.log('🎤 Mic ready');
     hideMicBanner();
 
+    // ✅ Audio output detection jab mic on ho
+    await autoDetectAndRouteAudio();
+
     if(socket&&socket.connected){
-      // ✅ Peer connection banao agar nahi hai
       if(!peerConnection){
         createPeerConnection();
       } else {
-        // ✅ Existing connection me tracks add karo agar nahi hai
         const hasAudioTrack = peerConnection.getSenders().some(s => s.track && s.track.kind === 'audio');
         if(!hasAudioTrack && localStream){
           localStream.getTracks().forEach(track => {
@@ -2280,11 +2502,9 @@ async function setupMic(){
         }
       }
       
-      // ✅ Offer bhejo (sirf polite peer nahi)
       setTimeout(async () => {
         if(!peerConnection) return;
         
-        // ✅ FIX: sirf remoteDescription check karo
         if(peerConnection.remoteDescription && peerConnection.remoteDescription.type){
           console.log('⏭️ Remote description already set, skip offer');
           return;
@@ -2366,6 +2586,9 @@ function createPeerConnection(){
     remote.autoplay = true;
     remote.playsInline = true;
     remote.volume = 1.0;
+
+    // ✅ Bluetooth sink apply karo
+    applyVoiceSinkToAudio(remote);
 
     const tryPlay=()=>{
       remote.play().then(()=>{
@@ -2607,7 +2830,7 @@ window.addEventListener('appinstalled',()=>{
 });
 
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/sw.js?v=2')
+  navigator.serviceWorker.register('/sw.js?v=3')
     .then((reg)=>{console.log('SW registered:',reg.scope);})
     .catch((err)=>console.log('SW failed:',err));
 }
