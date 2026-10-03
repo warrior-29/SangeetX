@@ -358,14 +358,46 @@ app.get('/api/admin/blockedList', (req, res) => {
 });
 
 app.post('/api/admin/kickUser', (req, res) => {
-  const { password, userId } = req.body;
+  const { password, userId, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-  const s = io.sockets.sockets.get(userId);
+  
+  console.log(`👢 Kick request: userId=${userId}, roomId=${roomId}`);
+  
+  // ✅ Try to find socket
+  let s = io.sockets.sockets.get(userId);
+  
+  // ✅ Agar userId se nahi mila, room me dhoondo
+  if (!s && roomId && rooms[roomId]) {
+    const room = rooms[roomId];
+    const user = room.users.find(u => u.id === userId || u.name === userId);
+    if (user) {
+      s = io.sockets.sockets.get(user.id);
+      if (!s) {
+        // User already disconnected, just remove from room
+        room.users = room.users.filter(u => u.id !== user.id);
+        io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
+        return res.json({ success: true });
+      }
+    }
+  }
+  
   if (s) {
     s.emit('kicked', { message: 'Admin removed you' });
-    setTimeout(() => s.disconnect(true), 500);
+    // Remove from room immediately
+    if (roomId && rooms[roomId]) {
+      const room = rooms[roomId];
+      room.users = room.users.filter(u => u.id !== s.id);
+      io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
+    }
+    setTimeout(() => {
+      try { s.disconnect(true); } catch (e) {}
+    }, 500);
+    console.log(`✅ Kicked user: ${userId}`);
+    res.json({ success: true });
+  } else {
+    console.log(`⚠️ User not found: ${userId}`);
+    res.json({ success: false, error: 'User not found' });
   }
-  res.json({ success: true });
 });
 
 app.post('/api/admin/blockAction', (req, res) => {
@@ -775,8 +807,10 @@ async function playNextSong(reason = 'auto', user = null) {
   let nextSong = null;
 
   const currentIsAmbient = room.state.isAmbient || false;
+  const currentTrackId = room.state.track?.id;
 
-  if (!currentIsAmbient) {
+  // ✅ Sirf tab "context" try karo jab current track real ho
+  if (!currentIsAmbient && currentTrackId && currentTrackId !== 'ambient-silent-default') {
     if (reason === 'skip') {
       nextSong = await getSkipSong(room.state.track, playedHistory);
     } else if (reason === 'next' || reason === 'auto') {
@@ -784,59 +818,52 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // ✅ Auto DJ fallback — 3 retries
+  // ✅ Auto DJ fallback — 5 retries
   if (!nextSong) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
-      console.log(`🎵 Auto DJ attempt ${i+1}/3: ${songName}`);
+      console.log(`🎵 Auto DJ attempt ${i+1}/5: ${songName}`);
       nextSong = await searchSong(songName);
       if (nextSong) {
         console.log(`✅ Auto DJ got: ${nextSong.title}`);
         break;
       }
-      if (i < 2) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
+      if (i < 4) await new Promise(r => setTimeout(r, 800));
     }
   }
 
-  // ✅ If still null → ambient continues
+  // ✅ If still null → keep ambient, retry
   if (!nextSong) {
-    console.error('❌ playNextSong: all APIs failed → keeping ambient');
+    console.error('❌ playNextSong: all APIs failed');
     if (!room.state.isAmbient) {
       startAmbientMusic();
     }
     setTimeout(() => {
-      console.log('🔄 Auto-retry playNextSong in 5s...');
+      console.log('🔄 Retry playNextSong in 5s...');
       playNextSong(reason, user);
     }, 5000);
     return;
   }
 
+  // ✅ History update
   if (!room.playedHistory) room.playedHistory = [];
-  if (room.state.track && !room.state.isAmbient) {
+  if (room.state.track && !room.state.isAmbient && room.state.track.id !== nextSong.id) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
 
-  let playedByName;
-  let autoDjFlag;
+  let playedByName = 'Someone';
+  let autoDjFlag = false;
 
   if (reason === 'auto') {
     playedByName = '🎵 Auto DJ';
     autoDjFlag = true;
-  } else if (reason === 'skip') {
-    playedByName = user ? user.name : 'Someone';
-    autoDjFlag = false;
-  } else if (reason === 'next') {
-    playedByName = user ? user.name : 'Someone';
-    autoDjFlag = false;
-  } else {
-    playedByName = user ? user.name : 'Someone';
-    autoDjFlag = false;
+  } else if (user) {
+    playedByName = user.name;
   }
 
+  // ✅ SET NEW STATE
   room.state = {
     track: nextSong,
     position: 0,
@@ -850,6 +877,7 @@ async function playNextSong(reason = 'auto', user = null) {
 
   console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
 
+  // ✅ Emit to all clients
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: nextSong,
@@ -1110,7 +1138,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  socket.on('requestNext', async ({ roomId }) => {
+    socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1129,7 +1157,19 @@ io.on('connection', (socket) => {
       message: `⏭️ Next song`
     });
 
-    await playNextSong('next', user);
+    // ✅ Force reset isAmbient so playNextSong runs
+    const wasAmbient = room.state.isAmbient;
+    if (wasAmbient) {
+      // ✅ Skip "next from context" if ambient — direct Auto DJ
+      room.state.isAmbient = false;
+    }
+
+    try {
+      await playNextSong('next', user);
+      console.log(`✅ Next song result:`, room.state.track?.title || 'none');
+    } catch (e) {
+      console.error('Next song error:', e);
+    }
   });
 
   socket.on('requestPrev', async ({ roomId }) => {
