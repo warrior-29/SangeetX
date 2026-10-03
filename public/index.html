@@ -301,9 +301,43 @@ body::before {
 }
 .mood-meter.active { display:flex; }
 
-.waveform-live { display:none; align-items:center; justify-content:center; gap:2px; height:18px; width:100%; max-width:200px; margin:2px auto; }
-.waveform-live.active { display:flex; }
-.waveform-live span { width:2.5px; height:20%; background:linear-gradient(180deg, var(--dynamic-1), var(--dynamic-2)); border-radius:2px; transition:height 0.08s ease; }
+.waveform-live {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  height:18px;
+  width:100%;
+  max-width:200px;
+  margin:2px auto;
+  flex-shrink:0;
+  opacity:0.35;
+  transition:opacity 0.3s ease;
+  position: relative;
+}
+.waveform-live::before {
+  content: "";
+  position: absolute;
+  inset: -4px -8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);      /* ✅ Halka dark backdrop */
+  z-index: 0;
+  pointer-events: none;
+}
+.waveform-live.active {
+  display:flex;
+  opacity:1;
+}
+.waveform-live span {
+  width:2.5px;
+  height:15%;
+  background:linear-gradient(180deg, var(--dynamic-1), var(--dynamic-2));
+  border-radius:2px;
+  transition:height 0.08s ease;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 3px rgba(0,0,0,0.6);   /* ✅ Shadow on bars */
+}
 
 /* ✅ FIX 2: PROGRESS BAR — WITH DRAG SUPPORT */
 .progress-section { width:100%; padding:0 6px; flex-shrink:0; }
