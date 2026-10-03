@@ -2597,17 +2597,34 @@ function initSocket(){
     }
   });
   
+  // ✅ stateSync handler — sahi position + drift correction
   socket.on('stateSync',(state)=>{
     if (state.position !== undefined) lastKnownPosition = state.position;
     applyRemoteState(state);
   });
 
+  // ✅ songChanged — same track pe skip, sirf position sync
   socket.on('songChanged', ({ track, reason, playedBy }) => {
     if (!track || !track.audioUrl) {
       console.warn('⚠️ songChanged: invalid track', track);
       return;
     }
     console.log(`🎵 songChanged: ${track.title} (${reason})`);
+
+    // ✅ Agar same track already chal raha hai — sirf position sync karo
+    if (currentTrack && currentTrack.id === track.id) {
+      console.log('⏭️ Same track — syncing position only');
+      if (reason === 'sync' && lastKnownPosition) {
+        const drift = Math.abs(audio.currentTime - lastKnownPosition);
+        if (drift > 2) {
+          audio.currentTime = lastKnownPosition;
+          console.log(`🎯 Position corrected: ${lastKnownPosition.toFixed(1)}s`);
+        }
+      }
+      return;
+    }
+
+    // ✅ Naya track
     if (reason === 'sync') {
       const syncPos = lastKnownPosition || 0;
       loadTrack(track, syncPos, true);
@@ -2615,9 +2632,11 @@ function initSocket(){
       setTimeout(() => updatePlayIcon(), 100);
       return;
     }
+
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
     setTimeout(() => updatePlayIcon(), 200);
+
     if (reason === 'auto') showToast('🎵 Auto next');
     else if (reason === 'next') showToast(`⏭️ Next`);
     else if (reason === 'prev') showToast(`⏮️ Previous`);
@@ -3270,7 +3289,7 @@ async function applyRemoteState(state){
       if (!state.isPlaying && !audio.paused) {
         audio.pause();
       }
-      if (state.isPlaying && !audio.paused) {
+      if (state.isPlaying && !audio.paused && state.position !== undefined) {
         const drift = audio.currentTime - state.position;
         const abs = Math.abs(drift);
         if (abs < 0.3) audio.playbackRate = 1.0;
@@ -3281,6 +3300,7 @@ async function applyRemoteState(state){
         } else {
           audio.currentTime = state.position;
           audio.playbackRate = 1.0;
+          console.log(`🎯 State position corrected: ${state.position.toFixed(1)}s`);
         }
       }
     }
@@ -3310,7 +3330,7 @@ function updatePlayIcon() {
 }
 
 /* ============ LOAD TRACK ============ */
-async function loadTrack(track,position=0,autoPlay=false){
+async function loadTrack(track, position = 0, autoPlay = false) {
   if (!track) {
     console.error('❌ loadTrack: track is null');
     return;
@@ -3320,27 +3340,31 @@ async function loadTrack(track,position=0,autoPlay=false){
     showToast('⚠️ Song has no audio', 'error');
     return;
   }
-  currentTrack=track;
-  document.getElementById('songTitle').textContent=track.title;
-  document.getElementById('songArtist').textContent=track.artist;
-  const art=document.getElementById('albumArt');
-  art.innerHTML=track.image
-    ?`<img src="${track.image}" alt="" crossorigin="anonymous">`
-    :`<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
+
+  currentTrack = track;
+  document.getElementById('songTitle').textContent = track.title;
+  document.getElementById('songArtist').textContent = track.artist;
+  const art = document.getElementById('albumArt');
+  art.innerHTML = track.image
+    ? `<img src="${track.image}" alt="" crossorigin="anonymous">`
+    : `<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
+
   audio.volume = 1.0;
-  if(track.image)updateDynamicBackground(track.image);
-  updateMood(track.title,track.artist);
-  audio.playbackRate=1.0;
-  audio.src=track.audioUrl;
-  audio.crossOrigin='anonymous';
+  if (track.image) updateDynamicBackground(track.image);
+  updateMood(track.title, track.artist);
+  audio.playbackRate = 1.0;
+  audio.src = track.audioUrl;
+  audio.crossOrigin = 'anonymous';
   audio.load();
+
   const loadTimeout = setTimeout(() => {
     if (!audio.duration || isNaN(audio.duration)) {
       console.warn('⚠️ Audio load timeout — retrying...');
       audio.load();
     }
   }, 15000);
+
   const clearLoadTimeout = () => clearTimeout(loadTimeout);
   audio.addEventListener('canplay', clearLoadTimeout, { once: true });
   audio.addEventListener('error', (e) => {
@@ -3354,22 +3378,54 @@ async function loadTrack(track,position=0,autoPlay=false){
       }
     }, 3000);
   }, { once: true });
+
   cacheSongForOffline(track);
-  const setPos=()=>{try{audio.currentTime=position||0;}catch(e){}audio.removeEventListener('loadedmetadata',setPos);};
-  audio.addEventListener('loadedmetadata',setPos);
-  if(autoPlay){
-    try{
+
+  // ✅ Robust position setting — slow network pe bhi sahi jagah se chalega
+  const setPos = () => {
+    if (position > 0) {
+      try {
+        audio.currentTime = position;
+        console.log(`🎯 Position set: ${position.toFixed(1)}s`);
+      } catch (e) {
+        console.warn('Position set failed:', e);
+      }
+    }
+    audio.removeEventListener('loadedmetadata', setPos);
+    audio.removeEventListener('canplay', setPos);
+  };
+  audio.addEventListener('loadedmetadata', setPos);
+  audio.addEventListener('canplay', setPos);
+
+  if (autoPlay) {
+    try {
       initAudioContext();
       await audio.play();
-      if(audioContext?.state==='suspended')await audioContext.resume();
+      if (audioContext?.state === 'suspended') await audioContext.resume();
       art.classList.add('playing');
       document.getElementById('waveformLive').classList.add('active');
-      startWaveform();startBeatDetection();
-    }catch(e){
-      document.addEventListener('click',()=>{if(audio.paused&&currentTrack)audio.play().catch(()=>{});},{once:true});
+      startWaveform();
+      startBeatDetection();
+
+      // ✅ Play ke baad drift fix — network slow hone pe position correct karo
+      if (position > 0) {
+        setTimeout(() => {
+          const drift = Math.abs(audio.currentTime - position);
+          if (drift > 1.5) {
+            audio.currentTime = position;
+            console.log(`🔧 Drift corrected after play: ${drift.toFixed(1)}s`);
+          }
+        }, 2000);
+      }
+    } catch (e) {
+      document.addEventListener('click', () => {
+        if (audio.paused && currentTrack) audio.play().catch(() => {});
+      }, { once: true });
     }
   }
+
   setTimeout(() => { updatePlayIcon(); }, 150);
+
   audio.addEventListener('play', () => {
     const btn = document.getElementById('playBtn');
     if (btn) btn.dataset.state = 'paused';
@@ -3380,19 +3436,24 @@ async function loadTrack(track,position=0,autoPlay=false){
     if (btn) btn.dataset.state = 'playing';
     updatePlayIcon();
   });
-  updatePlayIcon();startHeartbeat();
-  if(distanceKm>100)setTimeout(showDistanceHeart,800);
-  if('mediaSession' in navigator&&track){
-    try{
-      navigator.mediaSession.metadata=new MediaMetadata({
-        title:track.title||'Unknown',artist:track.artist||'Unknown',album:'Music Sync',
-        artwork:track.image?[
-          {src:track.image,sizes:'96x96',type:'image/jpeg'},
-          {src:track.image,sizes:'192x192',type:'image/jpeg'},
-          {src:track.image,sizes:'512x512',type:'image/jpeg'}
-        ]:[]
+
+  updatePlayIcon();
+  startHeartbeat();
+  if (distanceKm > 100) setTimeout(showDistanceHeart, 800);
+
+  if ('mediaSession' in navigator && track) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title || 'Unknown',
+        artist: track.artist || 'Unknown',
+        album: 'Music Sync',
+        artwork: track.image ? [
+          { src: track.image, sizes: '96x96', type: 'image/jpeg' },
+          { src: track.image, sizes: '192x192', type: 'image/jpeg' },
+          { src: track.image, sizes: '512x512', type: 'image/jpeg' }
+        ] : []
       });
-    }catch(e){}
+    } catch (e) {}
   }
 }
 
