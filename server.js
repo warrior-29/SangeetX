@@ -23,7 +23,7 @@ const GLOBAL_MUTED_USERS = new Set();
 let currentAnnouncement = null;
 
 const IDLE_TIMEOUT = 2 * 60 * 1000;
-const DISCONNECT_GRACE = 60 * 1000;
+const DISCONNECT_GRACE = 30 * 1000; // ✅ 30 second grace
 
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
@@ -43,13 +43,56 @@ const AUTO_DJ_PLAYLIST = [
 
 let autoDjIndex = 0;
 
+// ✅ Expanded similar artists mapping
 const SIMILAR_ARTISTS = {
-  'arijit singh': ['atif aslam', 'jubin nautiyal', 'sachet tandon', 'darshan raval'],
-  'atif aslam': ['arijit singh', 'jubin nautiyal', 'sonu nigam'],
-  'jubin nautiyal': ['arijit singh', 'atif aslam', 'darshan raval'],
-  'sachet tandon': ['arijit singh', 'jubin nautiyal', 'darshan raval'],
-  'neha kakkar': ['shreya ghoshal', 'sunidhi chauhan', 'dhvani bhanushali'],
-  'shreya ghoshal': ['neha kakkar', 'sunidhi chauhan', 'alka yagnik']
+  // Hindi Male Playback
+  'arijit singh': ['atif aslam', 'jubin nautiyal', 'sachet tandon', 'darshan raval', 'sonu nigam', 'armaan malik'],
+  'atif aslam': ['arijit singh', 'jubin nautiyal', 'sonu nigam', 'darshan raval', 'rahat fateh ali khan'],
+  'jubin nautiyal': ['arijit singh', 'atif aslam', 'darshan raval', 'sachet tandon', 'armaan malik'],
+  'sachet tandon': ['arijit singh', 'jubin nautiyal', 'darshan raval', 'parampara tandon'],
+  'darshan raval': ['jubin nautiyal', 'arijit singh', 'sachet tandon', 'armaan malik'],
+  'armaan malik': ['arijit singh', 'jubin nautiyal', 'darshan raval'],
+  'sonu nigam': ['arijit singh', 'udit narayan', 'kumar sanu', 'shaan'],
+  'udit narayan': ['sonu nigam', 'kumar sanu', 'shaan', 'alka yagnik'],
+  'kumar sanu': ['udit narayan', 'sonu nigam', 'alka yagnik'],
+  'shaan': ['sonu nigam', 'udit narayan', 'kk'],
+  'kk': ['shaan', 'sonu nigam', 'mohit chauhan'],
+  'mohit chauhan': ['kk', 'sonu nigam', 'papon'],
+  
+  // Hindi Female Playback
+  'neha kakkar': ['shreya ghoshal', 'sunidhi chauhan', 'dhvani bhanushali', 'jasmine sandlas'],
+  'shreya ghoshal': ['neha kakkar', 'sunidhi chauhan', 'alka yagnik', 'shilpa rao'],
+  'sunidhi chauhan': ['shreya ghoshal', 'neha kakkar', 'alka yagnik'],
+  'alka yagnik': ['shreya ghoshal', 'sunidhi chauhan', 'sadhana sargam'],
+  'dhvani bhanushali': ['neha kakkar', 'jasmine sandlas', 'akasa singh'],
+  'jasmine sandlas': ['dhvani bhanushali', 'neha kakkar', 'guru randhawa'],
+  'akasa singh': ['dhvani bhanushali', 'neha kakkar'],
+  'shilpa rao': ['shreya ghoshal', 'sunidhi chauhan'],
+  'sadhana sargam': ['alka yagnik', 'shreya ghoshal'],
+  
+  // Punjabi
+  'guru randhawa': ['jasmine sandlas', 'badshah', 'harrdy sandhu', 'diljit dosanjh'],
+  'diljit dosanjh': ['guru randhawa', 'harrdy sandhu', 'badshah', 'ammy virk'],
+  'badshah': ['guru randhawa', 'yo yo honey singh', 'diljit dosanjh'],
+  'harrdy sandhu': ['guru randhawa', 'diljit dosanjh', 'ammy virk'],
+  'yo yo honey singh': ['badshah', 'guru randhawa'],
+  'ammy virk': ['diljit dosanjh', 'harrdy sandhu', 'guru randhawa'],
+  
+  // Pakistani
+  'rahat fateh ali khan': ['atif aslam', 'nusrat fateh ali khan', 'ali zafar'],
+  'nusrat fateh ali khan': ['rahat fateh ali khan', 'atif aslam'],
+  'ali zafar': ['rahat fateh ali khan', 'atif aslam', 'ali sethi'],
+  
+  // South Indian
+  'sid sriram': ['a.r. rahman', 'anirudh ravichander', 'harris jayaraj'],
+  'a.r. rahman': ['sid sriram', 'anirudh ravichander', 'harris jayaraj'],
+  'anirudh ravichander': ['sid sriram', 'a.r. rahman', 'yuvan shankar raja'],
+  
+  // Bollywood Composers
+  'pritam': ['arijit singh', 'amit trivedi', 'vishal shekhar'],
+  'amit trivedi': ['pritam', 'arijit singh', 'vishal shekhar'],
+  'vishal shekhar': ['pritam', 'shankar ehsaan loy', 'amit trivedi'],
+  'shankar ehsaan loy': ['vishal shekhar', 'pritam', 'a.r. rahman']
 };
 
 const analytics = {
@@ -316,7 +359,7 @@ app.get('/api/admin/blockedList', (req, res) => {
   });
 });
 
-// ✅ FIXED: Kick user — robust
+// ✅ Kick user — robust
 app.post('/api/admin/kickUser', (req, res) => {
   const { password, userId, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
@@ -528,6 +571,7 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
+// ✅ Parallel API search
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
@@ -681,69 +725,88 @@ async function searchSimilarSongs(query, exclude = []) {
   return [];
 }
 
+// ✅ Improved next song from context
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-  if (currentTrack.isAmbient) return null;
 
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const title = currentTrack.title || '';
+  const currentId = currentTrack.id;
+  const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
+  // Priority 1: Same artist
   if (artist && artist !== 'Unknown') {
-    const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
+    console.log(`🎵 Trying same artist: ${artist}`);
+    const artistSongs = await searchSimilarSongs(artist, fullExclude);
     if (artistSongs.length > 0) {
-      console.log(`🎵 Next from same artist: ${artist}`);
-      return artistSongs[0];
+      const pick = artistSongs[Math.floor(Math.random() * Math.min(3, artistSongs.length))];
+      console.log(`🎵 Next from same artist: ${artist} → ${pick.title}`);
+      return pick;
     }
   }
 
+  // Priority 2: Similar artists
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower];
   if (similarArtists && similarArtists.length > 0) {
-    for (const simArtist of similarArtists) {
-      const songs = await searchSimilarSongs(simArtist, [currentTrack.id, ...playedHistory]);
+    const shuffled = [...similarArtists].sort(() => Math.random() - 0.5);
+    for (const simArtist of shuffled) {
+      console.log(`🎵 Trying similar artist: ${simArtist}`);
+      const songs = await searchSimilarSongs(simArtist, fullExclude);
       if (songs.length > 0) {
-        console.log(`🎵 Next from similar artist: ${simArtist}`);
-        return songs[0];
+        const pick = songs[0];
+        console.log(`🎵 Next from similar artist: ${simArtist} → ${pick.title}`);
+        return pick;
       }
     }
   }
 
-  const keyword = title.split(' ')[0];
-  if (keyword && keyword.length > 3) {
-    const keywordSongs = await searchSimilarSongs(keyword, [currentTrack.id, ...playedHistory]);
-    if (keywordSongs.length > 0) {
-      console.log(`🎵 Next from keyword: ${keyword}`);
-      return keywordSongs[0];
+  // Priority 3: Keyword from title
+  const keywords = title.split(' ').filter(w => w.length > 3);
+  if (keywords.length > 0) {
+    for (const keyword of keywords) {
+      console.log(`🎵 Trying keyword: ${keyword}`);
+      const keywordSongs = await searchSimilarSongs(keyword, fullExclude);
+      if (keywordSongs.length > 0) {
+        const pick = keywordSongs[0];
+        console.log(`🎵 Next from keyword: ${keyword} → ${pick.title}`);
+        return pick;
+      }
     }
   }
 
+  console.log('⚠️ No context match found — will use Auto DJ');
   return null;
 }
 
+// ✅ Improved skip song
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-  if (currentTrack.isAmbient) return null;
 
   const artist = (currentTrack.artist || '').split(',')[0].trim();
+  const currentId = currentTrack.id;
+  const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
   if (artist && artist !== 'Unknown') {
-    const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
-    if (artistSongs.length > 1) {
-      console.log(`🎲 Skip: same artist different song`);
-      return artistSongs[1];
-    } else if (artistSongs.length === 1) {
-      return artistSongs[0];
+    const artistSongs = await searchSimilarSongs(artist, fullExclude);
+    if (artistSongs.length > 0) {
+      const pick = artistSongs[Math.floor(Math.random() * Math.min(5, artistSongs.length))];
+      console.log(`🎲 Skip: ${artist} → ${pick.title}`);
+      return pick;
     }
   }
 
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower];
   if (similarArtists && similarArtists.length > 0) {
-    const randomArtist = similarArtists[Math.floor(Math.random() * similarArtists.length)];
-    const songs = await searchSimilarSongs(randomArtist, [currentTrack.id, ...playedHistory]);
-    if (songs.length > 0) {
-      console.log(`🎲 Skip: similar artist ${randomArtist}`);
-      return songs[0];
+    const shuffled = [...similarArtists].sort(() => Math.random() - 0.5);
+    for (const simArtist of shuffled) {
+      const songs = await searchSimilarSongs(simArtist, fullExclude);
+      if (songs.length > 0) {
+        const pick = songs[Math.floor(Math.random() * Math.min(3, songs.length))];
+        console.log(`🎲 Skip: similar ${simArtist} → ${pick.title}`);
+        return pick;
+      }
     }
   }
 
@@ -764,7 +827,7 @@ async function playNextSong(reason = 'auto', user = null) {
   const currentIsAmbient = room.state.isAmbient || false;
   const currentTrackId = room.state.track?.id;
 
-  if (!currentIsAmbient && currentTrackId && currentTrackId !== 'ambient-silent-default') {
+  if (!currentIsAmbient && currentTrackId) {
     if (reason === 'skip') {
       nextSong = await getSkipSong(room.state.track, playedHistory);
     } else if (reason === 'next' || reason === 'auto') {
@@ -772,7 +835,7 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // ✅ Auto DJ fallback — 3 retries, 500ms delay
+  // Auto DJ fallback — 3 retries
   if (!nextSong) {
     for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
@@ -787,7 +850,6 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // ✅ If still null → retry in 10s (no ambient)
   if (!nextSong) {
     console.error('❌ playNextSong: all APIs failed, retrying in 10s');
     setTimeout(() => playNextSong(reason, user), 10000);
@@ -831,7 +893,6 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ Song end check — no ambient
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -872,7 +933,6 @@ function startPositionUpdater() {
 }
 
 function startAutoDj() {
-  // ✅ No auto-start — user plays first song
   console.log('🎵 Auto DJ: Waiting for user to play a song...');
 }
 
@@ -1029,7 +1089,7 @@ io.on('connection', (socket) => {
       console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
 
       if (!room.playedHistory) room.playedHistory = [];
-      if (room.state.track && !room.state.isAmbient && room.state.track.id !== newState.track.id) {
+      if (room.state.track && room.state.track.id !== newState.track.id) {
         room.playedHistory.push(room.state.track.id);
         if (room.playedHistory.length > 20) room.playedHistory.shift();
       }
@@ -1062,11 +1122,6 @@ io.on('connection', (socket) => {
       userName: user.name,
       message: `⏭️ Next song`
     });
-
-    const wasAmbient = room.state.isAmbient;
-    if (wasAmbient) {
-      room.state.isAmbient = false;
-    }
 
     try {
       await playNextSong('next', user);
@@ -1383,7 +1438,7 @@ io.on('connection', (socket) => {
         user.status = 'disconnected';
         user.disconnectedAt = Date.now();
 
-        console.log(`⏳ ${user.name} disconnected — grace`);
+        console.log(`⏳ ${user.name} disconnected — 30s grace`);
 
         io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
         io.to(roomId).emit('globalStats', {
@@ -1404,7 +1459,7 @@ io.on('connection', (socket) => {
           if (!r) return;
           const u = r.users.find(x => x.id === socket.id);
           if (u && u.status === 'disconnected') {
-            console.log(`❌ ${u.name} removed`);
+            console.log(`❌ ${u.name} removed after 30s grace`);
             r.users = r.users.filter(x => x.id !== socket.id);
             io.to(roomId).emit('usersUpdate', getUsersWithStatus(r));
           }
@@ -1474,6 +1529,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
   console.log('🎵 Auto DJ: Waiting for user to play a song...');
+  console.log('⏱️  Session grace: 30 seconds');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
