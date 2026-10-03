@@ -577,11 +577,11 @@ input:checked + .slider:before { transform:translateX(16px); }
 .leaflet-popup-tip { background: rgba(22,22,32,0.98) !important; }
 
 /* ═══════════════════════════════════════════════════════════════
-   CHAT PANEL — WHATSAPP STYLE
+   CHAT PANEL — PIXEL PERFECT MATCH TO REFERENCE IMAGE
    ═══════════════════════════════════════════════════════════════ */
 #chatPanel {
   display: none; position: fixed; inset: 0;
-  background: #0a0a14;
+  background: #0a0614;
   z-index: 200; justify-content: flex-end; flex-direction: column;
   height: 100vh; height: 100dvh; overflow: hidden;
 }
@@ -593,66 +593,63 @@ input:checked + .slider:before { transform:translateX(16px); }
 
 .chat-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 12px;
-  background: rgba(15, 12, 25, 0.95);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(139,92,246,0.15);
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 12px 14px;
+  background: #0d0819;
+  border-bottom: 1px solid rgba(139,92,246,0.08);
+  padding-top: max(12px, env(safe-area-inset-top));
   flex-shrink: 0; position: sticky; top: 0; z-index: 10;
-  min-height: 56px;
+  min-height: 60px;
 }
-.chat-header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.chat-header-left { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
 .chat-header-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: 42px; height: 42px; border-radius: 50%;
   background: linear-gradient(135deg, #8B5CF6, #EC4899);
   display: flex; align-items: center; justify-content: center;
   position: relative; flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(139,92,246,0.4);
-  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(139,92,246,0.45);
 }
 .chat-header-avatar::after {
   content: "";
   position: absolute;
-  bottom: 1px; right: 1px;
-  width: 11px; height: 11px;
+  bottom: 0; right: 0;
+  width: 12px; height: 12px;
   border-radius: 50%;
   background: #10B981;
-  border: 2px solid #0f0c19;
+  border: 2.5px solid #0d0819;
 }
 .chat-header-avatar [data-lucide] {
-  width: 20px; height: 20px; stroke-width: 2.5; color: white;
+  width: 20px; height: 20px; stroke-width: 2.4; color: white;
 }
 .chat-header-info { flex: 1; min-width: 0; }
 .chat-header-info h3 {
   font-size: 16px; font-weight: 700;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
   color: #FAFAFC;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: -0.2px;
 }
 .chat-header-info .chat-sub {
-  font-size: 12px; color: #A8A8B3; font-weight: 500;
+  font-size: 12px; color: #8B8B95; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .chat-close {
-  background: transparent; border: none; color: #A8A8B3;
-  width: 40px; height: 40px; border-radius: 50%;
+  background: transparent; border: none; color: #B0B0B8;
+  width: 36px; height: 36px; border-radius: 50%;
   cursor: pointer; font-family: inherit;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   transition: all 0.2s var(--ease);
 }
-.chat-close:active { background: rgba(255,255,255,0.08); transform: scale(0.92); }
+.chat-close:active { background: rgba(255,255,255,0.06); transform: scale(0.92); }
 .chat-close [data-lucide] { width: 22px; height: 22px; stroke-width: 2; }
 
 .chat-presence {
-  padding: 8px 12px;
-  background: rgba(15, 12, 25, 0.85);
-  border-bottom: 1px solid rgba(139,92,246,0.08);
+  padding: 8px 14px;
+  background: #0d0819;
+  border-bottom: 1px solid rgba(139,92,246,0.06);
   display: flex; align-items: center; gap: 6px;
-  min-height: 36px; overflow-x: auto;
+  min-height: 34px; overflow-x: auto;
   scrollbar-width: none; flex-shrink: 0;
-  position: sticky; top: 56px; z-index: 9;
 }
 .chat-presence::-webkit-scrollbar { display: none; }
 .chat-presence-list { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0; }
@@ -663,8 +660,8 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-presence-empty::before { content: "•"; font-style: normal; color: #10B981; font-size: 16px; line-height: 0; }
 .chat-presence-user {
   display: flex; align-items: center; gap: 5px;
-  background: rgba(139,92,246,0.1);
-  border: 1px solid rgba(139,92,246,0.2);
+  background: rgba(139,92,246,0.15);
+  border: 1px solid rgba(139,92,246,0.25);
   padding: 3px 10px 3px 8px; border-radius: 100px;
   font-size: 11px; font-weight: 600; color: #C4B5FD;
   white-space: nowrap; flex-shrink: 0;
@@ -675,21 +672,21 @@ input:checked + .slider:before { transform:translateX(16px); }
   box-shadow: 0 0 6px #10B981;
 }
 .chat-presence-user.is-me {
-  background: rgba(139,92,246,0.2);
+  background: rgba(139,92,246,0.22);
   border-color: rgba(139,92,246,0.35);
   color: #FAFAFC;
 }
 
 .chat-messages {
   flex: 1; overflow-y: auto;
-  padding: 16px 12px 20px;
-  display: flex; flex-direction: column; gap: 8px;
-  background: #0a0a14;
+  padding: 16px 14px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: #0a0614;
   background-image:
-    radial-gradient(circle at 15% 10%, rgba(139,92,246,0.15) 0%, transparent 35%),
-    radial-gradient(circle at 85% 30%, rgba(236,72,153,0.1) 0%, transparent 40%),
-    radial-gradient(circle at 50% 90%, rgba(88,28,135,0.15) 0%, transparent 45%),
-    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.015'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+    radial-gradient(circle at 15% 8%, rgba(139,92,246,0.10) 0%, transparent 40%),
+    radial-gradient(circle at 85% 30%, rgba(236,72,153,0.07) 0%, transparent 45%),
+    radial-gradient(circle at 50% 95%, rgba(88,28,135,0.10) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.012'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   min-height: 0;
@@ -723,15 +720,14 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .chat-msg-row.mine { align-self: flex-end; align-items: flex-end; }
 .chat-msg-row.theirs { align-self: flex-start; align-items: flex-start; }
-
 @keyframes msgIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .chat-msg-sender {
   display: flex; align-items: center; gap: 8px;
-  padding: 0 4px 6px;
+  padding: 0 4px 5px;
   font-size: 13px;
   font-weight: 600;
   color: #A78BFA;
@@ -739,7 +735,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .chat-msg-sender::before {
   content: "";
-  width: 3px; height: 16px;
+  width: 3px; height: 14px;
   border-radius: 2px;
   background: linear-gradient(180deg, #8B5CF6, #EC4899);
   flex-shrink: 0;
@@ -747,17 +743,17 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-msg-row.mine .chat-msg-sender { color: #C4B5FD; }
 
 .chat-msg {
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 9px 13px;
+  border-radius: 14px;
   font-size: 14.5px;
-  line-height: 1.4;
+  line-height: 1.42;
   word-wrap: break-word;
   font-weight: 400;
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 80px;
+  min-width: 70px;
   max-width: 100%;
 }
 
@@ -765,38 +761,34 @@ input:checked + .slider:before { transform:translateX(16px); }
   background: linear-gradient(135deg, #6D28D9 0%, #7C3AED 100%);
   color: #FFFFFF;
   border-top-right-radius: 4px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 8px rgba(109,40,217,0.35);
 }
 
 .chat-msg.theirs {
-  background: rgba(30, 25, 45, 0.85);
+  background: rgba(30, 22, 48, 0.9);
   color: #FAFAFC;
   border-top-left-radius: 4px;
-  border: 1px solid rgba(139,92,246,0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  border: 1px solid rgba(139,92,246,0.12);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 
 .chat-msg.bot {
-  background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(139,92,246,0.15));
-  border: 1px solid rgba(16,185,129,0.3);
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(30,22,48,0.9));
+  border: 1px solid rgba(139,92,246,0.25);
   color: #FAFAFC;
 }
-.chat-msg.bot .chat-msg-sender { color: #10B981; }
+.chat-msg.bot .chat-msg-sender { color: #A78BFA; }
 .chat-msg.bot .chat-msg-sender::before {
-  background: linear-gradient(180deg, #10B981, #059669);
+  background: linear-gradient(180deg, #A78BFA, #8B5CF6);
 }
 
-.chat-msg.pending {
-  opacity: 0.6;
-}
+.chat-msg.pending { opacity: 0.6; }
 
 .chat-msg-text {
   font-size: 14.5px;
-  line-height: 1.4;
+  line-height: 1.42;
   word-break: break-word;
-  padding-right: 60px;
+  padding-right: 55px;
 }
 
 .chat-msg-meta {
@@ -804,10 +796,10 @@ input:checked + .slider:before { transform:translateX(16px); }
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 10.5px;
+  opacity: 0.65;
   font-weight: 500;
-  margin-top: -18px;
+  margin-top: -16px;
   margin-left: auto;
   align-self: flex-end;
   position: relative;
@@ -816,26 +808,25 @@ input:checked + .slider:before { transform:translateX(16px); }
   letter-spacing: 0.2px;
 }
 
-.chat-msg.mine .chat-msg-meta { color: rgba(255,255,255,0.75); }
-.chat-msg.theirs .chat-msg-meta { color: rgba(200,200,220,0.65); }
+.chat-msg.mine .chat-msg-meta { color: rgba(255,255,255,0.7); }
+.chat-msg.theirs .chat-msg-meta { color: rgba(190,190,210,0.6); }
 
 .chat-msg-tick {
   display: inline-flex;
   align-items: center;
-  color: #60A5FA;
+  color: #A5B4FC;
   font-size: 13px;
   letter-spacing: -3px;
   margin-left: -2px;
 }
-.chat-msg.mine .chat-msg-tick { color: #A5B4FC; }
 
 .typing-indicator {
-  padding: 6px 14px 8px;
+  padding: 6px 16px 8px;
   display: none;
   align-items: center; gap: 8px;
   font-size: 11px; color: #A8A8B3; font-weight: 500;
-  background: #0a0a14;
-  border-top: 1px solid rgba(139,92,246,0.08);
+  background: #0a0614;
+  border-top: 1px solid rgba(139,92,246,0.06);
   flex-shrink: 0; min-height: 28px;
 }
 .typing-indicator.show { display: flex; }
@@ -852,37 +843,37 @@ input:checked + .slider:before { transform:translateX(16px); }
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
+/* --- INPUT ROW — ONLY 3 ELEMENTS: emoji, input, send --- */
 .chat-input-row {
   display: flex; gap: 8px;
-  padding: 8px 10px;
-  background: #0f0c19;
-  border-top: 1px solid rgba(139,92,246,0.1);
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding: 10px 14px;
+  background: #0d0819;
+  border-top: 1px solid rgba(139,92,246,0.08);
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
   flex-shrink: 0;
-  position: sticky; bottom: 0; z-index: 10;
   align-items: center;
 }
 
 .chat-emoji-btn {
-  width: 44px; height: 44px;
+  width: 40px; height: 40px;
   border-radius: 50%;
   background: transparent;
   border: none;
-  color: #A8A8B3;
+  color: #B0B0B8;
   cursor: pointer; font-family: inherit;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   transition: all 0.2s var(--ease);
 }
-.chat-emoji-btn:active { background: rgba(255,255,255,0.08); transform: scale(0.92); }
-.chat-emoji-btn [data-lucide] { width: 24px; height: 24px; stroke-width: 2; }
+.chat-emoji-btn:active { background: rgba(255,255,255,0.06); transform: scale(0.92); }
+.chat-emoji-btn [data-lucide] { width: 24px; height: 24px; stroke-width: 1.8; }
 .chat-emoji-btn.active { color: #A78BFA; }
 
 .chat-input-editable {
   flex: 1;
   padding: 11px 18px;
-  background: rgba(30, 25, 45, 0.9);
-  border: 1px solid rgba(139,92,246,0.15);
+  background: rgba(30, 22, 48, 0.85);
+  border: 1px solid rgba(139,92,246,0.12);
   border-radius: 22px;
   color: #FAFAFC;
   font-size: 15px;
@@ -901,11 +892,11 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .chat-input-editable:empty::before {
   content: attr(data-placeholder);
-  color: #5E5E6B;
+  color: #6E6E7A;
   pointer-events: none;
 }
 .chat-input-editable:focus {
-  border-color: rgba(139,92,246,0.4);
+  border-color: rgba(139,92,246,0.35);
 }
 .chat-input-editable[contenteditable="false"] {
   opacity: 0.5;
@@ -913,18 +904,18 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 
 .chat-send {
-  width: 46px; height: 46px;
+  width: 42px; height: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
   border: none; color: white;
   cursor: pointer; font-family: inherit;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(139,92,246,0.4);
+  box-shadow: 0 4px 14px rgba(139,92,246,0.5);
   flex-shrink: 0;
   transition: all 0.2s var(--spring);
 }
 .chat-send:active { transform: scale(0.9); }
-.chat-send [data-lucide] { width: 22px; height: 22px; stroke-width: 2.2; }
+.chat-send [data-lucide] { width: 20px; height: 20px; stroke-width: 2.4; }
 .chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .emoji-picker {
@@ -932,8 +923,8 @@ input:checked + .slider:before { transform:translateX(16px); }
   bottom: 100%;
   left: 0;
   right: 0;
-  background: #0f0c19;
-  border-top: 1px solid rgba(139,92,246,0.15);
+  background: #0d0819;
+  border-top: 1px solid rgba(139,92,246,0.12);
   border-radius: 16px 16px 0 0;
   padding: 12px;
   max-height: 240px;
@@ -982,63 +973,65 @@ input:checked + .slider:before { transform:translateX(16px); }
 
 @media (max-width: 360px) {
   .chat-input-editable { font-size: 14px; padding: 9px 14px; }
-  .chat-emoji-btn { width: 38px; height: 38px; }
-  .chat-send { width: 40px; height: 40px; }
-  .chat-send [data-lucide] { width: 20px; height: 20px; }
+  .chat-emoji-btn { width: 36px; height: 36px; }
+  .chat-emoji-btn [data-lucide] { width: 22px; height: 22px; }
+  .chat-send { width: 38px; height: 38px; }
+  .chat-send [data-lucide] { width: 18px; height: 18px; }
   .emoji-grid { grid-template-columns: repeat(6, 1fr); }
 }
+@media (min-width: 768px) {
+  #chatPanel .chat-messages,
+  #chatPanel .chat-header,
+  #chatPanel .chat-presence,
+  #chatPanel .chat-input-row,
+  #chatPanel .typing-indicator {
+    max-width: 600px; margin-left: auto; margin-right: auto; width: 100%;
+  }
+}
+@media (max-height: 500px) {
+  .chat-header { padding: 8px 14px; min-height: 48px; }
+  .chat-header h3 { font-size: 14px; }
+  .chat-presence { min-height: 28px; padding: 6px 12px; }
+  .chat-input-row { padding: 8px 12px; }
+  .chat-input-editable { padding: 9px 14px; font-size: 14px; }
+  .chat-send { width: 38px; height: 38px; }
+}
+@supports (-webkit-touch-callout: none) {
+  .chat-input-editable { font-size: 16px; }
+  #chatPanel.active { height: 100%; }
+}
+@keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
 
-/* ============ SEARCH MODAL ============ */
-#searchModal { display:none; position:fixed; inset:0; background:var(--bg); z-index:100; flex-direction:column; }
-#searchModal.active { display:flex; }
-.search-header {
-  display:flex; align-items:center; gap:10px;
-  padding:12px 16px; border-bottom:1px solid var(--border);
-  padding-top:max(12px,env(safe-area-inset-top));
-  background:rgba(0,0,0,0.5); backdrop-filter:blur(10px); flex-shrink:0;
+/* ============ RESPONSIVE ============ */
+@media (max-height:700px) {
+  .album-art { width:min(42vw, 155px); }
+  .player-section { gap:7px; }
+  .song-title { font-size:14px; }
+  .ctrl-btn.play { width:56px; height:56px; }
+  .ctrl-btn { width:42px; height:42px; }
+  .ptt-button { height:40px; }
+  .reaction-btn { height:38px; font-size:16px; }
 }
-.back-btn {
-  background:rgba(255,255,255,0.05); border:1px solid var(--border);
-  color:var(--text); cursor:pointer; width:38px; height:38px;
-  border-radius:50%; font-family:inherit;
-  display:flex; align-items:center; justify-content:center;
-  flex-shrink:0;
+@media (max-width:360px) {
+  .status { max-width:140px; font-size:10px; padding:6px 10px; }
+  .icon-btn { width:34px; height:34px; }
+  .distance-meter { font-size:9px; padding:5px 10px; }
+  .audio-output-badge { font-size:9px; padding:4px 8px; max-width:100px; }
 }
-.back-btn [data-lucide] { width:18px; height:18px; stroke-width:2.3; }
-#searchInput {
-  flex:1; padding:11px 16px;
-  background:rgba(0,0,0,0.4);
-  border:1.5px solid var(--border); border-radius:100px;
-  color:var(--text); font-size:14px; font-weight:500;
-  outline:none; font-family:inherit; min-width:0;
+@media (min-width:768px) {
+  .album-art { width:min(28vw, 260px); }
+  .song-title { font-size:20px; }
+  .ptt-button { height:52px; font-size:12px; }
 }
-#searchInput:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,92,246,0.15); }
-.search-results { flex:1; overflow-y:auto; padding:10px 12px; -webkit-overflow-scrolling:touch; }
-.search-hint { text-align:center; color:var(--muted); padding:50px 20px; font-size:13px; font-weight:500; }
-.song-item {
-  display:flex; align-items:center; gap:12px; padding:10px;
-  border-radius:12px; cursor:pointer; margin-bottom:4px;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-.song-item:active { background:rgba(255,255,255,0.08); }
-.song-item img { width:50px; height:50px; border-radius:10px; object-fit:cover; background:var(--surface-2); flex-shrink:0; }
-.song-item-info { flex:1; min-width:0; }
-.song-item-title { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.song-item-artist { font-size:11px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
-.song-item-duration { font-size:11px; color:var(--muted); font-weight:600; flex-shrink:0; }
+::-webkit-scrollbar { width:0; height:0; }
 
-/* ============ FLOATING EMOJI ============ */
-.reaction-layer { position:fixed; inset:0; pointer-events:none; z-index:250; overflow:hidden; }
-.floating-emoji {
-  position:absolute; font-size:42px;
-  animation:floatUp 2.2s cubic-bezier(0.4,0,0.2,1) forwards;
-  filter:drop-shadow(0 6px 16px rgba(0,0,0,0.5));
-}
-@keyframes floatUp {
-  0% { transform:translateY(0) scale(1) rotate(0deg); opacity:1; }
-  100% { transform:translateY(-240px) scale(1.7) rotate(20deg); opacity:0; }
-}
-
-/* ============ WELCOME TOAST ============ */
+/* ============ TOAST / BANNERS (kept) ============ */
 .welcome-toast {
   position: fixed;
   top: max(70px, calc(env(safe-area-inset-top) + 70px));
@@ -1073,7 +1066,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .welcome-name { font-size: 12px; font-weight: 800; color: var(--text); margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .welcome-msg { font-size: 10px; color: var(--text-dim); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ============ TOAST ============ */
 .toast {
   position:fixed; bottom:90px; left:50%;
   transform:translateX(-50%) translateY(20px);
@@ -1094,7 +1086,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.warning { border-color:rgba(245,158,11,0.4); }
 .toast.warning [data-lucide] { color:var(--warning); }
 
-/* ============ MIC BANNER ============ */
 .mic-banner {
   position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%;
   transform:translateX(-50%) translateY(-120px);
@@ -1116,7 +1107,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   flex-shrink:0;
 }
 
-/* ============ OFFLINE BANNER ============ */
 .offline-banner {
   position:fixed; top:max(60px, calc(env(safe-area-inset-top) + 60px));
   left:50%; transform:translateX(-50%) translateY(-120px);
@@ -1135,7 +1125,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   text-align:center; flex-shrink:0;
 }
 
-/* ============ INSTALL BANNER ============ */
 .install-banner {
   position:fixed; bottom:max(20px, env(safe-area-inset-bottom));
   left:50%; transform:translateX(-50%) translateY(200px);
@@ -1167,7 +1156,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   flex-shrink:0;
 }
 
-/* ============ ADMIN ANNOUNCE BANNER ============ */
 .admin-announce-banner {
   position: fixed; top: 0; left: 0; right: 0;
   z-index: 9999;
@@ -1212,57 +1200,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .announce-close [data-lucide] { width: 16px; height: 16px; stroke-width: 2.5; }
 .announce-close:active { transform: scale(0.9); background: rgba(255,255,255,0.4); }
-
-@keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
-
-/* ============ RESPONSIVE ============ */
-@media (max-height:700px) {
-  .album-art { width:min(42vw, 155px); }
-  .player-section { gap:7px; }
-  .song-title { font-size:14px; }
-  .ctrl-btn.play { width:56px; height:56px; }
-  .ctrl-btn { width:42px; height:42px; }
-  .ptt-button { height:40px; }
-  .reaction-btn { height:38px; font-size:16px; }
-}
-@media (max-width:360px) {
-  .status { max-width:140px; font-size:10px; padding:6px 10px; }
-  .icon-btn { width:34px; height:34px; }
-  .distance-meter { font-size:9px; padding:5px 10px; }
-  .audio-output-badge { font-size:9px; padding:4px 8px; max-width:100px; }
-  .chat-input-editable { font-size:14px; padding:10px 14px; }
-}
-@media (min-width:768px) {
-  .album-art { width:min(28vw, 260px); }
-  .song-title { font-size:20px; }
-  .ptt-button { height:52px; font-size:12px; }
-  #chatPanel .chat-messages,
-  #chatPanel .chat-header,
-  #chatPanel .chat-presence,
-  #chatPanel .chat-input-row,
-  #chatPanel .typing-indicator {
-    max-width:600px; margin-left:auto; margin-right:auto; width:100%;
-  }
-}
-@supports (-webkit-touch-callout: none) {
-  .chat-input-editable { font-size:16px; }
-  #chatPanel.active { height:100%; }
-}
-@media (max-height:500px) {
-  .chat-header { padding:8px 14px; min-height:44px; }
-  .chat-header h3 { font-size:14px; }
-  .chat-presence { min-height:30px; padding:6px 12px; }
-  .chat-input-row { padding:8px 12px; }
-  .chat-input-editable { padding:10px 14px; font-size:14px; }
-  .chat-send { width:40px; height:40px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-::-webkit-scrollbar { width:0; height:0; }
 </style>
 </head>
 <body>
@@ -1474,7 +1411,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ CHAT PANEL ============ -->
+<!-- ============ CHAT PANEL — PIXEL PERFECT ============ -->
 <div id="chatPanel">
   <div class="chat-header">
     <div class="chat-header-left">
@@ -1656,7 +1593,6 @@ let deferredPrompt = null;
 let globalMap = null;
 let mapMarkers = [];
 
-// ✅ Session validity
 const SESSION_VALIDITY_MS = 30 * 1000;
 let sessionRefreshInterval = null;
 
@@ -1938,7 +1874,7 @@ async function updateDynamicBackground(url){
   }catch(e){}
 }
 
-/* ============ WAVEFORM (30 FPS) ============ */
+/* ============ WAVEFORM ============ */
 function startWaveform(){
   if(!analyser)return;
   const bars=document.getElementById('waveformLive').children;
@@ -1946,7 +1882,6 @@ function startWaveform(){
   const barCount=bars.length;
   let lastFrame = 0;
   const FRAME_INTERVAL = 33;
-  
   function draw(now){
     if(!analyser||audio.paused){waveformAnimationId=null;return;}
     if(now - lastFrame < FRAME_INTERVAL){
@@ -1971,7 +1906,7 @@ function stopWaveform(){
   for(let b of bars)b.style.height='15%';
 }
 
-/* ============ BEAT DETECTION (15 FPS) ============ */
+/* ============ BEAT DETECTION ============ */
 function startBeatDetection(){
   if(beatDetectionActive||!analyser)return;
   beatDetectionActive=true;
@@ -1980,7 +1915,6 @@ function startBeatDetection(){
   let lastBeat=0;
   let lastFrame=0;
   const FRAME_INTERVAL = 66;
-  
   function detect(now){
     if(!beatDetectionActive||audio.paused){beatDetectionActive=false;return;}
     if(now - lastFrame < FRAME_INTERVAL){
@@ -2008,7 +1942,7 @@ function startBeatDetection(){
 }
 function stopBeatDetection(){beatDetectionActive=false;}
 
-/* ============ SYNC CHECK (10s) ============ */
+/* ============ SYNC CHECK ============ */
 function startSyncCheck(){
   if(syncInterval)clearInterval(syncInterval);
   syncInterval=setInterval(()=>{
@@ -2159,7 +2093,6 @@ function showDistanceHeart(){
 function openGlobalMap() {
   document.getElementById('globalMapModal').classList.add('active');
   refreshIcons();
-  
   if (!globalMap) {
     setTimeout(() => {
       try {
@@ -2167,7 +2100,6 @@ function openGlobalMap() {
           zoomControl: true,
           attributionControl: false
         }).setView([20, 0], 2);
-        
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 18,
           minZoom: 2
@@ -2181,7 +2113,6 @@ function openGlobalMap() {
       if (globalMap) globalMap.invalidateSize();
     }, 100);
   }
-  
   if (socket && socket.connected) {
     socket.emit('requestGlobalListeners', { roomId });
   }
@@ -2193,13 +2124,10 @@ function closeGlobalMap() {
 
 function renderGlobalMap({ listeners, currentTrack }) {
   if (!globalMap) return;
-  
   mapMarkers.forEach(m => globalMap.removeLayer(m));
   mapMarkers = [];
-  
   listeners.forEach(l => {
     if (!l.lat || !l.lng) return;
-    
     const marker = L.circleMarker([l.lat, l.lng], {
       radius: Math.min(6 + l.userCount * 2, 18),
       fillColor: '#EC4899',
@@ -2208,7 +2136,6 @@ function renderGlobalMap({ listeners, currentTrack }) {
       opacity: 1,
       fillOpacity: 0.8
     }).addTo(globalMap);
-    
     marker.bindPopup(
       `<div style="font-family: Inter, sans-serif;">
         <b>📍 ${l.city}</b><br>
@@ -2217,16 +2144,12 @@ function renderGlobalMap({ listeners, currentTrack }) {
     );
     mapMarkers.push(marker);
   });
-  
   const nowPlayingEl = document.getElementById('mapNowPlaying');
   const cityListEl = document.getElementById('mapCityList');
-  
   nowPlayingEl.textContent = currentTrack 
     ? `${currentTrack.title} — ${currentTrack.artist}` 
     : 'No song playing';
-  
   const sorted = [...listeners].sort((a, b) => b.userCount - a.userCount);
-  
   if (sorted.length === 0) {
     cityListEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);">No listeners with location yet</div>';
   } else {
@@ -2237,7 +2160,6 @@ function renderGlobalMap({ listeners, currentTrack }) {
       </div>
     `).join('');
   }
-  
   refreshIcons();
 }
 
@@ -2381,7 +2303,6 @@ function initSocket(){
   socket.on('usersUpdate',(users)=>{
     renderUsers(users);
     updatePartnerStatus(users);
-    
     const sub = document.getElementById('chatHeaderSub');
     if (sub && users) {
       const onlineCount = users.filter(u => u.status === 'online').length;
@@ -2399,9 +2320,7 @@ function initSocket(){
       console.warn('⚠️ songChanged: invalid track', track);
       return;
     }
-
     console.log(`🎵 songChanged: ${track.title} (${reason})`);
-
     if (reason === 'sync') {
       const syncPos = lastKnownPosition || 0;
       loadTrack(track, syncPos, true);
@@ -2409,11 +2328,9 @@ function initSocket(){
       setTimeout(() => updatePlayIcon(), 100);
       return;
     }
-
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
     setTimeout(() => updatePlayIcon(), 200);
-    
     if (reason === 'auto') showToast('🎵 Auto next');
     else if (reason === 'next') showToast(`⏭️ Next`);
     else if (reason === 'skip') showToast(`🎲 Skipped`);
@@ -2537,13 +2454,11 @@ function initSocket(){
         entry.audio.muted = muted || muteAll;
       }
     });
-    
     if (muted) {
       showToast(`🔇 ${mutedName} muted by admin`, 'warning');
     } else {
       showToast(`🔊 ${mutedName} unmuted by admin`, 'success');
     }
-    
     if (muted) {
       mutedUsers.add(mutedName.toLowerCase());
     } else {
@@ -2588,7 +2503,6 @@ function initSocket(){
 function showAdminAnnounce(message) {
   const existing = document.getElementById('adminAnnounceBanner');
   if (existing) existing.remove();
-  
   const banner = document.createElement('div');
   banner.id = 'adminAnnounceBanner';
   banner.className = 'admin-announce-banner';
@@ -2606,11 +2520,9 @@ function showAdminAnnounce(message) {
   `;
   document.body.appendChild(banner);
   refreshIcons();
-  
   requestAnimationFrame(() => {
     setTimeout(() => banner.classList.add('show'), 50);
   });
-  
   setTimeout(() => {
     banner.classList.remove('show');
     setTimeout(() => banner.remove(), 500);
@@ -2748,7 +2660,6 @@ document.getElementById('closeChat').addEventListener('click',()=>{
   }
   clearTimeout(typingTimer);isTyping=false;
   typingUsers.forEach(t=>clearTimeout(t));typingUsers.clear();renderTypingIndicator();
-  
   const picker = document.getElementById('emojiPicker');
   const emojiBtn = document.getElementById('chatEmojiBtn');
   if (picker) picker.classList.remove('show');
@@ -2808,7 +2719,6 @@ if (emojiBtn && emojiPickerEl) {
       emojiBtn.classList.add('active');
     }
   });
-  
   emojiPickerEl.querySelectorAll('[data-emoji]').forEach(btn => {
     btn.addEventListener('click', () => {
       const emoji = btn.dataset.emoji;
@@ -2831,7 +2741,6 @@ if (emojiBtn && emojiPickerEl) {
       }
     });
   });
-  
   document.addEventListener('click', (e) => {
     if (emojiPickerEl.classList.contains('show')) {
       if (!emojiPickerEl.contains(e.target) && e.target !== emojiBtn && !emojiBtn.contains(e.target)) {
@@ -2872,18 +2781,13 @@ function renderChat(messages,replace){
   }
   const empty=box.querySelector('.chat-empty');
   if(empty)empty.remove();
-  
   messages.forEach(m=>{
     const mine = m.userId === socket?.id || m.pending;
     const isBot = m.type === 'bot';
-    
     const row = document.createElement('div');
     row.className = 'chat-msg-row ' + (mine ? 'mine' : 'theirs');
-    
     const time = new Date(m.time).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
-    
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName||'Unknown'));
-    
     row.innerHTML = `
       <div class="chat-msg-sender">
         <span>${esc(senderName)}</span>
@@ -2995,13 +2899,11 @@ window.addEventListener('load', async () => {
     myFingerprint = await generateFingerprint();
     localStorage.setItem('sangeetxFingerprint', myFingerprint);
   }
-  
   const lastSavedName = localStorage.getItem('sangeetxUserName');
   if (lastSavedName) {
     document.getElementById('userNameInput').value = lastSavedName;
     console.log(`💡 Suggested name: ${lastSavedName}`);
   }
-  
   try {
     const res = await fetch('/api/global/stats');
     const stats = await res.json();
@@ -3012,28 +2914,23 @@ window.addEventListener('load', async () => {
       document.getElementById('nowPlayingText').textContent = `${stats.currentTrack.title} — ${stats.currentTrack.artist}`;
     }
   } catch (e) {}
-  
   setTimeout(async () => { await autoDetectAndRouteAudio(); }, 1500);
   setInterval(async () => {
     const devices = await detectAudioOutputDevices();
     const btDevice = devices.find(d => isBluetoothDevice(d.label));
     if (btDevice && btDevice.deviceId !== currentVoiceSinkId) await autoDetectAndRouteAudio();
   }, 5000);
-  
   const sessionRaw = localStorage.getItem('musicSyncSession');
   if (sessionRaw) {
     try {
       const session = JSON.parse(sessionRaw);
       const age = Date.now() - (session.savedAt || 0);
-      
       console.log(`🕐 Last session: ${Math.round(age/1000)}s ago`);
-      
       if (age < SESSION_VALIDITY_MS && session.userName) {
         console.log(`✅ Auto-rejoin: ${session.userName} (session valid)`);
         userName = session.userName;
         roomId = session.roomId || 'global';
         isOwner = false;
-        
         setTimeout(() => {
           saveSession();
           startSessionRefresh();
@@ -3065,7 +2962,6 @@ async function applyRemoteState(state){
       if (!state.isPlaying && !audio.paused) {
         audio.pause();
       }
-      
       if (state.isPlaying && !audio.paused) {
         const drift = audio.currentTime - state.position;
         const abs = Math.abs(drift);
@@ -3090,17 +2986,13 @@ async function applyRemoteState(state){
 function updatePlayIcon() {
   const btn = document.getElementById('playBtn');
   if (!btn) return;
-
   const isPaused = audio.paused;
   const currentState = btn.dataset.state;
-
   if (currentState === (isPaused ? 'paused' : 'playing')) return;
   btn.dataset.state = isPaused ? 'paused' : 'playing';
-
   const svg = isPaused
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><rect x="6" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/></svg>`;
-
   const iconEl = btn.querySelector('svg') || btn.querySelector('[data-lucide]');
   if (iconEl) {
     iconEl.outerHTML = svg;
@@ -3120,7 +3012,6 @@ async function loadTrack(track,position=0,autoPlay=false){
     showToast('⚠️ Song has no audio', 'error');
     return;
   }
-
   currentTrack=track;
   document.getElementById('songTitle').textContent=track.title;
   document.getElementById('songArtist').textContent=track.artist;
@@ -3129,23 +3020,19 @@ async function loadTrack(track,position=0,autoPlay=false){
     ?`<img src="${track.image}" alt="" crossorigin="anonymous">`
     :`<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
-
   audio.volume = 1.0;
-
   if(track.image)updateDynamicBackground(track.image);
   updateMood(track.title,track.artist);
   audio.playbackRate=1.0;
   audio.src=track.audioUrl;
   audio.crossOrigin='anonymous';
   audio.load();
-  
   const loadTimeout = setTimeout(() => {
     if (!audio.duration || isNaN(audio.duration)) {
       console.warn('⚠️ Audio load timeout — retrying...');
       audio.load();
     }
   }, 15000);
-  
   const clearLoadTimeout = () => clearTimeout(loadTimeout);
   audio.addEventListener('canplay', clearLoadTimeout, { once: true });
   audio.addEventListener('error', (e) => {
@@ -3159,7 +3046,6 @@ async function loadTrack(track,position=0,autoPlay=false){
       }
     }, 3000);
   }, { once: true });
-  
   cacheSongForOffline(track);
   const setPos=()=>{try{audio.currentTime=position||0;}catch(e){}audio.removeEventListener('loadedmetadata',setPos);};
   audio.addEventListener('loadedmetadata',setPos);
@@ -3175,9 +3061,7 @@ async function loadTrack(track,position=0,autoPlay=false){
       document.addEventListener('click',()=>{if(audio.paused&&currentTrack)audio.play().catch(()=>{});},{once:true});
     }
   }
-  
   setTimeout(() => { updatePlayIcon(); }, 150);
-  
   audio.addEventListener('play', () => {
     const btn = document.getElementById('playBtn');
     if (btn) btn.dataset.state = 'paused';
@@ -3188,7 +3072,6 @@ async function loadTrack(track,position=0,autoPlay=false){
     if (btn) btn.dataset.state = 'playing';
     updatePlayIcon();
   });
-  
   updatePlayIcon();startHeartbeat();
   if(distanceKm>100)setTimeout(showDistanceHeart,800);
   if('mediaSession' in navigator&&track){
@@ -3294,13 +3177,10 @@ function updateSeekVisual(pct) {
 function startDrag(e) {
   if (!currentTrack || !audio.duration) return;
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
-
   isDragging = true;
   wasPlayingBeforeDrag = !audio.paused;
-
   progressBarEl.classList.add('dragging');
   progressBarEl.setPointerCapture?.(e.pointerId);
-
   const pct = getSeekPercent(e.clientX);
   updateSeekVisual(pct);
   e.preventDefault();
@@ -3317,19 +3197,14 @@ function endDrag(e) {
   if (!isDragging) return;
   isDragging = false;
   progressBarEl.classList.remove('dragging');
-
   const pct = getSeekPercent(e.clientX);
-
   try {
     audio.currentTime = pct * audio.duration;
   } catch (err) {}
-
   broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
-
   if (wasPlayingBeforeDrag && audio.paused) {
     audio.play().catch(() => {});
   }
-
   if (navigator.vibrate) navigator.vibrate(15);
   e.preventDefault();
 }
