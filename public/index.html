@@ -757,7 +757,30 @@ input:checked + .slider:before { transform:translateX(16px); }
   flex-shrink:0; transition:all 0.2s var(--spring);
 }
 .install-close:active { transform:scale(0.9); background:rgba(255,255,255,0.45); }
-
+.played-by {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 12px;
+  background:rgba(139,92,246,0.1);
+  border:1px solid rgba(139,92,246,0.25);
+  border-radius:100px;
+  font-size:10px;
+  font-weight:700;
+  color:var(--primary-2);
+  margin-top:2px;
+  animation:moodIn 0.4s var(--spring);
+}
+.played-by [data-lucide] {
+  width:11px;
+  height:11px;
+  stroke-width:2.5;
+}
+.played-by.auto {
+  background:rgba(16,185,129,0.1);
+  border-color:rgba(16,185,129,0.25);
+  color:var(--success);
+}
 @media (max-height:700px) {
   .album-art { width:min(42vw, 155px); }
   .player-section { gap:7px; }
@@ -875,6 +898,10 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
       <div class="song-title" id="songTitle">No song playing</div>
       <div class="song-artist" id="songArtist">Search and play a song</div>
+      <div class="played-by" id="playedBy" style="display:none;">
+        <i data-lucide="user"></i>
+        <span id="playedByText">Played by You</span>
+      </div>
       <div class="mood-meter" id="moodMeter">
         <span id="moodEmoji">🎵</span>
         <span id="moodText">Mood: Neutral</span>
@@ -1017,6 +1044,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 function refreshIcons() { if (window.lucide) lucide.createIcons(); }
 refreshIcons();
 
+/* ===== STATE ===== */
 let socket = null;
 let roomId = null;
 let userName = null;
@@ -1031,7 +1059,6 @@ let peerConnection = null;
 let heartbeatInterval = null;
 let activityInterval = null;
 let syncInterval = null;
-let pendingRequestUserId = null;
 let unreadMessages = 0;
 let chatOpen = false;
 let audio = document.getElementById('audioPlayer');
@@ -1050,16 +1077,16 @@ let locationShared = false;
 let isOnline = navigator.onLine;
 let messageQueue = [];
 
-/* ✅ TYPING — Map based */
+/* ✅ TYPING */
 const typingUsers = new Map();
 let isTyping = false;
 let typingTimer = null;
 
-/* ✅ PERFECT NEGOTIATION FLAGS */
+/* ✅ PERFECT NEGOTIATION */
 let makingOffer = false;
 let ignoreOffer = false;
 
-/* ✅ AUDIO OUTPUT — auto bluetooth routing */
+/* ✅ AUDIO OUTPUT */
 let currentVoiceSinkId = 'default';
 let currentMusicSinkId = 'default';
 let audioOutputDevices = [];
@@ -1069,6 +1096,12 @@ let analyser = null;
 let sourceNode = null;
 let waveformAnimationId = null;
 let beatDetectionActive = false;
+
+/* ✅ FINGERPRINT */
+let myFingerprint = 'unknown';
+
+/* ✅ SONG HISTORY (context) */
+let lastPlayedIds = [];
 
 function initAudioContext() {
   if (audioContext) return;
@@ -1084,15 +1117,56 @@ function initAudioContext() {
 }
 
 /* ============================================================
-   ✅ AUDIO OUTPUT — AUTO BLUETOOTH ROUTING
+   ✅ FINGERPRINT GENERATOR
    ============================================================ */
+async function generateFingerprint() {
+  const components = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 0,
+    navigator.deviceMemory || 0,
+    navigator.platform || '',
+    navigator.maxTouchPoints || 0
+  ];
+  
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('SangeetX', 2, 15);
+    components.push(canvas.toDataURL().slice(-50));
+  } catch (e) {}
+  
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    components.push(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
+  } catch (e) {}
+  
+  const str = components.join('|');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return 'fp_' + Math.abs(hash).toString(36);
+}
 
-// Bluetooth device detection
+/* ============================================================
+   ✅ AUDIO OUTPUT — BLUETOOTH AUTO ROUTING
+   ============================================================ */
 function isBluetoothDevice(label) {
   const l = (label || '').toLowerCase();
   return l.includes('bluetooth') ||
-         l.includes('bt ') ||
-         l.includes(' bt') ||
+         l.includes('bt ') || l.includes(' bt') ||
          l.includes('wireless') ||
          l.includes('headphone') ||
          l.includes('headset') ||
@@ -1109,15 +1183,11 @@ function isBluetoothDevice(label) {
 
 async function detectAudioOutputDevices() {
   try {
-    // Permission ke liye trigger
     await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
-    
     const devices = await navigator.mediaDevices.enumerateDevices();
     const outputs = devices.filter(d => d.kind === 'audiooutput');
     audioOutputDevices = outputs;
-    
     console.log('🔊 Available outputs:', outputs.map(d => d.label || 'unnamed'));
-    
     return outputs;
   } catch (err) {
     console.log('Device enumeration failed:', err.message);
@@ -1125,9 +1195,8 @@ async function detectAudioOutputDevices() {
   }
 }
 
-// Voice sink apply karo sabhi remote audios pe
 function applyVoiceSinkToAll() {
-  remoteAudios.forEach((entry, key) => {
+  remoteAudios.forEach((entry) => {
     if (entry.audio && entry.audio.setSinkId && currentVoiceSinkId) {
       entry.audio.setSinkId(currentVoiceSinkId)
         .then(() => console.log(`🎤 Voice ${entry.userName} → ${currentVoiceSinkId}`))
@@ -1136,7 +1205,6 @@ function applyVoiceSinkToAll() {
   });
 }
 
-// Naye audio pe sink apply karo
 function applyVoiceSinkToAudio(audioEl) {
   if (!audioEl || !audioEl.setSinkId || !currentVoiceSinkId) return;
   audioEl.setSinkId(currentVoiceSinkId)
@@ -1144,53 +1212,34 @@ function applyVoiceSinkToAudio(audioEl) {
     .catch(err => console.log('New voice sink error:', err.message));
 }
 
-// Auto-detect best output (bluetooth priority)
 async function autoDetectAndRouteAudio() {
   const outputs = await detectAudioOutputDevices();
   
-  if (outputs.length === 0) {
-    console.log('⚠️ No output devices found');
-    return;
-  }
+  if (outputs.length === 0) return;
   
-  // Find Bluetooth device
   const btDevice = outputs.find(d => isBluetoothDevice(d.label));
-  
   let selectedDeviceId = 'default';
   let selectedLabel = 'System Default';
   
   if (btDevice) {
     selectedDeviceId = btDevice.deviceId;
     selectedLabel = btDevice.label || 'Bluetooth Speaker';
-    console.log('✅ Bluetooth found:', selectedLabel);
-  } else if (outputs.length > 0) {
-    // Fallback: default
-    selectedDeviceId = 'default';
-    selectedLabel = 'System Default';
   }
   
-  // ✅ Apply to voice
   currentVoiceSinkId = selectedDeviceId;
   applyVoiceSinkToAll();
   
-  // ✅ Apply to music (agar setSinkId support ho)
   if (audio.setSinkId) {
     try {
       await audio.setSinkId(selectedDeviceId);
       currentMusicSinkId = selectedDeviceId;
-      console.log('🎵 Music →', selectedLabel);
-    } catch (err) {
-      console.log('Music sink error:', err.message);
-    }
+    } catch (err) {}
   }
   
-  // ✅ Update UI
-  updateAudioOutputBadge(selectedLabel, btDevice ? true : false);
-  
+  updateAudioOutputBadge(selectedLabel, !!btDevice);
   return { deviceId: selectedDeviceId, label: selectedLabel, isBluetooth: !!btDevice };
 }
 
-// UI badge update
 function updateAudioOutputBadge(label, isBluetooth) {
   const badge = document.getElementById('audioOutputBadge');
   const text = document.getElementById('audioOutputText');
@@ -1201,13 +1250,9 @@ function updateAudioOutputBadge(label, isBluetooth) {
     text.textContent = label.length > 20 ? label.slice(0, 18) + '...' : label;
     badge.classList.add('active');
     
-    // Icon change
     const icon = badge.querySelector('[data-lucide]');
-    if (icon) {
-      icon.setAttribute('data-lucide', isBluetooth ? 'bluetooth' : 'volume-2');
-    }
+    if (icon) icon.setAttribute('data-lucide', isBluetooth ? 'bluetooth' : 'volume-2');
     
-    // Color: bluetooth blue, else success
     if (isBluetooth) {
       badge.style.background = 'rgba(59,130,246,0.12)';
       badge.style.borderColor = 'rgba(59,130,246,0.3)';
@@ -1217,19 +1262,16 @@ function updateAudioOutputBadge(label, isBluetooth) {
       badge.style.borderColor = 'rgba(16,185,129,0.25)';
       badge.style.color = 'var(--success)';
     }
-    
     refreshIcons();
   } else {
     badge.classList.remove('active');
   }
 }
 
-// ✅ Device change listener — Bluetooth connect/disconnect
 if (navigator.mediaDevices) {
   navigator.mediaDevices.addEventListener('devicechange', async () => {
-    console.log('🔌 Audio device changed — rescanning...');
+    console.log('🔌 Audio device changed');
     const result = await autoDetectAndRouteAudio();
-    
     if (result && result.isBluetooth) {
       showToast(`🔊 ${result.label}`, 'success');
     }
@@ -1237,9 +1279,44 @@ if (navigator.mediaDevices) {
 }
 
 /* ============================================================
-   MOOD / DYNAMIC BG / WAVEFORM — (unchanged)
+   ✅ PLAYED BY BADGE UPDATE
    ============================================================ */
+function updatePlayedBy(playedByName, reason) {
+  const badge = document.getElementById('playedBy');
+  const text = document.getElementById('playedByText');
+  
+  if (!badge || !text) return;
+  
+  if (!playedByName) {
+    badge.style.display = 'none';
+    return;
+  }
+  
+  badge.style.display = 'flex';
+  
+  if (reason === 'auto' || playedByName === '🎵 Auto DJ') {
+    text.textContent = '🎵 Auto DJ';
+    badge.classList.add('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'radio');
+  } else if (reason === 'next' || playedByName === '⏭️ Skip') {
+    text.textContent = '⏭️ Auto-next';
+    badge.classList.add('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'skip-forward');
+  } else {
+    text.textContent = `Played by ${playedByName}`;
+    badge.classList.remove('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'user');
+  }
+  
+  refreshIcons();
+}
 
+/* ============================================================
+   MOOD
+   ============================================================ */
 const MOODS = {
   happy:{emoji:'😊',text:'Happy',color:'#F59E0B'},
   sad:{emoji:'😢',text:'Sad',color:'#3B82F6'},
@@ -1270,6 +1347,9 @@ function updateMood(title,artist){
   socket?.emit('moodUpdate',{roomId,mood:k,emoji:m.emoji,text:m.text,color:m.color});
 }
 
+/* ============================================================
+   DYNAMIC BG
+   ============================================================ */
 function extractColorsFromImage(imgEl){
   return new Promise(resolve=>{
     try{
@@ -1306,6 +1386,9 @@ async function updateDynamicBackground(url){
   }catch(e){}
 }
 
+/* ============================================================
+   WAVEFORM + BEAT
+   ============================================================ */
 function startWaveform(){
   if(!analyser)return;
   const bars=document.getElementById('waveformLive').children;
@@ -1365,6 +1448,9 @@ function startSyncCheck(){
   },3000);
 }
 
+/* ============================================================
+   SESSION PERSISTENCE
+   ============================================================ */
 function saveSession(){
   if(roomId&&userName){
     localStorage.setItem('musicSyncSession',JSON.stringify({
@@ -1373,19 +1459,10 @@ function saveSession(){
   }
 }
 function clearSession(){localStorage.removeItem('musicSyncSession');}
-function getSavedSession(){
-  try{
-    const data=localStorage.getItem('musicSyncSession');
-    if(!data)return null;
-    const session=JSON.parse(data);
-    if(Date.now()-session.savedAt>24*60*60*1000){
-      localStorage.removeItem('musicSyncSession');
-      return null;
-    }
-    return session;
-  }catch(e){return null;}
-}
 
+/* ============================================================
+   MUTE FUNCTIONS
+   ============================================================ */
 function toggleMuteUser(userName){
   const k=userName.toLowerCase();
   if(mutedUsers.has(k)){mutedUsers.delete(k);showToast(`🔊 ${userName} unmuted`,'success');}
@@ -1437,6 +1514,9 @@ function loadMuteState(){
   }catch(e){}
 }
 
+/* ============================================================
+   LOCATION / DISTANCE
+   ============================================================ */
 async function getMyLocation(){
   return new Promise(resolve=>{
     if(!navigator.geolocation){resolve(null);return;}
@@ -1513,6 +1593,9 @@ function showDistanceHeart(){
   setTimeout(()=>el.remove(),2500);
 }
 
+/* ============================================================
+   OFFLINE
+   ============================================================ */
 window.addEventListener('online',()=>{
   isOnline=true;hideOfflineBanner();
   showToast('✅ Back online!','success');
@@ -1558,52 +1641,76 @@ async function cacheSongForOffline(track){
   }catch(e){}
 }
 
-document.getElementById('createRoomBtn').addEventListener('click',()=>{
-  const name=document.getElementById('userNameInput').value.trim();
-  if(!name){showToast('Please enter your name first','error');return;}
-  userName=name;
-  roomId=name.toLowerCase().replace(/\s+/g,'-')+'-'+Math.floor(Math.random()*9000+1000);
-  isOwner=true;
+/* ============================================================
+   JOIN GLOBAL
+   ============================================================ */
+document.getElementById('joinGlobalBtn').addEventListener('click', async () => {
+  const name = document.getElementById('userNameInput').value.trim();
+  if (!name) { showToast('Please enter your name first', 'error'); return; }
+  
+  userName = name;
+  roomId = 'global';
+  isOwner = false;
+  
+  // Fingerprint
+  if (myFingerprint === 'unknown') {
+    myFingerprint = await generateFingerprint();
+    console.log('🔒 Fingerprint:', myFingerprint);
+  }
+  
+  localStorage.setItem('sangeetxFingerprint', myFingerprint);
+  localStorage.setItem('sangeetxUserName', userName);
+  
   saveSession();
   initSocket();
-  socket.on('connect',()=>socket.emit('createRoom',{roomId,userName}));
+  
+  socket.on('connect', () => {
+    socket.emit('joinGlobal', { userName, fingerprint: myFingerprint });
+  });
 });
 
-document.getElementById('joinRoomBtn').addEventListener('click',()=>{
-  const name=document.getElementById('userNameInput').value.trim();
-  const room=document.getElementById('roomIdInput').value.trim().toLowerCase();
-  if(!name||!room){showToast('Please enter both name and room code','error');return;}
-  userName=name;roomId=room;isOwner=false;
-  saveSession();
-  initSocket();
-  socket.on('connect',()=>socket.emit('requestJoin',{roomId,userName}));
-});
-
+/* ============================================================
+   SOCKET INIT
+   ============================================================ */
 function initSocket(){
-  socket=io();
+  // ✅ Fingerprint ke saath connect
+  socket = io({
+    auth: { fingerprint: myFingerprint },
+    query: { fingerprint: myFingerprint }
+  });
+  
   socket.on('connect',()=>{
     isOnline=true;hideOfflineBanner();
     setTimeout(flushMessageQueue,800);
     if(roomId&&userName&&locationShared)setTimeout(shareLocation,1500);
   });
-
-  socket.on('createRoomResult',(r)=>{
-    if(r.success){
-      isOwner=true;
-      joinScreen.classList.remove('active');
-      mainScreen.classList.add('active');
-      startActivityPing();
-      startSyncCheck();
-      showToast('Room created! Share the link','success');
-      setTimeout(shareLocation,2000);
-    }else showToast(r.message||'Failed to create room','error');
+  
+  /* ===== BLOCKED ===== */
+  socket.on('blocked', ({ message, reason }) => {
+    console.error('🚫 Blocked:', reason);
+    localStorage.setItem('sangeetxBlocked', 'true');
+    
+    document.body.innerHTML = `
+      <div style="position:fixed;inset:0;background:#08080C;display:flex;flex-direction:column;
+                  align-items:center;justify-content:center;text-align:center;padding:40px;z-index:9999;
+                  font-family:'Inter',sans-serif;color:#FAFAFC;">
+        <div style="font-size:80px;margin-bottom:20px;">🚫</div>
+        <h1 style="font-size:26px;font-weight:900;margin-bottom:12px;color:#EF4444;">
+          You Are Blocked
+        </h1>
+        <p style="color:#A8A8B3;font-size:14px;max-width:400px;line-height:1.6;">
+          ${message || 'You have been blocked from accessing this room.'}
+        </p>
+        <p style="color:#5E5E6B;font-size:12px;margin-top:20px;">
+          Reason: ${reason || 'Rule violation'}
+        </p>
+      </div>
+    `;
   });
 
+  /* ===== JOIN RESULT ===== */
   socket.on('joinResult',(r)=>{
-    if(r.pending){
-      joinScreen.classList.remove('active');
-      waitingScreen.classList.add('active');
-    }else if(r.success){
+    if(r.success){
       joinScreen.classList.remove('active');
       waitingScreen.classList.remove('active');
       mainScreen.classList.add('active');
@@ -1611,20 +1718,17 @@ function initSocket(){
       startActivityPing();
       startSyncCheck();
       setTimeout(shareLocation,2000);
-    }else{
+    } else if (r.pending) {
+      joinScreen.classList.remove('active');
+      waitingScreen.classList.add('active');
+    } else {
       waitingScreen.classList.remove('active');
       joinScreen.classList.add('active');
       showToast(r.message||'Failed to join','error');
     }
   });
 
-  socket.on('joinRequest',({userId,userName:reqName})=>{
-    pendingRequestUserId=userId;
-    document.getElementById('requestUserName').textContent=reqName;
-    document.getElementById('joinRequestModal').classList.add('active');
-    refreshIcons();
-  });
-
+  /* ===== KICKED / ROOM CLOSED ===== */
   socket.on('kicked',({message})=>{
     clearSession();showToast(message,'error');
     setTimeout(()=>location.reload(),2000);
@@ -1633,7 +1737,6 @@ function initSocket(){
     clearSession();showToast(message,'error');
     setTimeout(()=>location.reload(),2000);
   });
-  socket.on('ownerOffline',({message})=>{showToast(message);});
   socket.on('permissionDenied',({message})=>{showToast(message,'error');});
 
   socket.on('disconnect',()=>{
@@ -1644,6 +1747,40 @@ function initSocket(){
   socket.on('usersUpdate',(users)=>{renderUsers(users);updatePartnerStatus(users);});
   socket.on('stateSync',(state)=>applyRemoteState(state));
 
+  /* ===== SONG CHANGED (Auto-next / Context) ===== */
+  socket.on('songChanged', ({ track, reason, playedBy }) => {
+    console.log('🎵 Song changed:', track.title, 'reason:', reason);
+    
+    if (reason === 'auto') {
+      showToast('🎵 Auto-playing next...');
+    }
+    
+    loadTrack(track, 0, true);
+    updatePlayedBy(playedBy, reason);
+  });
+
+  /* ===== SKIP NOTICE ===== */
+  socket.on('skipNotice', ({ userName, message }) => {
+    showToast(message);
+  });
+
+  /* ===== USER JOINED / LEFT ===== */
+  socket.on('userJoined', ({ userName, message }) => {
+    showToast(message, 'success');
+  });
+  socket.on('userLeft', ({ userName, message }) => {
+    showToast(message);
+  });
+
+  /* ===== GLOBAL STATS ===== */
+  socket.on('globalStats', (stats) => {
+    const onlineEl = document.getElementById('onlineCount');
+    const totalEl = document.getElementById('totalCount');
+    if (onlineEl) onlineEl.textContent = stats.onlineUsers;
+    if (totalEl) totalEl.textContent = stats.totalUsers;
+  });
+
+  /* ===== HEARTBEAT ===== */
   socket.on('heartbeat',({position,isPlaying})=>{
     if(!currentTrack)return;
     if(isPlaying&&audio.paused)audio.play().catch(()=>{});
@@ -1736,8 +1873,18 @@ function initSocket(){
     console.log(`⌨️ ${typer} ${typingNow ? 'is' : 'stopped'} typing`);
     updateTypingIndicator(typer,typingNow);
   });
+
+  /* ===== AUTO DJ TRACK (special event) ===== */
+  socket.on('autoDjTrack', ({ track }) => {
+    console.log('🎵 Auto DJ:', track.title);
+    loadTrack(track, 0, true);
+    updatePlayedBy('🎵 Auto DJ', 'auto');
+  });
 }
 
+/* ============================================================
+   APPLY PERMISSIONS
+   ============================================================ */
 function applyPermissions(){
   const ci=document.getElementById('chatInput');
   const cs=document.getElementById('chatSend');
@@ -1761,6 +1908,9 @@ function applyPermissions(){
   }
 }
 
+/* ============================================================
+   SCREEN REFS
+   ============================================================ */
 const joinScreen=document.getElementById('joinScreen');
 const waitingScreen=document.getElementById('waitingScreen');
 const mainScreen=document.getElementById('mainScreen');
@@ -1775,6 +1925,9 @@ document.addEventListener('click',()=>{
   if(socket&&roomId)socket.emit('activity',{roomId});
 });
 
+/* ============================================================
+   PARTNER / USERS
+   ============================================================ */
 function updatePartnerStatus(users){
   const others=users.filter(u=>u.id!==socket.id);
   const dot=document.getElementById('connectionDot');
@@ -1802,7 +1955,6 @@ function renderUsers(users){
       <div class="user-item-left">
         <span class="user-item-dot ${u.status==='idle'?'idle':''} ${isBlocked?'blocked':''}"></span>
         <span class="user-item-name">${esc(u.name)}${isMe?' (You)':''}</span>
-        ${u.isOwner?'<span class="user-item-role">OWNER</span>':''}
         ${isBlocked?'<span class="user-item-blocked-tag">BLOCKED</span>':''}
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
@@ -1810,61 +1962,43 @@ function renderUsers(users){
           <i data-lucide="${isMuted?'volume-x':'volume-2'}"></i>
           <span>${isMuted?'Unmute':'Mute'}</span>
         </button>`:''}
-        ${isOwner&&!isMe?`<button class="btn-remove" data-uid="${u.id}">Remove</button>`:''}
       </div>
     </div>`;
   }).join('');
   refreshIcons();
-  list.querySelectorAll('.btn-remove[data-uid]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      if(confirm('Remove this user?'))socket.emit('removeUser',{roomId,userId:b.dataset.uid});
-    });
-  });
   list.querySelectorAll('.mute-btn').forEach(b=>{
     b.addEventListener('click',()=>toggleMuteUser(b.dataset.muteName));
   });
 }
 
-document.getElementById('allowJoinBtn').addEventListener('click',()=>{
-  if(pendingRequestUserId){
-    socket.emit('approveJoin',{roomId,userId:pendingRequestUserId});
-    pendingRequestUserId=null;
-  }
-  document.getElementById('joinRequestModal').classList.remove('active');
-});
-document.getElementById('denyJoinBtn').addEventListener('click',()=>{
-  if(pendingRequestUserId){
-    socket.emit('denyJoin',{roomId,userId:pendingRequestUserId});
-    pendingRequestUserId=null;
-  }
-  document.getElementById('joinRequestModal').classList.remove('active');
-});
-
+/* ============================================================
+   USERS PANEL
+   ============================================================ */
 document.getElementById('usersBtn').addEventListener('click',()=>
   document.getElementById('usersPanel').classList.add('active'));
 document.getElementById('closeUsersBtn').addEventListener('click',()=>
   document.getElementById('usersPanel').classList.remove('active'));
 document.getElementById('muteAllBtn').addEventListener('click',toggleMuteAll);
 
-// ✅ Audio output button — manual rescan
+/* ============================================================
+   AUDIO OUTPUT BUTTON
+   ============================================================ */
 document.getElementById('audioOutputBtn')?.addEventListener('click', async () => {
   showToast('🔊 Scanning audio devices...');
   const result = await autoDetectAndRouteAudio();
-  if (result) {
-    showToast(`🔊 ${result.label}`, 'success');
-  } else {
-    showToast('No audio devices found', 'warning');
-  }
+  if (result) showToast(`🔊 ${result.label}`, 'success');
+  else showToast('No audio devices found', 'warning');
 });
 
+/* ============================================================
+   CHAT PANEL
+   ============================================================ */
 document.getElementById('chatBtn').addEventListener('click',()=>{
   chatOpen=true;unreadMessages=0;updateChatBadge();
   document.getElementById('chatPanel').classList.add('active');
-
   if(socket&&socket.connected){
     socket.emit('chatPresence',{roomId,active:true});
   }
-
   setTimeout(()=>{
     const inp=document.getElementById('chatInput');
     if(inp&&!inp.disabled)inp.focus();
@@ -1876,12 +2010,10 @@ document.getElementById('chatBtn').addEventListener('click',()=>{
 document.getElementById('closeChat').addEventListener('click',()=>{
   chatOpen=false;
   document.getElementById('chatPanel').classList.remove('active');
-
   if(socket&&socket.connected){
     socket.emit('chatPresence',{roomId,active:false});
     socket.emit('typing',{roomId,isTyping:false,userName});
   }
-
   clearTimeout(typingTimer);
   isTyping=false;
   typingUsers.forEach(t=>clearTimeout(t));
@@ -1919,7 +2051,6 @@ function sendChat(){
   const input=document.getElementById('chatInput');
   const text=input.value.trim();
   if(!text)return;
-
   clearTimeout(typingTimer);
   isTyping=false;
   if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
@@ -1939,7 +2070,6 @@ function sendChat(){
     input.value='';
     return;
   }
-
   socket.emit('chatMessage',{roomId,text,mentions:[]});
   input.value='';
 }
@@ -1955,8 +2085,9 @@ function renderChat(messages,replace){
   if(empty)empty.remove();
   messages.forEach(m=>{
     const mine=m.userId===socket?.id||m.pending;
+    const isBot=m.type==='bot';
     const div=document.createElement('div');
-    div.className='chat-msg '+(mine?'mine':'theirs')+(m.pending?' pending':'');
+    div.className='chat-msg '+(mine?'mine':'theirs')+(m.pending?' pending':'')+(isBot?' bot':'');
     div.dataset.msgId=m.id;
     const time=new Date(m.time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     div.innerHTML=`
@@ -1994,15 +2125,10 @@ function renderChatPresence(users){
 
 function updateTypingIndicator(userName,isTypingNow){
   if(isTypingNow){
-    if(typingUsers.has(userName)){
-      clearTimeout(typingUsers.get(userName));
-    }
-    const timer = setTimeout(() => {
-      typingUsers.delete(userName);
-      renderTypingIndicator();
-    }, 4000);
-    typingUsers.set(userName, timer);
-  } else {
+    if(typingUsers.has(userName))clearTimeout(typingUsers.get(userName));
+    const timer=setTimeout(()=>{typingUsers.delete(userName);renderTypingIndicator();},4000);
+    typingUsers.set(userName,timer);
+  }else{
     if(typingUsers.has(userName)){
       clearTimeout(typingUsers.get(userName));
       typingUsers.delete(userName);
@@ -2014,30 +2140,21 @@ function updateTypingIndicator(userName,isTypingNow){
 function renderTypingIndicator(){
   const indicator=document.getElementById('typingIndicator');
   const text=document.getElementById('typingText');
-  
-  if(!indicator || !text) return;
-  
-  if(typingUsers.size===0){
-    indicator.classList.remove('show');
-    return;
-  }
-  
+  if(!indicator||!text)return;
+  if(typingUsers.size===0){indicator.classList.remove('show');return;}
   indicator.classList.add('show');
-  
-  const names = Array.from(typingUsers.keys());
-  
-  if(names.length===1){
-    text.textContent = names[0] + ' is typing...';
-  } else if(names.length===2){
-    text.textContent = names[0] + ' and ' + names[1] + ' are typing...';
-  } else {
-    text.textContent = names.length + ' people are typing...';
-  }
+  const names=Array.from(typingUsers.keys());
+  if(names.length===1)text.textContent=names[0]+' is typing...';
+  else if(names.length===2)text.textContent=names[0]+' and '+names[1]+' are typing...';
+  else text.textContent=names.length+' people are typing...';
 }
 
+/* ============================================================
+   SHARE
+   ============================================================ */
 document.getElementById('shareBtn').addEventListener('click',async()=>{
-  const url=window.location.origin+'?room='+encodeURIComponent(roomId);
-  const text=`Listen to music with me on Music Sync!\n\nRoom code: ${roomId}\nLink: ${url}`;
+  const url=window.location.origin;
+  const text=`Listen to music with me on Music Sync!\n\nLink: ${url}`;
   if(navigator.share){
     try{await navigator.share({title:'Music Sync',text,url});}catch(e){}
   }else{
@@ -2048,68 +2165,100 @@ document.getElementById('shareBtn').addEventListener('click',async()=>{
   }
 });
 
-/* ===== LOAD HANDLER ===== */
+/* ============================================================
+   LOAD HANDLER
+   ============================================================ */
 window.addEventListener('load', async () => {
+  // ✅ Blocked flag check
+  if (localStorage.getItem('sangeetxBlocked') === 'true') {
+    document.body.innerHTML = `
+      <div style="position:fixed;inset:0;background:#08080C;display:flex;flex-direction:column;
+                  align-items:center;justify-content:center;text-align:center;padding:40px;
+                  font-family:'Inter',sans-serif;color:#FAFAFC;">
+        <div style="font-size:80px;margin-bottom:20px;">🚫</div>
+        <h1 style="font-size:26px;font-weight:900;color:#EF4444;">You Are Blocked</h1>
+        <p style="color:#A8A8B3;margin-top:20px;">Contact support if you think this is a mistake.</p>
+      </div>
+    `;
+    return;
+  }
+  
   checkMicPermission();
   loadMuteState();
   updateMuteAllButton();
-
-  if(!navigator.onLine){isOnline=false;showOfflineBanner();}
-
-  // ✅ Initial audio output detection
+  
+  if (!navigator.onLine) { isOnline = false; showOfflineBanner(); }
+  
+  // ✅ Fingerprint
+  myFingerprint = localStorage.getItem('sangeetxFingerprint') || 'unknown';
+  if (myFingerprint === 'unknown') {
+    myFingerprint = await generateFingerprint();
+    localStorage.setItem('sangeetxFingerprint', myFingerprint);
+  }
+  
+  // ✅ Saved name
+  const savedName = localStorage.getItem('sangeetxUserName');
+  if (savedName) {
+    document.getElementById('userNameInput').value = savedName;
+  }
+  
+  // ✅ Global stats
+  try {
+    const res = await fetch('/api/global/stats');
+    const stats = await res.json();
+    document.getElementById('onlineCount').textContent = stats.onlineUsers;
+    document.getElementById('totalCount').textContent = stats.totalUsers;
+    
+    if (stats.currentTrack) {
+      document.getElementById('nowPlaying').style.display = 'block';
+      document.getElementById('nowPlayingText').textContent = 
+        `${stats.currentTrack.title} — ${stats.currentTrack.artist}${stats.currentTrack.playedBy ? ' (by ' + stats.currentTrack.playedBy + ')' : ''}`;
+    }
+  } catch (e) {}
+  
+  // ✅ Audio output detection
   setTimeout(async () => {
     console.log('🔊 Detecting audio outputs...');
     await autoDetectAndRouteAudio();
   }, 1500);
-
-  // ✅ Periodic check (bluetooth may connect later)
+  
+  // ✅ Periodic bluetooth check
   setInterval(async () => {
     const devices = await detectAudioOutputDevices();
     const btDevice = devices.find(d => isBluetoothDevice(d.label));
-    
     if (btDevice && btDevice.deviceId !== currentVoiceSinkId) {
       console.log('🔊 New bluetooth detected:', btDevice.label);
       await autoDetectAndRouteAudio();
     }
   }, 5000);
-
-  const params=new URLSearchParams(window.location.search);
-  const r=params.get('room');
-  if(r&&r.trim().length>0){
-    document.getElementById('roomIdInput').value=r.trim();
-    setTimeout(()=>document.getElementById('userNameInput').focus(),300);
-    showToast('Room code auto-filled — enter your name');
-  }
-
-  const savedSession=getSavedSession();
-  if(savedSession&&!r){
-    setTimeout(()=>{
-      roomId=savedSession.roomId;
-      userName=savedSession.userName;
-      isOwner=savedSession.isOwner;
-      if(window.location.search.includes('room=')){
-        window.history.replaceState({},'',window.location.pathname);
-      }
-      joinScreen.classList.remove('active');
-      mainScreen.classList.add('active');
+  
+  // ✅ Auto-join if name saved
+  if (savedName && savedName.trim()) {
+    console.log('🔄 Auto-joining as:', savedName);
+    userName = savedName;
+    roomId = 'global';
+    isOwner = false;
+    
+    setTimeout(() => {
+      saveSession();
       initSocket();
-      socket.on('connect',()=>{
-        if(isOwner)socket.emit('createRoom',{roomId,userName});
-        else socket.emit('requestJoin',{roomId,userName});
+      socket.on('connect', () => {
+        socket.emit('joinGlobal', { userName, fingerprint: myFingerprint });
       });
-    },500);
+    }, 300);
   }
 });
 
-document.getElementById('cancelWaitBtn').addEventListener('click',()=>{
-  clearSession();
-  location.reload();
-});
-
+/* ============================================================
+   APPLY REMOTE STATE
+   ============================================================ */
 async function applyRemoteState(state){
   isRemoteUpdate=true;
   if(state.track&&(!currentTrack||currentTrack.id!==state.track.id)){
     await loadTrack(state.track,state.position,state.isPlaying);
+    if(state.playedByName){
+      updatePlayedBy(state.playedByName,state.autoDj?'auto':'user');
+    }
   }else if(currentTrack){
     if(state.isPlaying&&audio.paused)await audio.play().catch(()=>{});
     if(!state.isPlaying&&!audio.paused)audio.pause();
@@ -2138,6 +2287,9 @@ function updatePlayIcon(){
   }
 }
 
+/* ============================================================
+   LOAD TRACK
+   ============================================================ */
 async function loadTrack(track,position=0,autoPlay=false){
   currentTrack=track;
   document.getElementById('songTitle').textContent=track.title;
@@ -2203,6 +2355,9 @@ async function loadTrack(track,position=0,autoPlay=false){
   }
 }
 
+/* ============================================================
+   PLAY / PAUSE / NEXT
+   ============================================================ */
 document.getElementById('playBtn').addEventListener('click',()=>{
   if(!currentTrack){showToast('Select a song first','error');return;}
   if(myPermissions.play){showToast('You are blocked from controlling playback','error');return;}
@@ -2230,9 +2385,26 @@ document.getElementById('playBtn').addEventListener('click',()=>{
   }
 });
 
+// ✅ NEXT BUTTON — Context-based
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  if(!socket||!socket.connected){showToast('Not connected','error');return;}
+  if(myPermissions.play){showToast('You are blocked','error');return;}
+  socket.emit('requestNext',{roomId});
+  showToast('⏭️ Skipping...');
+});
+
+// ✅ PREV — restart current
+document.getElementById('prevBtn').addEventListener('click',()=>{
+  if(!currentTrack){showToast('No song playing','error');return;}
+  if(myPermissions.play){showToast('You are blocked','error');return;}
+  audio.currentTime=0;
+  if(audio.paused)audio.play().catch(()=>{});
+  broadcastState({isPlaying:true,position:0});
+});
+
 document.getElementById('progressBar').addEventListener('click',(e)=>{
   if(!currentTrack||!audio.duration)return;
-  if(myPermissions.play){showToast('You are blocked from controlling playback','error');return;}
+  if(myPermissions.play){showToast('You are blocked','error');return;}
   const rect=e.currentTarget.getBoundingClientRect();
   const pct=(e.clientX-rect.left)/rect.width;
   audio.currentTime=pct*audio.duration;
@@ -2248,7 +2420,10 @@ audio.addEventListener('timeupdate',()=>{
 audio.addEventListener('loadedmetadata',()=>{
   document.getElementById('totalTime').textContent=fmt(audio.duration);
 });
+
+// ✅ SONG ENDED — server handle karega
 audio.addEventListener('ended',()=>{
+  console.log('🎵 Song ended — waiting for server auto-next');
   document.getElementById('albumArt').classList.remove('playing');
   document.getElementById('waveformLive').classList.remove('active');
   stopWaveform();
@@ -2281,6 +2456,9 @@ function startHeartbeat(){
   },3000);
 }
 
+/* ============================================================
+   SEARCH
+   ============================================================ */
 const searchModal=document.getElementById('searchModal');
 document.getElementById('searchBtn').addEventListener('click',()=>{
   searchModal.classList.add('active');
@@ -2330,12 +2508,19 @@ async function searchSongs(query){
 }
 
 function selectSong(song){
-  if(myPermissions.play){showToast('You are blocked from controlling playback','error');return;}
+  if(myPermissions.play){showToast('You are blocked','error');return;}
   searchModal.classList.remove('active');
   document.getElementById('searchInput').value='';
   loadTrack(song,0,true);
+  
+  // ✅ Update played-by badge for self
+  updatePlayedBy(userName, 'user');
+  
   if(socket&&socket.connected){
-    socket.emit('updateState',{roomId,newState:{track:song,position:0,isPlaying:true}});
+    socket.emit('updateState',{
+      roomId,
+      newState:{track:song,position:0,isPlaying:true}
+    });
   }
   showToast('▶ '+song.title,'success');
 }
@@ -2346,7 +2531,9 @@ function esc(s){
   return d.innerHTML;
 }
 
-/* ===== PTT ===== */
+/* ============================================================
+   PTT
+   ============================================================ */
 const pttToggle=document.getElementById('pttToggle');
 const alwaysOnToggle=document.getElementById('alwaysOnToggle');
 const pttButton=document.getElementById('pttButton');
@@ -2486,7 +2673,6 @@ async function setupMic(){
     console.log('🎤 Mic ready');
     hideMicBanner();
 
-    // ✅ Audio output detection jab mic on ho
     await autoDetectAndRouteAudio();
 
     if(socket&&socket.connected){
@@ -2504,12 +2690,10 @@ async function setupMic(){
       
       setTimeout(async () => {
         if(!peerConnection) return;
-        
         if(peerConnection.remoteDescription && peerConnection.remoteDescription.type){
           console.log('⏭️ Remote description already set, skip offer');
           return;
         }
-        
         if(peerConnection.signalingState !== 'stable'){
           console.log('⏭️ Not stable, skip offer');
           return;
@@ -2587,7 +2771,6 @@ function createPeerConnection(){
     remote.playsInline = true;
     remote.volume = 1.0;
 
-    // ✅ Bluetooth sink apply karo
     applyVoiceSinkToAudio(remote);
 
     const tryPlay=()=>{
@@ -2719,6 +2902,9 @@ async function handleVoiceSignal(signal){
   }
 }
 
+/* ============================================================
+   REACTIONS
+   ============================================================ */
 document.querySelectorAll('.reaction-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const emoji=btn.dataset.emoji;
@@ -2739,6 +2925,9 @@ function showFloatingEmoji(emoji){
   setTimeout(()=>el.remove(),2200);
 }
 
+/* ============================================================
+   TOAST
+   ============================================================ */
 function showToast(msg,type){
   let toast=document.querySelector('.toast');
   if(!toast){
@@ -2754,6 +2943,9 @@ function showToast(msg,type){
   toast._timeout=setTimeout(()=>toast.classList.remove('show'),2500);
 }
 
+/* ============================================================
+   MIC BANNER
+   ============================================================ */
 function showMicBanner(){
   if(document.getElementById('installBanner'))return;
   const b=document.getElementById('micBanner');
@@ -2787,6 +2979,9 @@ async function checkMicPermission(){
   }catch(e){micPermissionState='prompt';}
 }
 
+/* ============================================================
+   PWA INSTALL
+   ============================================================ */
 let deferredPrompt=null;
 window.addEventListener('beforeinstallprompt',(e)=>{
   e.preventDefault();
@@ -2835,6 +3030,9 @@ if('serviceWorker' in navigator){
     .catch((err)=>console.log('SW failed:',err));
 }
 
+/* ============================================================
+   MEDIA SESSION
+   ============================================================ */
 function setupMediaSession(){
   if(!('mediaSession' in navigator))return;
   navigator.mediaSession.setActionHandler('play',()=>{
@@ -2849,13 +3047,40 @@ function setupMediaSession(){
       broadcastState({isPlaying:!audio.paused,position:audio.currentTime});
     }
   });
+  navigator.mediaSession.setActionHandler('nexttrack',()=>{
+    if(socket&&socket.connected)socket.emit('requestNext',{roomId});
+  });
 }
 document.addEventListener('click',setupMediaSession,{once:true});
 
+/* ============================================================
+   VISIBILITY
+   ============================================================ */
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden&&socket&&!socket.connected){
     console.log('Reconnecting socket...');
     socket.connect();
+  }
+});
+
+/* ============================================================
+   BACK BUTTON PROTECTION
+   ============================================================ */
+history.pushState({page:'sangeetx'},'',window.location.href);
+
+window.addEventListener('popstate',(e)=>{
+  const inRoom = mainScreen && mainScreen.classList.contains('active');
+  if(inRoom){
+    history.pushState({page:'sangeetx'},'',window.location.href);
+    const leave = confirm('🎵 Do you want to leave?\n\nMusic will stop.');
+    if(leave){
+      clearSession();
+      if(socket)socket.disconnect();
+      if(audio){audio.pause();audio.src='';}
+      if(peerConnection){peerConnection.close();peerConnection=null;}
+      if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+      window.location.href = window.location.origin;
+    }
   }
 });
 </script>
