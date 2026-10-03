@@ -43,9 +43,6 @@ const AUTO_DJ_PLAYLIST = [
 ];
 
 let autoDjIndex = 0;
-let autoDjTimer = null;
-let autoDjActive = true;
-let currentAutoDjTrack = null;
 
 // ===== SIMILAR ARTIST MAPPING =====
 const SIMILAR_ARTISTS = {
@@ -112,6 +109,7 @@ function ensureGlobalRoom() {
         autoDj: false,
         lastUpdated: Date.now() 
       },
+      playedHistory: [],
       isGlobal: true
     };
     console.log('🌍 Global room created');
@@ -262,6 +260,7 @@ app.post('/api/admin/blockUser', (req, res) => {
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
   }
   
+  console.log(`🚫 Blocked: IP=${ip}, FP=${fingerprint}`);
   res.json({ success: true });
 });
 
@@ -372,14 +371,13 @@ async function searchSimilarSongs(query, exclude = []) {
   } catch (e) { return []; }
 }
 
-// ✅ Get next song based on context (artist/mood)
+// ✅ Get next song based on context (artist/mood) — for NEXT button
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
   
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const title = currentTrack.title || '';
   
-  // ✅ Try 1: Same artist ke aur songs
   if (artist && artist !== 'Unknown') {
     const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
     if (artistSongs.length > 0) {
@@ -388,7 +386,6 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     }
   }
   
-  // ✅ Try 2: Similar artist ke songs
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower];
   if (similarArtists && similarArtists.length > 0) {
@@ -401,7 +398,6 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     }
   }
   
-  // ✅ Try 3: Song title keyword search
   const keyword = title.split(' ')[0];
   if (keyword && keyword.length > 3) {
     const keywordSongs = await searchSimilarSongs(keyword, [currentTrack.id, ...playedHistory]);
@@ -411,24 +407,57 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     }
   }
   
-  // ✅ Fallback: Auto DJ playlist
   return null;
 }
 
-// ✅ Play next song
-async function playNextSong(reason = 'auto') {
+// ✅ Get skip song — different from current
+async function getSkipSong(currentTrack, playedHistory = []) {
+  if (!currentTrack) return null;
+  
+  const artist = (currentTrack.artist || '').split(',')[0].trim();
+  
+  if (artist && artist !== 'Unknown') {
+    const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
+    if (artistSongs.length > 1) {
+      console.log(`🎲 Skip: same artist different song`);
+      return artistSongs[1];
+    } else if (artistSongs.length === 1) {
+      return artistSongs[0];
+    }
+  }
+  
+  const artistLower = artist.toLowerCase();
+  const similarArtists = SIMILAR_ARTISTS[artistLower];
+  if (similarArtists && similarArtists.length > 0) {
+    const randomArtist = similarArtists[Math.floor(Math.random() * similarArtists.length)];
+    const songs = await searchSimilarSongs(randomArtist, [currentTrack.id, ...playedHistory]);
+    if (songs.length > 0) {
+      console.log(`🎲 Skip: similar artist ${randomArtist}`);
+      return songs[0];
+    }
+  }
+  
+  const randomIndex = Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length);
+  const songName = AUTO_DJ_PLAYLIST[randomIndex];
+  autoDjIndex++;
+  console.log(`🎲 Skip: random from Auto DJ`);
+  return await searchSong(songName);
+}
+
+// ✅ Play next song — reason: 'auto' | 'next' | 'skip'
+async function playNextSong(reason = 'auto', user = null) {
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return;
   
   const playedHistory = room.playedHistory || [];
   let nextSong = null;
   
-  // Context-based
-  if (reason === 'auto' || reason === 'next') {
+  if (reason === 'skip') {
+    nextSong = await getSkipSong(room.state.track, playedHistory);
+  } else if (reason === 'next' || reason === 'auto') {
     nextSong = await getNextSongFromContext(room.state.track, playedHistory);
   }
   
-  // Fallback: Auto DJ playlist
   if (!nextSong) {
     const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
     autoDjIndex++;
@@ -438,65 +467,102 @@ async function playNextSong(reason = 'auto') {
   
   if (!nextSong) return;
   
-  // Track history (last 20)
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
   
-  // Update state
+  let playedByName;
+  let autoDjFlag;
+  
+  if (reason === 'auto') {
+    playedByName = '🎵 Auto DJ';
+    autoDjFlag = true;
+  } else if (reason === 'skip') {
+    playedByName = user ? user.name : 'Someone';
+    autoDjFlag = false;
+  } else if (reason === 'next') {
+    playedByName = user ? user.name : 'Someone';
+    autoDjFlag = false;
+  } else {
+    playedByName = user ? user.name : 'Someone';
+    autoDjFlag = false;
+  }
+  
   room.state = {
     track: nextSong,
     position: 0,
     isPlaying: true,
-    playedBy: null,
-    playedByName: reason === 'next' ? '⏭️ Skip' : '🎵 Auto DJ',
-    autoDj: reason !== 'user',
+    playedBy: user ? user.id : null,
+    playedByName: playedByName,
+    autoDj: autoDjFlag,
     lastUpdated: Date.now()
   };
   
-  console.log(`🎵 Playing: ${nextSong.title} (${reason})`);
+  console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
   
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: nextSong,
     reason: reason,
-    playedBy: room.state.playedByName
+    playedBy: playedByName
   });
 }
 
-// ✅ Check if song ended (every 2 sec)
+// ✅ Song end check — Auto DJ hamesha chalta rahe
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
-    if (!room || !room.state.track || !room.state.isPlaying) return;
+    if (!room) return;
     
-    // Duration check (in seconds)
+    // ✅ CASE 1: Koi user nahi + koi song nahi → Auto DJ chalu karo
+    if (room.users.length === 0) {
+      if (!room.state.track || !room.state.isPlaying) {
+        console.log(`🎵 No users — Auto DJ starting`);
+        await playNextSong('auto');
+      }
+      return;
+    }
+    
+    // ✅ CASE 2: Users hain lekin song nahi chal raha → Auto DJ
+    if (!room.state.track || !room.state.isPlaying) {
+      console.log(`🎵 No song playing — Auto DJ starting`);
+      await playNextSong('auto');
+      return;
+    }
+    
+    // ✅ CASE 3: Song chal raha hai — check if ended
     const duration = room.state.track.duration || 0;
     const position = room.state.position || 0;
     const lastUpdated = room.state.lastUpdated || Date.now();
     
-    // Estimate current position
     const elapsed = (Date.now() - lastUpdated) / 1000;
     const estimatedPos = position + elapsed;
     
-    // ✅ Song ended? (2 sec tolerance)
     if (duration > 0 && estimatedPos >= duration - 2) {
-      console.log(`🎵 Song ended, auto-playing next...`);
+      console.log(`🎵 Song ended — Auto DJ next`);
       await playNextSong('auto');
     }
   }, 3000);
 }
 
-// ✅ Auto DJ initial start
-function startAutoDj() {
-  setTimeout(async () => {
+// ✅ Position updater — position accurate rahe
+function startPositionUpdater() {
+  setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
-    if (room && !room.state.track) {
-      await playNextSong('auto');
+    if (!room || !room.state.track || !room.state.isPlaying) return;
+    
+    const lastUpdated = room.state.lastUpdated || Date.now();
+    const elapsed = (Date.now() - lastUpdated) / 1000;
+    
+    // Agar 5 sec se zyada hogaya, matlab koi heartbeat nahi aayi
+    // toh manually position update karo
+    if (elapsed > 5) {
+      room.state.position = (room.state.position || 0) + elapsed;
+      room.state.lastUpdated = Date.now();
     }
-  }, 3000);
+  }, 2000);
 }
 
 // ===== SOCKET.IO =====
@@ -506,7 +572,7 @@ io.on('connection', (socket) => {
              socket.handshake.query?.fingerprint ||
              'unknown';
   
-  console.log('Connected:', socket.id, 'IP:', ip);
+  console.log('Connected:', socket.id, 'IP:', ip, 'FP:', fp.slice(-8));
   
   const blockStatus = isBlocked(socket, fp);
   if (blockStatus.blocked) {
@@ -530,7 +596,7 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Direct join
+    // Direct join (silent approval)
     let existingUser = room.users.find(u => u.fingerprint === userFp);
     
     if (existingUser) {
@@ -572,8 +638,42 @@ io.on('connection', (socket) => {
       isGlobal: true, 
       isOwner: false 
     });
-    socket.emit('stateSync', room.state);
+    
+    // ✅ Sync current state with position
+    let currentPosition = room.state.position || 0;
+    if (room.state.track && room.state.isPlaying) {
+      const lastUpdated = room.state.lastUpdated || Date.now();
+      const elapsed = (Date.now() - lastUpdated) / 1000;
+      currentPosition = (room.state.position || 0) + elapsed;
+    }
+    
+    socket.emit('stateSync', {
+      track: room.state.track,
+      position: currentPosition,
+      isPlaying: room.state.isPlaying,
+      playedByName: room.state.playedByName,
+      autoDj: room.state.autoDj,
+      lastUpdated: Date.now()
+    });
+    
     socket.emit('chatHistory', room.messages);
+    
+    // ✅ Agar song already chal raha hai, toh songChanged bhi bhejo
+    if (room.state.track) {
+      socket.emit('songChanged', {
+        track: room.state.track,
+        reason: 'sync',
+        playedBy: room.state.playedByName
+      });
+    } else {
+      // ✅ Agar song nahi chal raha, Auto DJ start karo
+      setTimeout(async () => {
+        const r = rooms[GLOBAL_ROOM_ID];
+        if (r && (!r.state.track || !r.state.isPlaying)) {
+          await playNextSong('auto');
+        }
+      }, 1000);
+    }
     
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
     io.to(GLOBAL_ROOM_ID).emit('globalStats', {
@@ -584,10 +684,10 @@ io.on('connection', (socket) => {
       ).length
     });
     
-    // Welcome
     io.to(GLOBAL_ROOM_ID).emit('userJoined', {
       userName,
-      message: `${userName} joined 🎉`
+      message: `${userName} joined 🎉`,
+      welcomeMessage: getRandomWelcome()
     });
     
     setTimeout(() => {
@@ -616,14 +716,12 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // ✅ User played a song — mark who
     if (newState.track) {
       newState.autoDj = false;
       newState.playedBy = socket.id;
       newState.playedByName = user.name;
       console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
       
-      // Add to history
       if (!room.playedHistory) room.playedHistory = [];
       if (room.state.track && room.state.track.id !== newState.track.id) {
         room.playedHistory.push(room.state.track.id);
@@ -640,7 +738,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
   
-  // ===== NEXT BUTTON (User requests next) =====
+  // ===== NEXT BUTTON =====
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -653,16 +751,76 @@ io.on('connection', (socket) => {
       return;
     }
     
-    console.log(`⏭️ ${user.name} requested next`);
+    console.log(`⏭️ ${user.name} requested NEXT`);
     
-    // Broadcast who skipped
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
-      message: `${user.name} skipped ⏭️`
+      message: `${user.name} played next ⏭️`
     });
     
-    // Play next in same context
-    await playNextSong('next');
+    await playNextSong('next', user);
+  });
+  
+  // ===== SKIP BUTTON =====
+  socket.on('requestSkip', async ({ roomId }) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    user.lastActive = Date.now();
+    
+    if (user.blocked && user.blocked.play) {
+      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
+      return;
+    }
+    
+    console.log(`🎲 ${user.name} SKIPPED`);
+    
+    io.to(room.roomId).emit('skipNotice', {
+      userName: user.name,
+      message: `${user.name} skipped 🎲`
+    });
+    
+    await playNextSong('skip', user);
+  });
+  
+  // ===== SYNC STATE REQUEST =====
+  socket.on('requestSyncState', ({ roomId }) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room) return;
+    
+    // ✅ Actual position calculate karo
+    let currentPosition = room.state.position || 0;
+    
+    if (room.state.track && room.state.isPlaying) {
+      const lastUpdated = room.state.lastUpdated || Date.now();
+      const elapsed = (Date.now() - lastUpdated) / 1000;
+      currentPosition = (room.state.position || 0) + elapsed;
+      
+      // Duration check
+      if (room.state.track.duration > 0 && currentPosition >= room.state.track.duration) {
+        currentPosition = 0;
+      }
+    }
+    
+    console.log(`🔄 Sync request — position: ${currentPosition.toFixed(1)}s`);
+    
+    socket.emit('stateSync', {
+      track: room.state.track,
+      position: currentPosition,
+      isPlaying: room.state.isPlaying,
+      playedByName: room.state.playedByName,
+      autoDj: room.state.autoDj,
+      lastUpdated: Date.now()
+    });
+    
+    if (room.state.track) {
+      socket.emit('songChanged', {
+        track: room.state.track,
+        reason: 'sync',
+        playedBy: room.state.playedByName
+      });
+    }
   });
   
   // ===== HEARTBEAT =====
@@ -784,6 +942,7 @@ io.on('connection', (socket) => {
     socket.emit('syncPong', { clientTime, serverTime: Date.now() });
   });
   
+  // ===== DISCONNECT =====
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     analytics.activeSessions.delete(socket.id);
@@ -796,6 +955,8 @@ io.on('connection', (socket) => {
         user.status = 'disconnected';
         user.disconnectedAt = Date.now();
         
+        console.log(`⏳ ${user.name} disconnected — grace`);
+        
         io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
         io.to(roomId).emit('globalStats', {
           totalUsers: room.users.length,
@@ -805,11 +966,17 @@ io.on('connection', (socket) => {
           ).length
         });
         
+        io.to(roomId).emit('userLeft', {
+          userName: user.name,
+          message: `${user.name} left`
+        });
+        
         setTimeout(() => {
           const r = rooms[roomId];
           if (!r) return;
           const u = r.users.find(x => x.id === socket.id);
           if (u && u.status === 'disconnected') {
+            console.log(`❌ ${u.name} removed`);
             r.users = r.users.filter(x => x.id !== socket.id);
             io.to(roomId).emit('usersUpdate', getUsersWithStatus(r));
           }
@@ -879,7 +1046,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
   console.log('🎵 Auto DJ started');
-  startAutoDj();
+  ensureGlobalRoom();
   startSongEndCheck();
+  startPositionUpdater();
   console.log('🔐 Admin panel: /admin');
 });
