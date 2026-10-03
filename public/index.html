@@ -13,6 +13,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
+<!-- ✅ Leaflet for Global Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -48,7 +52,6 @@ body::before {
   will-change: opacity;
 }
 
-/* ✅ FIX 1: Global lucide transition removed — UI hilna band */
 [data-lucide] { width:18px; height:18px; stroke-width:2; }
 
 .screen { display:none; height:100vh; height:100dvh; width:100%; position:relative; z-index:1; }
@@ -103,7 +106,6 @@ body::before {
   display:flex; align-items:center; justify-content:center; gap:8px;
   position:relative; overflow:hidden;
 }
-.btn-primary::before { content:""; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition:left 0.6s; }
 .btn-primary:active { transform:scale(0.96); }
 .btn-primary [data-lucide] { width:16px; height:16px; stroke-width:2.5; }
 
@@ -139,7 +141,7 @@ body::before {
 }
 #mainScreen.active { display:flex; }
 
-/* ============ TOP BAR — BADGE FIX ✅ ============ */
+/* ============ TOP BAR ============ */
 .topbar {
   display:flex;
   justify-content:space-between;
@@ -147,8 +149,8 @@ body::before {
   gap:6px;
   flex-shrink:0;
   overflow:visible;
-  padding:10px 14px 4px 2px;   /* ✅ Right padding badha diya */
-  min-height:52px;              /* ✅ Height badha di */
+  padding:10px 14px 4px 2px;
+  min-height:52px;
   position:relative;
   z-index:10;
 }
@@ -181,9 +183,9 @@ body::before {
   align-items:center;
   flex-shrink:0;
   overflow:visible;
-  padding:8px 4px 4px 8px;      /* ✅ Right padding kam ki */
+  padding:8px 4px 4px 8px;
   margin-top:-4px;
-  margin-right:-4px;            /* ✅ Icons ko thoda left shift */
+  margin-right:-4px;
   position:relative;
 }
 
@@ -201,8 +203,8 @@ body::before {
 
 .badge {
   position:absolute;
-  top:-3px;                     /* ✅ Aur andar */
-  right:-3px;                   /* ✅ Aur andar */
+  top:-3px;
+  right:-3px;
   background:var(--danger);
   color:white;
   font-size:9px;
@@ -261,13 +263,13 @@ body::before {
   overflow:hidden; background:var(--surface); border:1px solid var(--border);
   box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 30px var(--dynamic-1);
   flex-shrink:0;
-  transition: none;   /* ✅ Koi shadow transition nahi */
+  transition: none;
 }
 .album-art img { width:100%; height:100%; object-fit:cover; border-radius:17px; animation:imgFadeIn 0.6s var(--ease); }
 @keyframes imgFadeIn { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
 .album-art .placeholder { font-size:56px; opacity:0.15; }
 .album-art.playing {
-  box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 30px var(--dynamic-1);  /* ✅ Same shadow */
+  box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 30px var(--dynamic-1);
   border-color:rgba(139,92,246,0.4);
 }
 
@@ -320,7 +322,7 @@ body::before {
   position: absolute;
   inset: -4px -8px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.25);      /* ✅ Halka dark backdrop */
+  background: rgba(0, 0, 0, 0.25);
   z-index: 0;
   pointer-events: none;
 }
@@ -336,10 +338,10 @@ body::before {
   transition:height 0.08s ease;
   position: relative;
   z-index: 1;
-  box-shadow: 0 0 3px rgba(0,0,0,0.6);   /* ✅ Shadow on bars */
+  box-shadow: 0 0 3px rgba(0,0,0,0.6);
 }
 
-/* ✅ FIX 2: PROGRESS BAR — WITH DRAG SUPPORT */
+/* ============ PROGRESS BAR ============ */
 .progress-section { width:100%; padding:0 6px; flex-shrink:0; }
 
 .progress-bar {
@@ -407,13 +409,9 @@ body::before {
   height:6px;
 }
 
-.progress-bar:focus-visible .progress-thumb {
-  opacity:1;
-}
-
 .time-row { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; font-weight:600; padding:0 2px; }
 
-/* ============ CONTROLS — 5 buttons ============ */
+/* ============ CONTROLS ============ */
 .controls {
   display: flex;
   align-items: center;
@@ -432,7 +430,6 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* ✅ FIX 1: Specific transitions only */
   transition: transform 0.25s var(--spring), background 0.25s var(--ease), border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
   flex-shrink: 0;
   backdrop-filter: blur(10px);
@@ -441,7 +438,7 @@ body::before {
 .ctrl-btn [data-lucide] {
   width: 18px;
   height: 18px;
-  min-width: 18px;      /* ✅ Fixed size lock */
+  min-width: 18px;
   min-height: 18px;
   max-width: 18px;
   max-height: 18px;
@@ -501,7 +498,6 @@ body::before {
   transition: transform 0.25s var(--spring);
 }
 
-/* ✅ NAYA: Icon ke peeche dark circle */
 .ctrl-btn.play::before {
   content: "";
   position: absolute;
@@ -510,14 +506,13 @@ body::before {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background:rgb(0 0 0 / 15%);
+  background: rgba(0, 0, 0, 0.55);
   transform: translate(-50%, -50%);
   z-index: 1;
   pointer-events: none;
   backdrop-filter: blur(4px);
 }
 
-/* ✅ SVG aur icon ko z-index do */
 .ctrl-btn.play svg,
 .ctrl-btn.play [data-lucide] {
   position: relative;
@@ -528,7 +523,7 @@ body::before {
   min-height: 24px;
   max-width: 24px;
   max-height: 24px;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.9));   /* ✅ Strong shadow */
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.9));
   display: block;
   flex-shrink: 0;
 }
@@ -572,14 +567,14 @@ body::before {
   flex-shrink: 0;
   box-shadow: 0 4px 12px var(--primary-glow);
   position: relative;
-  border: 1px solid rgba(255,255,255,0.3);   /* ✅ Light border */
+  border: 1px solid rgba(255,255,255,0.3);
 }
 .search-btn .search-icon::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 9px;
-  background: rgba(0, 0, 0, 0.35);            /* ✅ Dark overlay */
+  background: rgba(0, 0, 0, 0.35);
   pointer-events: none;
   z-index: 1;
 }
@@ -587,11 +582,11 @@ body::before {
 .search-btn .search-icon [data-lucide] {
   width: 15px;
   height: 15px;
-  stroke-width: 2.8;                          /* ✅ Thicker stroke */
+  stroke-width: 2.8;
   color: #FFFFFF;
   position: relative;
   z-index: 2;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));   /* ✅ Shadow */
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
 }
 
 /* ============ PTT CARD ============ */
@@ -707,6 +702,84 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .mute-btn [data-lucide] { width:11px; height:11px; stroke-width:2.5; }
 .mute-btn.muted { background:rgba(239,68,68,0.15); color:var(--danger); }
+
+/* ============ GLOBAL MAP MODAL ============ */
+#globalMapModal {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.85); backdrop-filter:blur(12px);
+  z-index:120; align-items:center; justify-content:center; padding:16px;
+}
+#globalMapModal.active { display:flex; }
+.global-map-box {
+  background:var(--surface); border-radius:22px; padding:16px;
+  max-width:900px; width:100%; border:1px solid var(--border);
+  max-height:90vh; overflow-y:auto;
+  box-shadow:0 24px 60px rgba(0,0,0,0.7);
+}
+.global-map-box h3 {
+  font-size:16px; font-weight:800; margin-bottom:12px;
+  display:flex; align-items:center; gap:8px;
+}
+.global-map-box h3 [data-lucide] {
+  width:18px; height:18px; color:var(--primary-2);
+}
+#globalMap {
+  height: 420px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.3);
+  z-index: 1;
+}
+#globalMapStats {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+#globalMapStats .now-playing {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#globalMapStats .city-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+#globalMapStats .city-row:last-child {
+  border-bottom: none;
+}
+#globalMapStats .city-name {
+  font-weight: 700;
+  color: var(--text);
+}
+#globalMapStats .city-count {
+  color: var(--primary-2);
+  font-weight: 800;
+}
+
+/* Leaflet dark theme override */
+.leaflet-container {
+  background: #0a0a10 !important;
+}
+.leaflet-tile-pane {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+.leaflet-popup-content-wrapper {
+  background: rgba(22,22,32,0.98) !important;
+  color: var(--text) !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+}
+.leaflet-popup-tip {
+  background: rgba(22,22,32,0.98) !important;
+}
 
 /* ============ CHAT PANEL ============ */
 #chatPanel {
@@ -1304,6 +1377,9 @@ input:checked + .slider:before { transform:translateX(16px); }
       <button class="icon-btn" id="audioOutputBtn" title="Audio Output" style="display:none;">
         <i data-lucide="volume-2"></i>
       </button>
+      <button class="icon-btn" id="globalMapBtn" title="Global Listeners">
+        <i data-lucide="globe-2"></i>
+      </button>
       <button class="icon-btn" id="muteAllBtn" title="Mute All Voices"><i data-lucide="volume-2"></i></button>
       <button class="icon-btn" id="chatBtn" title="Chat">
         <i data-lucide="message-circle"></i>
@@ -1354,7 +1430,7 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
     
-    <!-- ✅ FIX 2: Progress Bar with thumb -->
+    <!-- Progress Bar -->
     <div class="progress-section">
       <div class="progress-bar" id="progressBar" tabindex="0" role="slider">
         <div class="progress-track">
@@ -1368,7 +1444,7 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
     
-    <!-- 5 BUTTONS: Prev / Rewind / Play / Forward / Next -->
+    <!-- 5 BUTTONS -->
     <div class="controls">
       <button class="ctrl-btn" id="prevBtn" title="Previous song">
         <i data-lucide="skip-back"></i>
@@ -1379,8 +1455,8 @@ input:checked + .slider:before { transform:translateX(16px); }
       </button>
       
       <button class="ctrl-btn play" id="playBtn" title="Play / Pause" data-state="paused">
-  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>
-</button>
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>
+      </button>
       
       <button class="ctrl-btn forward" id="forwardBtn" title="Fast-forward 10 seconds">
         <i data-lucide="fast-forward"></i>
@@ -1430,6 +1506,25 @@ input:checked + .slider:before { transform:translateX(16px); }
     <button class="reaction-btn" data-emoji="🕺">🕺</button>
     <button class="reaction-btn" data-emoji="❤️">❤️</button>
     <button class="reaction-btn" data-emoji="👎">👎</button>
+  </div>
+</div>
+
+<!-- ============ GLOBAL MAP MODAL ============ -->
+<div id="globalMapModal">
+  <div class="global-map-box">
+    <h3><i data-lucide="globe-2"></i> 🌍 Global Listeners</h3>
+    <div id="globalMap"></div>
+    <div id="globalMapStats">
+      <div class="now-playing">
+        <i data-lucide="music"></i>
+        <span id="mapNowPlaying">Loading...</span>
+      </div>
+      <div id="mapCityList"></div>
+    </div>
+    <button class="btn-secondary" id="closeGlobalMapBtn" style="margin-top:14px;">
+      <i data-lucide="x"></i>
+      <span>Close</span>
+    </button>
   </div>
 </div>
 
@@ -1557,6 +1652,7 @@ let myLocation = null;
 let partnerLocation = null;
 let distanceKm = 0;
 let locationShared = false;
+let myTimezone = 'unknown';
 
 let isOnline = navigator.onLine;
 let messageQueue = [];
@@ -1581,6 +1677,10 @@ let beatDetectionActive = false;
 
 let myFingerprint = 'unknown';
 let deferredPrompt = null;
+
+// ✅ Global Map
+let globalMap = null;
+let mapMarkers = [];
 
 function initAudioContext() {
   if (audioContext) return;
@@ -1715,8 +1815,9 @@ function updatePlayedBy(playedByName, reason) {
   if (!badge || !text) return;
   if (!playedByName) { badge.classList.remove('active'); return; }
   badge.classList.add('active');
-  // ✅ NAYA: Ambient case
-  if (reason === 'ambient' || playedByName === '🎧 SangeetX Radio') {
+
+  // ✅ Ambient case
+  if (reason === 'ambient' || playedByName === '🎧 SangeetX Radio' || playedByName === '🎧 Chill Vibes') {
     text.textContent = '🎧 Chill Vibes';
     badge.classList.remove('auto');
     const icon = badge.querySelector('[data-lucide]');
@@ -1724,6 +1825,7 @@ function updatePlayedBy(playedByName, reason) {
     refreshIcons();
     return;
   }
+
   if (reason === 'auto' || playedByName === '🎵 Auto DJ') {
     text.textContent = '🎵 Auto DJ';
     badge.classList.add('auto');
@@ -1762,7 +1864,7 @@ function detectMood(t,a) {
   if(/love|pyar|ishq|dil|romantic|sanam|jaan/.test(x))return'romantic';
   if(/sad|dukh|alone|broken|tanha|cry|rona/.test(x))return'sad';
   if(/party|dance|beat|club|dj|remix/.test(x))return'energetic';
-  if(/chill|lofi|relax|sleep|peace/.test(x))return'chill';
+  if(/chill|lofi|relax|sleep|peace|ambient/.test(x))return'chill';
   if(/happy|khush|good|celebrate|birthday/.test(x))return'happy';
   return'neutral';
 }
@@ -1805,7 +1907,6 @@ async function updateDynamicBackground(url){
     img.crossOrigin='anonymous';
     img.onload=async()=>{
       const c=await extractColorsFromImage(img);
-      // ✅ Batch both in one frame
       requestAnimationFrame(() => {
         document.documentElement.style.setProperty('--dynamic-1',c.c1);
         document.documentElement.style.setProperty('--dynamic-2',c.c2);
@@ -1967,7 +2068,11 @@ function getApproxLocation(lat,lng){
     {name:'Varanasi',lat:25.3176,lng:82.9739},{name:'Agra',lat:27.1767,lng:78.0081},
     {name:'Noida',lat:28.5355,lng:77.3910},{name:'Gurgaon',lat:28.4595,lng:77.0266},
     {name:'Chandigarh',lat:30.7333,lng:76.7794},{name:'Goa',lat:15.2993,lng:74.1240},
-    {name:'Kochi',lat:9.9312,lng:76.2673},{name:'Guwahati',lat:26.1445,lng:91.7362}
+    {name:'Kochi',lat:9.9312,lng:76.2673},{name:'Guwahati',lat:26.1445,lng:91.7362},
+    {name:'London',lat:51.5074,lng:-0.1278},{name:'New York',lat:40.7128,lng:-74.0060},
+    {name:'Dubai',lat:25.2048,lng:55.2708},{name:'Singapore',lat:1.3521,lng:103.8198},
+    {name:'Tokyo',lat:35.6762,lng:139.6503},{name:'Sydney',lat:-33.8688,lng:151.2093},
+    {name:'Toronto',lat:43.6532,lng:-79.3832},{name:'Los Angeles',lat:34.0522,lng:-118.2437}
   ];
   let n=cities[0],md=Infinity;
   cities.forEach(c=>{
@@ -1983,9 +2088,18 @@ function updateDistanceDisplay(){
   const pCity=getApproxLocation(partnerLocation.lat,partnerLocation.lng);
   const meter=document.getElementById('distanceMeter');
   const text=document.getElementById('distanceText');
-  if(distanceKm<5)text.textContent=`${myCity} · Same city! 🏙️`;
-  else if(distanceKm<100)text.textContent=`${myCity} ↔ ${pCity} · ${distanceKm} km`;
-  else text.textContent=`${myCity} ↔ ${pCity} · ${distanceKm.toLocaleString()} km apart`;
+
+  let msg;
+  if(distanceKm<5){
+    msg = `${myCity} · Same city! 🏙️ Same song 🎵`;
+  } else if(distanceKm<100){
+    msg = `${myCity} ↔ ${pCity} · ${distanceKm} km · same song 🎵`;
+  } else if(distanceKm<1000){
+    msg = `${myCity} ↔ ${pCity} · ${distanceKm} km apart, same song 🎵`;
+  } else {
+    msg = `${myCity} ↔ ${pCity} · ${distanceKm.toLocaleString()} km apart, same song 🎵`;
+  }
+  text.textContent = msg;
   meter.classList.add('active');
   refreshIcons();
 }
@@ -1994,7 +2108,15 @@ async function shareLocation(){
   const loc=await getMyLocation();
   if(!loc)return;
   myLocation=loc;locationShared=true;
-  if(socket&&socket.connected)socket.emit('shareLocation',{roomId,location:loc});
+
+  // ✅ Timezone detect
+  myTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  if(socket&&socket.connected)socket.emit('shareLocation',{
+    roomId, 
+    location: loc,
+    timezone: myTimezone
+  });
   if(partnerLocation)updateDistanceDisplay();
 }
 function showDistanceHeart(){
@@ -2005,6 +2127,99 @@ function showDistanceHeart(){
   el.style.left='50%';el.style.bottom='30%';el.style.fontSize='60px';el.style.transform='translateX(-50%)';
   layer.appendChild(el);
   setTimeout(()=>el.remove(),2500);
+}
+
+/* ============ GLOBAL MAP ============ */
+function openGlobalMap() {
+  document.getElementById('globalMapModal').classList.add('active');
+  refreshIcons();
+  
+  // ✅ Init map on first open
+  if (!globalMap) {
+    setTimeout(() => {
+      try {
+        globalMap = L.map('globalMap', {
+          zoomControl: true,
+          attributionControl: false
+        }).setView([20, 0], 2);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          minZoom: 2
+        }).addTo(globalMap);
+      } catch (e) {
+        console.error('Map init error:', e);
+      }
+    }, 100);
+  } else {
+    setTimeout(() => {
+      if (globalMap) globalMap.invalidateSize();
+    }, 100);
+  }
+  
+  // ✅ Request listeners from server
+  if (socket && socket.connected) {
+    socket.emit('requestGlobalListeners', { roomId });
+  }
+}
+
+function closeGlobalMap() {
+  document.getElementById('globalMapModal').classList.remove('active');
+}
+
+function renderGlobalMap({ listeners, currentTrack }) {
+  if (!globalMap) return;
+  
+  // ✅ Clear old markers
+  mapMarkers.forEach(m => globalMap.removeLayer(m));
+  mapMarkers = [];
+  
+  // ✅ Add new markers
+  listeners.forEach(l => {
+    if (!l.lat || !l.lng) return;
+    
+    const marker = L.circleMarker([l.lat, l.lng], {
+      radius: Math.min(6 + l.userCount * 2, 18),
+      fillColor: '#EC4899',
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(globalMap);
+    
+    marker.bindPopup(
+      `<div style="font-family: Inter, sans-serif;">
+        <b>📍 ${l.city}</b><br>
+        <span style="color: #EC4899; font-weight: 800;">${l.userCount}</span> listener${l.userCount > 1 ? 's' : ''}
+      </div>`
+    );
+    mapMarkers.push(marker);
+  });
+  
+  // ✅ Update stats
+  const statsEl = document.getElementById('globalMapStats');
+  const nowPlayingEl = document.getElementById('mapNowPlaying');
+  const cityListEl = document.getElementById('mapCityList');
+  
+  nowPlayingEl.textContent = currentTrack 
+    ? `${currentTrack.title} — ${currentTrack.artist}` 
+    : 'Chill Vibes 🎧';
+  
+  // City list sorted by count
+  const sorted = [...listeners].sort((a, b) => b.userCount - a.userCount);
+  
+  if (sorted.length === 0) {
+    cityListEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);">No listeners with location yet</div>';
+  } else {
+    cityListEl.innerHTML = sorted.map(l => `
+      <div class="city-row">
+        <span class="city-name">📍 ${l.city}</span>
+        <span class="city-count">${l.userCount} 🎵</span>
+      </div>
+    `).join('');
+  }
+  
+  refreshIcons();
 }
 
 /* ============ OFFLINE ============ */
@@ -2101,6 +2316,20 @@ function initSocket(){
       startSyncCheck();
       socket.emit('requestSyncState', { roomId });
       setTimeout(shareLocation,2000);
+
+      setTimeout(() => {
+        if (!currentTrack) {
+          console.log('⚠️ No song received, requesting sync...');
+          socket.emit('requestSyncState', { roomId });
+        }
+      }, 3000);
+
+      setTimeout(() => {
+        if (!currentTrack) {
+          console.log('⚠️ Still no song, requesting next...');
+          socket.emit('requestNext', { roomId });
+        }
+      }, 8000);
     } else if (r.pending) {
       joinScreen.classList.remove('active');
       waitingScreen.classList.add('active');
@@ -2127,29 +2356,35 @@ function initSocket(){
     applyRemoteState(state);
   });
 
- socket.on('songChanged', ({ track, reason, playedBy }) => {
-  if (reason === 'sync') {
-    const syncPos = lastKnownPosition || 0;
-    loadTrack(track, syncPos, true);
-    updatePlayedBy(playedBy, 'user');
-    return;
-  }
+  socket.on('songChanged', ({ track, reason, playedBy }) => {
+    // ✅ Safety check
+    if (!track || !track.audioUrl) {
+      console.warn('⚠️ songChanged: invalid track', track);
+      return;
+    }
 
-  // ✅ Ambient track ke liye koi toast nahi
-  if (reason === 'ambient' || track.isQuiet) {
+    if (reason === 'sync') {
+      const syncPos = lastKnownPosition || 0;
+      loadTrack(track, syncPos, true);
+      updatePlayedBy(playedBy, 'user');
+      return;
+    }
+
+    // ✅ Ambient — no toast
+    if (reason === 'ambient' || track.isQuiet) {
+      loadTrack(track, 0, true);
+      updatePlayedBy(playedBy, 'ambient');
+      return;
+    }
+
     loadTrack(track, 0, true);
-    updatePlayedBy(playedBy, 'ambient');
-    return;
-  }
-
-  loadTrack(track, 0, true);
-  updatePlayedBy(playedBy, reason);
-  
-  if (reason === 'auto') showToast('🎵 Auto next');
-  else if (reason === 'next') showToast(`⏭️ Next`);
-  else if (reason === 'skip') showToast(`🎲 Skipped`);
-  else if (reason === 'admin') showToast(`👑 Admin changed`);
-});
+    updatePlayedBy(playedBy, reason);
+    
+    if (reason === 'auto') showToast('🎵 Auto next');
+    else if (reason === 'next') showToast(`⏭️ Next`);
+    else if (reason === 'skip') showToast(`🎲 Skipped`);
+    else if (reason === 'admin') showToast(`👑 Admin changed`);
+  });
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
 
@@ -2203,6 +2438,11 @@ function initSocket(){
   socket.on('partnerLocation',({location})=>{
     if(!location||!location.lat||!location.lng)return;
     partnerLocation=location;updateDistanceDisplay();
+  });
+
+  // ✅ Global Listeners
+  socket.on('globalListeners', (data) => {
+    renderGlobalMap(data);
   });
 
   socket.on('chatMessage',(msg)=>{
@@ -2421,6 +2661,10 @@ document.getElementById('usersBtn').addEventListener('click',()=>document.getEle
 document.getElementById('closeUsersBtn').addEventListener('click',()=>document.getElementById('usersPanel').classList.remove('active'));
 document.getElementById('muteAllBtn').addEventListener('click',toggleMuteAll);
 
+// ✅ Global Map buttons
+document.getElementById('globalMapBtn').addEventListener('click', openGlobalMap);
+document.getElementById('closeGlobalMapBtn').addEventListener('click', closeGlobalMap);
+
 document.getElementById('audioOutputBtn')?.addEventListener('click', async () => {
   showToast('🔊 Scanning audio devices...');
   const result = await autoDetectAndRouteAudio();
@@ -2474,7 +2718,6 @@ chatInputEl.addEventListener('keydown', (e) => {
     clearTimeout(typingTimer);
     isTyping=false;
     if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
-    // ✅ FIX: Mobile keyboard reopen
     if (window.innerWidth <= 768) {
       setTimeout(() => {
         if (document.activeElement !== chatInputEl) {
@@ -2693,7 +2936,7 @@ async function applyRemoteState(state){
   isRemoteUpdate=false;
 }
 
-/* ✅ NAYA updatePlayIcon — UI shift ke bina */
+/* ✅ updatePlayIcon — Direct SVG, no UI shift */
 function updatePlayIcon() {
   const btn = document.getElementById('playBtn');
   if (!btn) return;
@@ -2701,16 +2944,13 @@ function updatePlayIcon() {
   const isPaused = audio.paused;
   const currentState = btn.dataset.state;
 
-  // Same state hai toh kuch mat karo
   if (currentState === (isPaused ? 'paused' : 'playing')) return;
   btn.dataset.state = isPaused ? 'paused' : 'playing';
 
-  // ✅ Fixed size SVG strings — dono same size, same viewBox
   const svg = isPaused
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><rect x="6" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/></svg>`;
 
-  // Direct HTML replace — no lucide re-render
   const iconEl = btn.querySelector('svg') || btn.querySelector('[data-lucide]');
   if (iconEl) {
     iconEl.outerHTML = svg;
@@ -2721,6 +2961,17 @@ function updatePlayIcon() {
 
 /* ============ LOAD TRACK ============ */
 async function loadTrack(track,position=0,autoPlay=false){
+  // ✅ Safety checks
+  if (!track) {
+    console.error('❌ loadTrack: track is null');
+    return;
+  }
+  if (!track.audioUrl) {
+    console.error('❌ loadTrack: no audioUrl', track);
+    showToast('⚠️ Song has no audio', 'error');
+    return;
+  }
+
   currentTrack=track;
   document.getElementById('songTitle').textContent=track.title;
   document.getElementById('songArtist').textContent=track.artist;
@@ -2729,14 +2980,16 @@ async function loadTrack(track,position=0,autoPlay=false){
     ?`<img src="${track.image}" alt="" crossorigin="anonymous">`
     :`<div class="placeholder"><i data-lucide="music" style="width:56px;height:56px;"></i></div>`;
   refreshIcons();
-  // ✅ NAYA: Ambient track ke liye low volume
+
+  // ✅ Ambient track volume control
   if (track.isQuiet) {
-    audio.volume = 0.15;   // ✅ 15% — halka background music
+    audio.volume = 0.15;
     console.log('🎧 Ambient track loaded — volume set to 15%');
   } else {
-    audio.volume = 1.0;    // ✅ Full volume for real songs
+    audio.volume = 1.0;
     console.log('🎵 Real song loaded — volume 100%');
   }
+
   if(track.image)updateDynamicBackground(track.image);
   updateMood(track.title,track.artist);
   audio.playbackRate=1.0;
@@ -2842,7 +3095,7 @@ document.getElementById('nextBtn').addEventListener('click',()=>{
   showToast('⏭️ Next');
 });
 
-/* ✅ FIX 2: PROGRESS BAR — Pointer Drag Seek */
+/* ✅ PROGRESS BAR — Pointer Drag Seek */
 const progressBarEl = document.getElementById('progressBar');
 const progressFillEl = document.getElementById('progressFill');
 const progressThumbEl = document.getElementById('progressThumb');
@@ -2927,7 +3180,7 @@ progressBarEl.addEventListener('keydown', (e) => {
 
 audio.addEventListener('timeupdate',()=>{
   if(!audio.duration)return;
-  if (isDragging) return;    // Don't override while dragging
+  if (isDragging) return;
   const pct=(audio.currentTime/audio.duration)*100;
   progressFillEl.style.width=pct+'%';
   progressThumbEl.style.left=pct+'%';
@@ -3383,7 +3636,7 @@ document.addEventListener('keydown', (e) => {
     case 'm': case 'M': e.preventDefault(); document.getElementById('muteAllBtn').click(); break;
     case 'c': case 'C': e.preventDefault(); document.getElementById('chatBtn').click(); break;
     case 'Escape':
-      document.querySelectorAll('.modal.active, #searchModal.active, #usersPanel.active, #chatPanel.active').forEach(m => m.classList.remove('active'));
+      document.querySelectorAll('.modal.active, #searchModal.active, #usersPanel.active, #chatPanel.active, #globalMapModal.active').forEach(m => m.classList.remove('active'));
       chatOpen = false;
       document.body.style.overflow = ''; document.body.style.position = '';
       break;
@@ -3404,6 +3657,11 @@ document.querySelectorAll('button').forEach(btn => {
 /* ============ RIPPLE ============ */
 document.querySelectorAll('.btn-primary, .btn-secondary, .icon-btn, .ctrl-btn').forEach(btn => {
   btn.style.position = 'relative';
+  if (btn.classList.contains('icon-btn')) {
+    btn.style.overflow = 'visible';
+  } else {
+    btn.style.overflow = 'hidden';
+  }
   btn.addEventListener('click', function(e) {
     const ripple = document.createElement('span');
     ripple.style.cssText = `
