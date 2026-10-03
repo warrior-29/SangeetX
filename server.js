@@ -922,11 +922,11 @@ io.on('connection', (socket) => {
 
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
-      message: `${user.name} played next ⏭️`
+      message: `⏭️ Next song`
     });
 
     await playNextSong('next', user);
-  });
+});
 
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
