@@ -145,11 +145,10 @@ body::before {
   gap:6px;
   flex-shrink:0;
   overflow:visible;
-  padding-top:10px;
-  padding-bottom:4px;
-  padding-right:6px;
-  padding-left:2px;
-  min-height:46px;
+  padding:10px 14px 4px 2px;   /* ✅ Right padding badha diya */
+  min-height:52px;              /* ✅ Height badha di */
+  position:relative;
+  z-index:10;
 }
 
 .status {
@@ -180,8 +179,10 @@ body::before {
   align-items:center;
   flex-shrink:0;
   overflow:visible;
-  padding:8px 10px 4px 8px;
+  padding:8px 4px 4px 8px;      /* ✅ Right padding kam ki */
   margin-top:-4px;
+  margin-right:-4px;            /* ✅ Icons ko thoda left shift */
+  position:relative;
 }
 
 .icon-btn {
@@ -196,28 +197,28 @@ body::before {
 .icon-btn:active { transform:scale(0.9); }
 .icon-btn.primary { background:linear-gradient(135deg, var(--primary), var(--accent)); border:none; box-shadow:0 6px 16px var(--primary-glow); }
 
-/* ✅ BADGE FIX — Cut nahi hoga */
 .badge {
   position:absolute;
-  top:-5px;
-  right:-5px;
+  top:-3px;                     /* ✅ Aur andar */
+  right:-3px;                   /* ✅ Aur andar */
   background:var(--danger);
   color:white;
   font-size:9px;
   font-weight:800;
-  min-width:17px;
-  height:17px;
-  border-radius:9px;
+  min-width:16px;
+  height:16px;
+  border-radius:8px;
   padding:0 4px;
   display:flex;
   align-items:center;
   justify-content:center;
   border:2px solid var(--bg);
-  z-index:10;
+  z-index:100;
   line-height:1;
-  box-sizing:content-box;
+  box-sizing:border-box;
   animation:badgePulse 2s infinite;
   pointer-events:none;
+  transform-origin:center;
 }
 @keyframes badgePulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
 
@@ -403,10 +404,15 @@ body::before {
 .ctrl-btn [data-lucide] {
   width: 18px;
   height: 18px;
+  min-width: 18px;      /* ✅ Fixed size lock */
+  min-height: 18px;
+  max-width: 18px;
+  max-height: 18px;
   stroke-width: 2.4;
   fill: currentColor;
   color: #FFFFFF;
-  transition: none;    /* ✅ FIX 1: No icon transition */
+  transition: none;
+  flex-shrink: 0;
 }
 .ctrl-btn:active {
   transform: scale(0.9);
@@ -442,19 +448,29 @@ body::before {
 .ctrl-btn.play {
   width: 62px;
   height: 62px;
+  min-width: 62px;
+  min-height: 62px;
+  max-width: 62px;
+  max-height: 62px;
   background: linear-gradient(135deg, var(--dynamic-1), var(--dynamic-2));
   border: 3px solid rgba(255,255,255,0.9);
   box-shadow: 0 12px 32px var(--dynamic-1), 0 0 0 4px rgba(0,0,0,0.3), 0 0 24px rgba(139,92,246,0.6);
   position: relative;
   z-index: 2;
+  transition: transform 0.25s var(--spring);   /* ✅ Sirf transform */
 }
 .ctrl-btn.play [data-lucide] {
   width: 26px;
   height: 26px;
+  min-width: 26px;      /* ✅ Fixed size lock */
+  min-height: 26px;
+  max-width: 26px;
+  max-height: 26px;
   stroke-width: 2.8;
   fill: #FFFFFF;
   color: #FFFFFF;
-  transition: none;    /* ✅ FIX 1 */
+  transition: none;
+  flex-shrink: 0;
 }
 .ctrl-btn.play:active {
   transform: scale(0.96);
@@ -1277,9 +1293,9 @@ input:checked + .slider:before { transform:translateX(16px); }
         <i data-lucide="rewind"></i>
       </button>
       
-      <button class="ctrl-btn play" id="playBtn" title="Play / Pause">
-        <i data-lucide="play"></i>
-      </button>
+      <button class="ctrl-btn play" id="playBtn" title="Play / Pause" data-state="paused">
+  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>
+</button>
       
       <button class="ctrl-btn forward" id="forwardBtn" title="Fast-forward 10 seconds">
         <i data-lucide="fast-forward"></i>
@@ -2570,31 +2586,30 @@ async function applyRemoteState(state){
   isRemoteUpdate=false;
 }
 
-/* ✅ FIX 3: updatePlayIcon without UI shift */
-function updatePlayIcon(){
+/* ✅ NAYA updatePlayIcon — UI shift ke bina */
+function updatePlayIcon() {
   const btn = document.getElementById('playBtn');
-  const icon = btn?.querySelector('[data-lucide]');
-  if (!icon) return;
+  if (!btn) return;
 
-  const newIcon = audio.paused ? 'play' : 'pause';
-  if (icon.getAttribute('data-lucide') === newIcon) return;
+  const isPaused = audio.paused;
+  const currentState = btn.dataset.state;
 
-  // Freeze size to prevent layout shift
-  const rect = icon.getBoundingClientRect();
-  icon.style.width = rect.width + 'px';
-  icon.style.height = rect.height + 'px';
+  // Same state hai toh kuch mat karo
+  if (currentState === (isPaused ? 'paused' : 'playing')) return;
+  btn.dataset.state = isPaused ? 'paused' : 'playing';
 
-  icon.setAttribute('data-lucide', newIcon);
-  refreshIcons();
+  // ✅ Fixed size SVG strings — dono same size, same viewBox
+  const svg = isPaused
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><rect x="6" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/></svg>`;
 
-  // Clean up inline sizes after render
-  requestAnimationFrame(() => {
-    const newIconEl = btn?.querySelector('[data-lucide]');
-    if (newIconEl) {
-      newIconEl.style.width = '';
-      newIconEl.style.height = '';
-    }
-  });
+  // Direct HTML replace — no lucide re-render
+  const iconEl = btn.querySelector('svg') || btn.querySelector('[data-lucide]');
+  if (iconEl) {
+    iconEl.outerHTML = svg;
+  } else {
+    btn.insertAdjacentHTML('beforeend', svg);
+  }
 }
 
 /* ============ LOAD TRACK ============ */
