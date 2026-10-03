@@ -25,7 +25,6 @@ let currentAnnouncement = null;
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 60 * 1000;
 
-// ✅ Auto DJ playlist — only when NO real song is playing
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
   'Tum Hi Ho Arijit Singh',
@@ -42,16 +41,14 @@ const AUTO_DJ_PLAYLIST = [
   'Muskurane Arijit Singh'
 ];
 
-// ✅ SILENT AMBIENT tracks — jab koi real song nahi
-// Ye royalty-free / chill ambient tracks hain jo irritate nahi karte
+// ✅ Silent ambient music (15% volume via isQuiet flag)
 const SILENT_AMBIENT_TRACK = {
   id: 'ambient-silent-default',
   title: '🎧 Chill Vibes',
   artist: 'SangeetX Radio',
-  duration: 99999, // Almost never ends
+  duration: 99999,
   image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
-  // ✅ Silent / very quiet ambient audio
-  audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3'
+  audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
   isQuiet: true,
   volume: 0.15
 };
@@ -137,11 +134,11 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 30000);
 
-// ✅ Start ambient music — silent background
+// ✅ Start ambient music
 function startAmbientMusic() {
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return;
-  if (room.state.track && !room.state.isAmbient) return; // Real song already playing
+  if (room.state.track && !room.state.isAmbient) return;
 
   room.state = {
     track: { ...SILENT_AMBIENT_TRACK },
@@ -154,7 +151,7 @@ function startAmbientMusic() {
     lastUpdated: Date.now()
   };
 
-  console.log('🎧 Ambient music started');
+  console.log('🎧 Ambient music started (volume: 15%)');
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: room.state.track,
@@ -176,6 +173,37 @@ function recordVisit(name, roomId, userAgent) {
 }
 
 function isAdmin(password) { return password === ADMIN_PASSWORD; }
+
+// ✅ Approx location helper (server-side, for Global Map)
+function getApproxLocation(lat, lng) {
+  const cities = [
+    {name:'Delhi',lat:28.6139,lng:77.2090},{name:'Mumbai',lat:19.0760,lng:72.8777},
+    {name:'Bangalore',lat:12.9716,lng:77.5946},{name:'Kolkata',lat:22.5726,lng:88.3639},
+    {name:'Chennai',lat:13.0827,lng:80.2707},{name:'Hyderabad',lat:17.3850,lng:78.4867},
+    {name:'Pune',lat:18.5204,lng:73.8567},{name:'Jaipur',lat:26.9124,lng:75.7873},
+    {name:'Lucknow',lat:26.8467,lng:80.9462},{name:'Ahmedabad',lat:23.0225,lng:72.5714},
+    {name:'Surat',lat:21.1702,lng:72.8311},{name:'Kanpur',lat:26.4499,lng:80.3319},
+    {name:'Nagpur',lat:21.1458,lng:79.0882},{name:'Indore',lat:22.7196,lng:75.8577},
+    {name:'Bhopal',lat:23.2599,lng:77.4126},{name:'Patna',lat:25.5941,lng:85.1376},
+    {name:'Varanasi',lat:25.3176,lng:82.9739},{name:'Agra',lat:27.1767,lng:78.0081},
+    {name:'Noida',lat:28.5355,lng:77.3910},{name:'Gurgaon',lat:28.4595,lng:77.0266},
+    {name:'Chandigarh',lat:30.7333,lng:76.7794},{name:'Goa',lat:15.2993,lng:74.1240},
+    {name:'Kochi',lat:9.9312,lng:76.2673},{name:'Guwahati',lat:26.1445,lng:91.7362},
+    {name:'London',lat:51.5074,lng:-0.1278},{name:'New York',lat:40.7128,lng:-74.0060},
+    {name:'Dubai',lat:25.2048,lng:55.2708},{name:'Singapore',lat:1.3521,lng:103.8198},
+    {name:'Tokyo',lat:35.6762,lng:139.6503},{name:'Sydney',lat:-33.8688,lng:151.2093},
+    {name:'Toronto',lat:43.6532,lng:-79.3832},{name:'Los Angeles',lat:34.0522,lng:-118.2437},
+    {name:'Paris',lat:48.8566,lng:2.3522},{name:'Berlin',lat:52.5200,lng:13.4050},
+    {name:'Moscow',lat:55.7558,lng:37.6173},{name:'São Paulo',lat:-23.5505,lng:-46.6333},
+    {name:'Cape Town',lat:-33.9249,lng:18.4241},{name:'Seoul',lat:37.5665,lng:126.9780}
+  ];
+  let n=cities[0],md=Infinity;
+  cities.forEach(c=>{
+    const d=Math.sqrt((c.lat-lat)**2+(c.lng-lng)**2);
+    if(d<md){md=d;n=c;}
+  });
+  return n.name;
+}
 
 const WELCOME_MESSAGES = [
   "Kaise ho? Music sunte hain! 🎵",
@@ -512,7 +540,7 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Parallel API search — faster, no 502
+// ✅ Parallel API search — no 502
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
@@ -746,7 +774,6 @@ async function playNextSong(reason = 'auto', user = null) {
   const playedHistory = room.playedHistory || [];
   let nextSong = null;
 
-  // ✅ If current track is ambient, don't try to get "next from context"
   const currentIsAmbient = room.state.isAmbient || false;
 
   if (!currentIsAmbient) {
@@ -774,7 +801,7 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // ✅ If still null → keep ambient playing
+  // ✅ If still null → ambient continues
   if (!nextSong) {
     console.error('❌ playNextSong: all APIs failed → keeping ambient');
     if (!room.state.isAmbient) {
@@ -831,13 +858,12 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ Aggressive Auto DJ — chahe user ho ya na ho
+// ✅ Aggressive Auto DJ
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
 
-    // ✅ Agar koi song nahi chal raha — ambient start karo
     if (!room.state.track || !room.state.isPlaying) {
       const lastAttempt = room._lastAutoDjAttempt || 0;
       if (Date.now() - lastAttempt < 10000) return;
@@ -848,10 +874,8 @@ function startSongEndCheck() {
       return;
     }
 
-    // ✅ Ambient hai toh skip
     if (room.state.isAmbient) return;
 
-    // ✅ Song end check
     const duration = room.state.track.duration || 0;
     const position = room.state.position || 0;
     const lastUpdated = room.state.lastUpdated || Date.now();
@@ -871,7 +895,7 @@ function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || !room.state.isPlaying) return;
-    if (room.state.isAmbient) return; // Ambient doesn't need position update
+    if (room.state.isAmbient) return;
 
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
@@ -942,7 +966,7 @@ io.on('connection', (socket) => {
         id: socket.id, name: userName, ip: ip, fingerprint: userFp,
         lastActive: Date.now(), status: 'online',
         blocked: { chat: false, play: false, voice: false },
-        location: null, chatActive: false, joinedAt: Date.now(),
+        location: null, timezone: null, chatActive: false, joinedAt: Date.now(),
         globallyMuted: isGloballyMuted(userName)
       });
       console.log(`👋 New: ${userName}`);
@@ -1353,13 +1377,54 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  socket.on('shareLocation', ({ roomId, location }) => {
+  // ✅ shareLocation with timezone
+  socket.on('shareLocation', ({ roomId, location, timezone }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
     const user = room.users.find(u => u.id === socket.id);
-    if (user) { user.location = location; user.lastActive = Date.now(); }
+    if (user) { 
+      user.location = location; 
+      if (timezone) user.timezone = timezone;
+      user.lastActive = Date.now(); 
+    }
     socket.to(room.roomId).emit('partnerLocation', { location, userId: socket.id, userName: user?.name });
+  });
+
+  // ✅ Global Listeners Request
+  socket.on('requestGlobalListeners', ({ roomId }) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room) return;
+
+    const cityCounts = {};
+    room.users.forEach(u => {
+      if (u.location && u.location.lat && u.location.lng) {
+        const city = getApproxLocation(u.location.lat, u.location.lng);
+        if (!cityCounts[city]) {
+          cityCounts[city] = {
+            city,
+            lat: u.location.lat,
+            lng: u.location.lng,
+            userCount: 0
+          };
+        }
+        cityCounts[city].userCount++;
+      }
+    });
+
+    const listeners = Object.values(cityCounts);
+
+    socket.emit('globalListeners', {
+      listeners,
+      currentTrack: room.state.track ? {
+        title: room.state.track.title,
+        artist: room.state.track.artist
+      } : null,
+      totalCities: listeners.length,
+      totalListeners: listeners.reduce((sum, l) => sum + l.userCount, 0)
+    });
+
+    console.log(`🌍 Global listeners requested: ${listeners.length} cities, ${listeners.reduce((s, l) => s + l.userCount, 0)} users`);
   });
 
   socket.on('syncPing', ({ roomId, clientTime }) => {
