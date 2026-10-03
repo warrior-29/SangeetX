@@ -153,6 +153,22 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 30000);
 
+// ✅ Real-time position calculator — hamesha live position deta hai
+function getCurrentPosition(room) {
+  if (!room || !room.state.track) return 0;
+  if (!room.state.isPlaying) return room.state.position || 0;
+
+  const lastUpdated = room.state.lastUpdated || Date.now();
+  const elapsed = (Date.now() - lastUpdated) / 1000;
+  let pos = (room.state.position || 0) + elapsed;
+
+  // Agar duration se zyada ho gaya to 0 kar do
+  if (room.state.track.duration > 0 && pos >= room.state.track.duration) {
+    pos = 0;
+  }
+  return pos;
+}
+
 function recordVisit(name, roomId, userAgent) {
   const now = new Date();
   const dateKey = now.toISOString().slice(0, 10);
@@ -558,10 +574,6 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ============================================
-// SEARCH FUNCTIONS
-// ============================================
-
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
@@ -715,7 +727,6 @@ async function searchSimilarSongs(query, exclude = []) {
   return [];
 }
 
-// ✅ FIX #4: Parallel API calls — 30-60s → 5-8s
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
 
@@ -724,17 +735,14 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
   const currentId = currentTrack.id;
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
-  // ✅ Parallel: same artist + similar artists + keywords
   const promises = [];
 
-  // P1: Same artist
   if (artist && artist !== 'Unknown') {
     promises.push(
       searchSimilarSongs(artist, fullExclude).then(songs => ({ priority: 1, songs }))
     );
   }
 
-  // P2: Similar artists
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower] || [];
   similarArtists.slice(0, 3).forEach(simArtist => {
@@ -743,7 +751,6 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     );
   });
 
-  // P3: Keywords from title
   const keywords = title.split(' ').filter(w => w.length > 3).slice(0, 2);
   keywords.forEach(keyword => {
     promises.push(
@@ -829,7 +836,6 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
-  // Auto DJ fallback — 3 retries
   if (!nextSong) {
     for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
@@ -887,7 +893,6 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ FIX #2: Multi-API fallback + peek (pop nahi)
 async function getPreviousSong(prevId) {
   const apis = [
     async () => {
@@ -961,13 +966,9 @@ function startSongEndCheck() {
     }
 
     const duration = room.state.track.duration || 0;
-    const position = room.state.position || 0;
-    const lastUpdated = room.state.lastUpdated || Date.now();
+    const currentPos = getCurrentPosition(room);
 
-    const elapsed = (Date.now() - lastUpdated) / 1000;
-    const estimatedPos = position + elapsed;
-
-    if (duration > 0 && estimatedPos >= duration - 2) {
+    if (duration > 0 && currentPos >= duration - 2) {
       room._lastAutoDjAttempt = Date.now();
       console.log(`🎵 Song ended — next`);
       await playNextSong('auto');
@@ -1073,11 +1074,9 @@ io.on('connection', (socket) => {
       socket.emit('adminAnnounce', currentAnnouncement);
     }
 
+    // ✅ Real-time position bhejo — actual jahan gaana chal raha hai
     if (room.state.track && room.state.isPlaying) {
-      let currentPosition = room.state.position || 0;
-      const lastUpdated = room.state.lastUpdated || Date.now();
-      const elapsed = (Date.now() - lastUpdated) / 1000;
-      currentPosition = (room.state.position || 0) + elapsed;
+      const currentPosition = getCurrentPosition(room);
 
       socket.emit('stateSync', {
         track: room.state.track,
@@ -1127,6 +1126,7 @@ io.on('connection', (socket) => {
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
 
+  // ✅ updateState — drift > 3s reject karo
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1139,7 +1139,12 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (newState.track) {
+    const serverPos = getCurrentPosition(room);
+    const isTrackChange = newState.track &&
+      (!room.state.track || room.state.track.id !== newState.track.id);
+
+    // ✅ TRACK CHANGE — allow
+    if (isTrackChange) {
       newState.autoDj = false;
       newState.isAmbient = false;
       newState.playedBy = socket.id;
@@ -1151,18 +1156,52 @@ io.on('connection', (socket) => {
         room.playedHistory.push(room.state.track.id);
         if (room.playedHistory.length > 20) room.playedHistory.shift();
       }
-    }
 
-    if (newState.track && (!room.state.track || room.state.track.id !== newState.track.id)) {
       analytics.songsPlayed++;
+
+      room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
+      socket.to(room.roomId).emit('stateSync', room.state);
+      io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
+      return;
     }
 
+    // ✅ SAME TRACK — position validation
+    if (room.state.track && newState.track &&
+        room.state.track.id === newState.track.id &&
+        newState.position !== undefined) {
+
+      const clientPos = newState.position;
+      const drift = Math.abs(clientPos - serverPos);
+
+      // ✅ Drift > 3s — reject + correct position bhejo
+      if (drift > 3) {
+        console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s (server: ${serverPos.toFixed(1)}s, client: ${clientPos.toFixed(1)}s)`);
+
+        socket.emit('stateSync', {
+          track: room.state.track,
+          position: serverPos,
+          isPlaying: room.state.isPlaying,
+          playedByName: room.state.playedByName,
+          autoDj: room.state.autoDj,
+          lastUpdated: Date.now()
+        });
+        return;
+      }
+
+      // ✅ Drift chhota — accept
+      room.state.position = clientPos;
+      room.state.isPlaying = newState.isPlaying !== undefined ? newState.isPlaying : room.state.isPlaying;
+      room.state.lastUpdated = Date.now();
+
+      socket.to(room.roomId).emit('stateSync', room.state);
+      return;
+    }
+
+    // ✅ Baaki updates
     room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
     socket.to(room.roomId).emit('stateSync', room.state);
-    io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ✅ FIX #1: requestNext with timeout + ACK + fallback
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1196,7 +1235,6 @@ io.on('connection', (socket) => {
       console.log(`✅ Next: ${room.state.track?.title}`);
     } catch (e) {
       console.error('Next error:', e.message);
-      // Fallback: random from Auto DJ
       const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
       const fallbackTrack = await searchSong(randomSong);
       if (fallbackTrack) {
@@ -1223,7 +1261,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ✅ FIX #2: requestPrev with multi-API + peek (pop nahi)
   socket.on('requestPrev', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1241,13 +1278,11 @@ io.on('connection', (socket) => {
     socket.emit('prevAck', { status: 'loading' });
 
     if (room.playedHistory && room.playedHistory.length > 0) {
-      // ✅ Peek karo, pop mat karo
       const prevId = room.playedHistory[room.playedHistory.length - 1];
 
       const prevTrack = await getPreviousSong(prevId);
 
       if (prevTrack && prevTrack.audioUrl) {
-        // ✅ Ab pop karo — track mil gaya
         room.playedHistory.pop();
 
         if (room.state.track && !room.state.isAmbient) {
@@ -1277,12 +1312,9 @@ io.on('connection', (socket) => {
         });
         socket.emit('prevAck', { status: 'success', track: prevTrack.title });
         return;
-      } else {
-        console.log('⚠️ Prev APIs all failed — fallback to Auto DJ');
       }
     }
 
-    // Fallback: Auto DJ
     const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
     const fallbackTrack = await searchSong(randomSong);
     if (fallbackTrack) {
@@ -1334,17 +1366,7 @@ io.on('connection', (socket) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
 
-    let currentPosition = room.state.position || 0;
-
-    if (room.state.track && room.state.isPlaying) {
-      const lastUpdated = room.state.lastUpdated || Date.now();
-      const elapsed = (Date.now() - lastUpdated) / 1000;
-      currentPosition = (room.state.position || 0) + elapsed;
-
-      if (room.state.track.duration > 0 && currentPosition >= room.state.track.duration) {
-        currentPosition = 0;
-      }
-    }
+    const currentPosition = getCurrentPosition(room);
 
     console.log(`🔄 Sync request — position: ${currentPosition.toFixed(1)}s`);
 
@@ -1373,6 +1395,24 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
     if (user.blocked && user.blocked.play) return;
+
+    // ✅ Heartbeat me bhi drift check
+    const serverPos = getCurrentPosition(room);
+    const drift = Math.abs(position - serverPos);
+
+    if (drift > 3) {
+      console.log(`🚫 Heartbeat drift rejected: ${drift.toFixed(1)}s`);
+      socket.emit('stateSync', {
+        track: room.state.track,
+        position: serverPos,
+        isPlaying: room.state.isPlaying,
+        playedByName: room.state.playedByName,
+        autoDj: room.state.autoDj,
+        lastUpdated: Date.now()
+      });
+      return;
+    }
+
     room.state.position = position;
     room.state.isPlaying = isPlaying;
     room.state.lastUpdated = Date.now();
