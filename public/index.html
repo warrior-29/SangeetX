@@ -13,9 +13,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     ▓▓▓ SECTION 1: CSS ▓▓▓
-     ═══════════════════════════════════════════════════════════════ -->
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -49,7 +46,8 @@ body::before {
   transition:all 1.5s ease; filter:blur(40px);
 }
 
-[data-lucide] { width:18px; height:18px; stroke-width:2; transition:all 0.2s var(--ease); }
+/* ✅ FIX 1: Global lucide transition removed — UI hilna band */
+[data-lucide] { width:18px; height:18px; stroke-width:2; }
 
 .screen { display:none; height:100vh; height:100dvh; width:100%; position:relative; z-index:1; }
 .screen.active { display:flex; flex-direction:column; }
@@ -149,6 +147,9 @@ body::before {
   overflow:visible;
   padding-top:10px;
   padding-bottom:4px;
+  padding-right:6px;
+  padding-left:2px;
+  min-height:46px;
 }
 
 .status {
@@ -179,7 +180,7 @@ body::before {
   align-items:center;
   flex-shrink:0;
   overflow:visible;
-  padding:8px 8px 4px 8px;
+  padding:8px 10px 4px 8px;
   margin-top:-4px;
 }
 
@@ -195,26 +196,28 @@ body::before {
 .icon-btn:active { transform:scale(0.9); }
 .icon-btn.primary { background:linear-gradient(135deg, var(--primary), var(--accent)); border:none; box-shadow:0 6px 16px var(--primary-glow); }
 
+/* ✅ BADGE FIX — Cut nahi hoga */
 .badge {
   position:absolute;
-  top:-6px;
-  right:-6px;
+  top:-5px;
+  right:-5px;
   background:var(--danger);
   color:white;
   font-size:9px;
   font-weight:800;
-  min-width:18px;
-  height:18px;
+  min-width:17px;
+  height:17px;
   border-radius:9px;
-  padding:0 5px;
+  padding:0 4px;
   display:flex;
   align-items:center;
   justify-content:center;
   border:2px solid var(--bg);
   z-index:10;
   line-height:1;
-  box-sizing:border-box;
+  box-sizing:content-box;
   animation:badgePulse 2s infinite;
+  pointer-events:none;
 }
 @keyframes badgePulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
 
@@ -298,9 +301,78 @@ body::before {
 .waveform-live.active { display:flex; }
 .waveform-live span { width:2.5px; height:20%; background:linear-gradient(180deg, var(--dynamic-1), var(--dynamic-2)); border-radius:2px; transition:height 0.08s ease; }
 
+/* ✅ FIX 2: PROGRESS BAR — WITH DRAG SUPPORT */
 .progress-section { width:100%; padding:0 6px; flex-shrink:0; }
-.progress-bar { width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; position:relative; cursor:pointer; overflow:hidden; }
-.progress-fill { height:100%; background:linear-gradient(90deg, var(--dynamic-1), var(--dynamic-2)); border-radius:3px; width:0%; box-shadow:0 0 10px var(--dynamic-1); transition:width 0.1s linear; }
+
+.progress-bar {
+  width:100%;
+  height:20px;
+  position:relative;
+  cursor:pointer;
+  touch-action:none;
+  display:flex;
+  align-items:center;
+  padding:7px 0;
+  margin:-7px 0;
+  -webkit-user-select:none;
+  user-select:none;
+  outline:none;
+}
+
+.progress-track {
+  width:100%;
+  height:5px;
+  background:rgba(255,255,255,0.08);
+  border-radius:3px;
+  position:relative;
+  overflow:visible;
+  transition:height 0.15s var(--ease);
+}
+
+.progress-fill {
+  height:100%;
+  background:linear-gradient(90deg, var(--dynamic-1), var(--dynamic-2));
+  border-radius:3px;
+  width:0%;
+  box-shadow:0 0 10px var(--dynamic-1);
+  position:relative;
+  pointer-events:none;
+}
+
+.progress-thumb {
+  position:absolute;
+  top:50%;
+  left:0%;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:white;
+  border:2px solid var(--dynamic-1);
+  box-shadow:0 0 12px var(--dynamic-1), 0 2px 6px rgba(0,0,0,0.5);
+  transform:translate(-50%, -50%);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.2s var(--ease), transform 0.15s var(--spring);
+  z-index:2;
+}
+
+.progress-bar:hover .progress-thumb,
+.progress-bar.dragging .progress-thumb {
+  opacity:1;
+}
+
+.progress-bar.dragging .progress-thumb {
+  transform:translate(-50%, -50%) scale(1.3);
+}
+
+.progress-bar.dragging .progress-track {
+  height:6px;
+}
+
+.progress-bar:focus-visible .progress-thumb {
+  opacity:1;
+}
+
 .time-row { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; font-weight:600; padding:0 2px; }
 
 /* ============ CONTROLS — 5 buttons ============ */
@@ -322,7 +394,8 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s var(--spring);
+  /* ✅ FIX 1: Specific transitions only */
+  transition: transform 0.25s var(--spring), background 0.25s var(--ease), border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
   flex-shrink: 0;
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
@@ -333,6 +406,7 @@ body::before {
   stroke-width: 2.4;
   fill: currentColor;
   color: #FFFFFF;
+  transition: none;    /* ✅ FIX 1: No icon transition */
 }
 .ctrl-btn:active {
   transform: scale(0.9);
@@ -380,6 +454,7 @@ body::before {
   stroke-width: 2.8;
   fill: #FFFFFF;
   color: #FFFFFF;
+  transition: none;    /* ✅ FIX 1 */
 }
 .ctrl-btn.play:active {
   transform: scale(0.96);
@@ -532,7 +607,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 .mute-btn [data-lucide] { width:11px; height:11px; stroke-width:2.5; }
 .mute-btn.muted { background:rgba(239,68,68,0.15); color:var(--danger); }
 
-/* ============ CHAT PANEL — Z-INDEX FIX ✅ ============ */
+/* ============ CHAT PANEL ============ */
 #chatPanel {
   display: none;
   position: fixed;
@@ -1062,10 +1137,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     ▓▓▓ SECTION 2: HTML ▓▓▓
-     ═══════════════════════════════════════════════════════════════ -->
-
 <!-- ============ JOIN SCREEN ============ -->
 <div id="joinScreen" class="screen active">
   <div class="join-box">
@@ -1182,9 +1253,13 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
     
+    <!-- ✅ FIX 2: Progress Bar with thumb -->
     <div class="progress-section">
-      <div class="progress-bar" id="progressBar">
-        <div class="progress-fill" id="progressFill"></div>
+      <div class="progress-bar" id="progressBar" tabindex="0" role="slider">
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+          <div class="progress-thumb" id="progressThumb"></div>
+        </div>
       </div>
       <div class="time-row">
         <span id="currentTime">0:00</span>
@@ -1344,10 +1419,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 <!-- ============ HIDDEN ============ -->
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
-
-<!-- ═══════════════════════════════════════════════════════════════
-     ▓▓▓ SECTION 3: JAVASCRIPT ▓▓▓
-     ═══════════════════════════════════════════════════════════════ -->
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -2042,13 +2113,9 @@ function initSocket(){
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{updateTypingIndicator(typer,typingNow);});
   socket.on('autoDjTrack', ({ track }) => { loadTrack(track, 0, true); updatePlayedBy('🎵 Auto DJ', 'auto'); });
 
-  /* ═══════════════════════════════════════════════
-     GLOBAL MUTE — Server se aane wala event
-     ═══════════════════════════════════════════════ */
   socket.on('globalMuteState', ({ muted }) => {
     if (muted) {
       globalMutedByAdmin = true;
-      // PTT card block karo
       const pttCard = document.getElementById('pttCard');
       if (pttCard) pttCard.classList.add('blocked');
       document.getElementById('pttToggle').disabled = true;
@@ -2069,21 +2136,18 @@ function initSocket(){
   });
 
   socket.on('globalMuteUpdate', ({ userId, userName: mutedName, muted }) => {
-    // Sab users ke remote audio me mute karo
     remoteAudios.forEach((entry) => {
       if (entry.userName === mutedName) {
         entry.audio.muted = muted || muteAll;
       }
     });
     
-    // Toast dikhao
     if (muted) {
       showToast(`🔇 ${mutedName} muted by admin`, 'warning');
     } else {
       showToast(`🔊 ${mutedName} unmuted by admin`, 'success');
     }
     
-    // Local storage me bhi add karo (taaki refresh pe bhi rahe)
     if (muted) {
       mutedUsers.add(mutedName.toLowerCase());
     } else {
@@ -2114,28 +2178,18 @@ function initSocket(){
     }
   });
 
-  /* ═══════════════════════════════════════════════
-     FORCE SKIP — Admin ne gaana badla
-     ═══════════════════════════════════════════════ */
   socket.on('adminForceSkip', ({ track, message }) => {
     console.log('👑 Admin force skip:', track.title);
     showToast(`👑 ${message}`, 'warning');
   });
 
-  // Ye 'songChanged' handler me already handle hoga
-  // reason: 'admin' ke saath
-
-  /* ═══════════════════════════════════════════════
-     ANNOUNCE — Admin ka message top pe
-     ═══════════════════════════════════════════════ */
   socket.on('adminAnnounce', ({ message, time }) => {
     showAdminAnnounce(message);
   });
 }
 
-/* ============ ADMIN ANNOUNCE — Full-screen banner ============ */
+/* ============ ADMIN ANNOUNCE ============ */
 function showAdminAnnounce(message) {
-  // Purane remove
   const existing = document.getElementById('adminAnnounceBanner');
   if (existing) existing.remove();
   
@@ -2161,7 +2215,6 @@ function showAdminAnnounce(message) {
     setTimeout(() => banner.classList.add('show'), 50);
   });
   
-  // 8 second baad auto-remove
   setTimeout(() => {
     banner.classList.remove('show');
     setTimeout(() => banner.remove(), 500);
@@ -2298,6 +2351,14 @@ chatInputEl.addEventListener('keydown', (e) => {
     clearTimeout(typingTimer);
     isTyping=false;
     if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
+    // ✅ FIX: Mobile keyboard reopen
+    if (window.innerWidth <= 768) {
+      setTimeout(() => {
+        if (document.activeElement !== chatInputEl) {
+          chatInputEl.focus();
+        }
+      }, 50);
+    }
   }
 });
 
@@ -2509,9 +2570,31 @@ async function applyRemoteState(state){
   isRemoteUpdate=false;
 }
 
+/* ✅ FIX 3: updatePlayIcon without UI shift */
 function updatePlayIcon(){
-  const icon=document.getElementById('playBtn').querySelector('[data-lucide]');
-  if(icon){icon.setAttribute('data-lucide',audio.paused?'play':'pause');refreshIcons();}
+  const btn = document.getElementById('playBtn');
+  const icon = btn?.querySelector('[data-lucide]');
+  if (!icon) return;
+
+  const newIcon = audio.paused ? 'play' : 'pause';
+  if (icon.getAttribute('data-lucide') === newIcon) return;
+
+  // Freeze size to prevent layout shift
+  const rect = icon.getBoundingClientRect();
+  icon.style.width = rect.width + 'px';
+  icon.style.height = rect.height + 'px';
+
+  icon.setAttribute('data-lucide', newIcon);
+  refreshIcons();
+
+  // Clean up inline sizes after render
+  requestAnimationFrame(() => {
+    const newIconEl = btn?.querySelector('[data-lucide]');
+    if (newIconEl) {
+      newIconEl.style.width = '';
+      newIconEl.style.height = '';
+    }
+  });
 }
 
 /* ============ LOAD TRACK ============ */
@@ -2585,7 +2668,7 @@ document.getElementById('playBtn').addEventListener('click',()=>{
   }
 });
 
-/* REWIND — 10 sec peeche */
+/* REWIND */
 document.getElementById('rewindBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -2596,7 +2679,7 @@ document.getElementById('rewindBtn').addEventListener('click', () => {
   showToast('⏪ -10s');
 });
 
-/* FAST-FORWARD — 10 sec aage */
+/* FAST-FORWARD */
 document.getElementById('forwardBtn').addEventListener('click', () => {
   if (!currentTrack || !audio.duration) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -2607,7 +2690,7 @@ document.getElementById('forwardBtn').addEventListener('click', () => {
   showToast('⏩ +10s');
 });
 
-/* PREV — Pichla gaana / restart */
+/* PREV */
 document.getElementById('prevBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -2629,19 +2712,95 @@ document.getElementById('nextBtn').addEventListener('click',()=>{
   showToast('⏭️ Next');
 });
 
-document.getElementById('progressBar').addEventListener('click',(e)=>{
-  if(!currentTrack||!audio.duration)return;
-  if(myPermissions.play){showToast('You are blocked','error');return;}
-  const rect=e.currentTarget.getBoundingClientRect();
-  const pct=(e.clientX-rect.left)/rect.width;
-  audio.currentTime=pct*audio.duration;
-  broadcastState({isPlaying:!audio.paused,position:audio.currentTime});
+/* ✅ FIX 2: PROGRESS BAR — Pointer Drag Seek */
+const progressBarEl = document.getElementById('progressBar');
+const progressFillEl = document.getElementById('progressFill');
+const progressThumbEl = document.getElementById('progressThumb');
+let isDragging = false;
+let wasPlayingBeforeDrag = false;
+
+function getSeekPercent(clientX) {
+  const track = progressBarEl.querySelector('.progress-track');
+  const rect = track.getBoundingClientRect();
+  let pct = (clientX - rect.left) / rect.width;
+  return Math.max(0, Math.min(1, pct));
+}
+
+function updateSeekVisual(pct) {
+  progressFillEl.style.width = (pct * 100) + '%';
+  progressThumbEl.style.left = (pct * 100) + '%';
+  if (audio.duration) {
+    document.getElementById('currentTime').textContent = fmt(pct * audio.duration);
+  }
+}
+
+function startDrag(e) {
+  if (!currentTrack || !audio.duration) return;
+  if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
+
+  isDragging = true;
+  wasPlayingBeforeDrag = !audio.paused;
+
+  progressBarEl.classList.add('dragging');
+  progressBarEl.setPointerCapture?.(e.pointerId);
+
+  const pct = getSeekPercent(e.clientX);
+  updateSeekVisual(pct);
+  e.preventDefault();
+}
+
+function moveDrag(e) {
+  if (!isDragging) return;
+  const pct = getSeekPercent(e.clientX);
+  updateSeekVisual(pct);
+  e.preventDefault();
+}
+
+function endDrag(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  progressBarEl.classList.remove('dragging');
+
+  const pct = getSeekPercent(e.clientX);
+
+  try {
+    audio.currentTime = pct * audio.duration;
+  } catch (err) {}
+
+  broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+
+  if (wasPlayingBeforeDrag && audio.paused) {
+    audio.play().catch(() => {});
+  }
+
+  if (navigator.vibrate) navigator.vibrate(15);
+  e.preventDefault();
+}
+
+progressBarEl.addEventListener('pointerdown', startDrag);
+progressBarEl.addEventListener('pointermove', moveDrag);
+progressBarEl.addEventListener('pointerup', endDrag);
+progressBarEl.addEventListener('pointercancel', endDrag);
+
+progressBarEl.addEventListener('keydown', (e) => {
+  if (!currentTrack || !audio.duration) return;
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+    broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    audio.currentTime = Math.max(0, audio.currentTime - 5);
+    broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+  }
 });
 
 audio.addEventListener('timeupdate',()=>{
   if(!audio.duration)return;
+  if (isDragging) return;    // Don't override while dragging
   const pct=(audio.currentTime/audio.duration)*100;
-  document.getElementById('progressFill').style.width=pct+'%';
+  progressFillEl.style.width=pct+'%';
+  progressThumbEl.style.left=pct+'%';
   document.getElementById('currentTime').textContent=fmt(audio.currentTime);
 });
 audio.addEventListener('loadedmetadata',()=>{document.getElementById('totalTime').textContent=fmt(audio.duration);});
