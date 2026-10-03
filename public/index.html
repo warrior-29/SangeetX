@@ -13,6 +13,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     ▓▓▓ SECTION 1: CSS ▓▓▓
+     ═══════════════════════════════════════════════════════════════ -->
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -220,8 +223,11 @@ body::before {
 .album-art img { width:100%; height:100%; object-fit:cover; border-radius:17px; animation:imgFadeIn 0.6s var(--ease); }
 @keyframes imgFadeIn { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
 .album-art .placeholder { font-size:56px; opacity:0.15; }
-.album-art.playing { animation:albumPulse 3s ease-in-out infinite; }
-@keyframes albumPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.015); } }
+/* ✅ Fixed: no transform animation on play (UI hilti nahi) */
+.album-art.playing {
+  box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 40px var(--dynamic-1), 0 0 60px rgba(139,92,246,0.4);
+  border-color:rgba(139,92,246,0.4);
+}
 
 .song-info { text-align:center; width:100%; padding:0 16px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:3px; }
 .song-title { font-size:16px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
@@ -262,28 +268,85 @@ body::before {
 .progress-fill { height:100%; background:linear-gradient(90deg, var(--dynamic-1), var(--dynamic-2)); border-radius:3px; width:0%; box-shadow:0 0 10px var(--dynamic-1); transition:width 0.1s linear; }
 .time-row { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; font-weight:600; padding:0 2px; }
 
-/* ============ CONTROLS ============ */
-.controls { display:flex; align-items:center; gap:18px; flex-shrink:0; }
-.ctrl-btn {
-  width:46px; height:46px; border-radius:50%;
-  background:rgba(0,0,0,0.6); border:1.5px solid rgba(255,255,255,0.15);
-  color:#FFFFFF; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:all 0.25s var(--spring); flex-shrink:0;
-  backdrop-filter:blur(10px); box-shadow:0 4px 16px rgba(0,0,0,0.4);
+/* ============ CONTROLS — 4 buttons ============ */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
-.ctrl-btn [data-lucide] { width:18px; height:18px; stroke-width:2.4; fill:currentColor; color:#FFFFFF; }
-.ctrl-btn:active { transform:scale(0.9); background:rgba(139,92,246,0.3); }
+.ctrl-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s var(--spring);
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.ctrl-btn [data-lucide] {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.4;
+  fill: currentColor;
+  color: #FFFFFF;
+}
+.ctrl-btn:active {
+  transform: scale(0.9);
+  background: rgba(139,92,246,0.3);
+}
 
 .ctrl-btn.play {
-  width:64px; height:64px;
-  background:linear-gradient(135deg, var(--dynamic-1), var(--dynamic-2));
-  border:3px solid rgba(255,255,255,0.9);
-  box-shadow:0 12px 32px var(--dynamic-1), 0 0 0 4px rgba(0,0,0,0.3), 0 0 24px rgba(139,92,246,0.6);
-  position:relative; z-index:2;
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--dynamic-1), var(--dynamic-2));
+  border: 3px solid rgba(255,255,255,0.9);
+  box-shadow: 0 12px 32px var(--dynamic-1), 0 0 0 4px rgba(0,0,0,0.3), 0 0 24px rgba(139,92,246,0.6);
+  position: relative;
+  z-index: 2;
 }
-.ctrl-btn.play [data-lucide] { width:26px; height:26px; stroke-width:2.8; fill:#FFFFFF; color:#FFFFFF; }
-.ctrl-btn.play:active { transform:scale(0.94); }
+.ctrl-btn.play [data-lucide] {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.8;
+  fill: #FFFFFF;
+  color: #FFFFFF;
+}
+.ctrl-btn.play:active {
+  transform: scale(0.96);
+}
+
+/* ✅ NAYA: Skip button */
+.ctrl-btn.skip {
+  background: rgba(139,92,246,0.15);
+  border-color: rgba(139,92,246,0.3);
+  color: var(--primary-2);
+}
+.ctrl-btn.skip [data-lucide] {
+  color: var(--primary-2);
+  fill: none;
+  stroke-width: 2.5;
+}
+.ctrl-btn.skip:active {
+  background: rgba(139,92,246,0.3);
+  transform: scale(0.9);
+}
+
+/* Mobile me space kam hai */
+@media (max-width: 380px) {
+  .controls { gap: 10px; }
+  .ctrl-btn { width: 40px; height: 40px; }
+  .ctrl-btn [data-lucide] { width: 16px; height: 16px; }
+  .ctrl-btn.play { width: 58px; height: 58px; }
+  .ctrl-btn.play [data-lucide] { width: 22px; height: 22px; }
+}
 
 /* ============ SEARCH BUTTON ============ */
 .search-btn {
@@ -636,6 +699,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   100% { transform:translateY(-240px) scale(1.7) rotate(20deg); opacity:0; }
 }
 
+/* ============ WELCOME TOAST (chhota) ============ */
 .welcome-toast {
   position: fixed;
   top: max(70px, calc(env(safe-area-inset-top) + 70px));
@@ -660,47 +724,17 @@ input:checked + .slider:before { transform:translateX(16px); }
   transform: translateX(-50%) translateY(0) scale(1);
   opacity: 1;
 }
-.welcome-toast-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
+.welcome-toast-content { display: flex; align-items: center; gap: 10px; width: 100%; }
 .welcome-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 900;
-  color: white;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 900; color: white; flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(139,92,246,0.4);
 }
-.welcome-text {
-  flex: 1;
-  min-width: 0;
-}
-.welcome-name {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
-  margin-bottom: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.welcome-msg {
-  font-size: 10px;
-  color: var(--text-dim);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.welcome-text { flex: 1; min-width: 0; }
+.welcome-name { font-size: 12px; font-weight: 800; color: var(--text); margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.welcome-msg { font-size: 10px; color: var(--text-dim); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ============ TOAST ============ */
 .toast {
@@ -827,10 +861,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   #chatPanel .chat-presence,
   #chatPanel .chat-input-row,
   #chatPanel .typing-indicator {
-    max-width:600px;
-    margin-left:auto;
-    margin-right:auto;
-    width:100%;
+    max-width:600px; margin-left:auto; margin-right:auto; width:100%;
   }
 }
 
@@ -983,10 +1014,20 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
     
+    <!-- ✅ 4 BUTTONS — prev, play, next, skip -->
     <div class="controls">
-      <button class="ctrl-btn" id="prevBtn" title="Previous"><i data-lucide="skip-back"></i></button>
-      <button class="ctrl-btn play" id="playBtn" title="Play/Pause"><i data-lucide="play"></i></button>
-      <button class="ctrl-btn" id="nextBtn" title="Next song"><i data-lucide="skip-forward"></i></button>
+      <button class="ctrl-btn" id="prevBtn" title="Previous song">
+        <i data-lucide="skip-back"></i>
+      </button>
+      <button class="ctrl-btn play" id="playBtn" title="Play/Pause">
+        <i data-lucide="play"></i>
+      </button>
+      <button class="ctrl-btn" id="nextBtn" title="Next song">
+        <i data-lucide="skip-forward"></i>
+      </button>
+      <button class="ctrl-btn skip" id="skipBtn" title="Skip — play similar">
+        <i data-lucide="shuffle"></i>
+      </button>
     </div>
   </div>
 
@@ -1119,12 +1160,11 @@ input:checked + .slider:before { transform:translateX(16px); }
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
 
-<!-- ============ SCRIPTS ============ -->
-<script src="/socket.io/socket.io.js"></script>
-
 <!-- ═══════════════════════════════════════════════════════════════
      ▓▓▓ SECTION 3: JAVASCRIPT ▓▓▓
      ═══════════════════════════════════════════════════════════════ -->
+
+<script src="/socket.io/socket.io.js"></script>
 <script>
 function refreshIcons() { if (window.lucide) lucide.createIcons(); }
 refreshIcons();
@@ -1161,6 +1201,7 @@ let locationShared = false;
 
 let isOnline = navigator.onLine;
 let messageQueue = [];
+let lastKnownPosition = 0;
 
 const typingUsers = new Map();
 let isTyping = false;
@@ -1198,25 +1239,18 @@ function initAudioContext() {
 /* ============ FINGERPRINT ============ */
 async function generateFingerprint() {
   const components = [
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    screen.colorDepth,
+    navigator.userAgent, navigator.language,
+    screen.width + 'x' + screen.height, screen.colorDepth,
     new Date().getTimezoneOffset(),
-    navigator.hardwareConcurrency || 0,
-    navigator.deviceMemory || 0,
-    navigator.platform || '',
-    navigator.maxTouchPoints || 0
+    navigator.hardwareConcurrency || 0, navigator.deviceMemory || 0,
+    navigator.platform || '', navigator.maxTouchPoints || 0
   ];
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#f60';
-    ctx.fillRect(125, 1, 62, 20);
-    ctx.fillStyle = '#069';
-    ctx.fillText('SangeetX', 2, 15);
+    ctx.textBaseline = 'top'; ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60'; ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069'; ctx.fillText('SangeetX', 2, 15);
     components.push(canvas.toDataURL().slice(-50));
   } catch (e) {}
   try {
@@ -1234,7 +1268,7 @@ async function generateFingerprint() {
   return 'fp_' + Math.abs(hash).toString(36);
 }
 
-/* ============ AUDIO OUTPUT — BLUETOOTH AUTO ROUTING ============ */
+/* ============ AUDIO OUTPUT ============ */
 function isBluetoothDevice(label) {
   const l = (label || '').toLowerCase();
   return l.includes('bluetooth') || l.includes('bt ') || l.includes(' bt') ||
@@ -1280,10 +1314,7 @@ async function autoDetectAndRouteAudio() {
   currentVoiceSinkId = selectedDeviceId;
   applyVoiceSinkToAll();
   if (audio.setSinkId) {
-    try {
-      await audio.setSinkId(selectedDeviceId);
-      currentMusicSinkId = selectedDeviceId;
-    } catch (err) {}
+    try { await audio.setSinkId(selectedDeviceId); currentMusicSinkId = selectedDeviceId; } catch (err) {}
   }
   updateAudioOutputBadge(selectedLabel, !!btDevice);
   return { deviceId: selectedDeviceId, label: selectedLabel, isBluetooth: !!btDevice };
@@ -1308,9 +1339,7 @@ function updateAudioOutputBadge(label, isBluetooth) {
       badge.style.color = 'var(--success)';
     }
     refreshIcons();
-  } else {
-    badge.classList.remove('active');
-  }
+  } else { badge.classList.remove('active'); }
 }
 
 if (navigator.mediaDevices) {
@@ -1325,16 +1354,18 @@ function updatePlayedBy(playedByName, reason) {
   const badge = document.getElementById('playedBy');
   const text = document.getElementById('playedByText');
   if (!badge || !text) return;
-  if (!playedByName) {
-    badge.classList.remove('active');
-    return;
-  }
+  if (!playedByName) { badge.classList.remove('active'); return; }
   badge.classList.add('active');
   if (reason === 'auto' || playedByName === '🎵 Auto DJ') {
     text.textContent = '🎵 Auto DJ';
     badge.classList.add('auto');
     const icon = badge.querySelector('[data-lucide]');
     if (icon) icon.setAttribute('data-lucide', 'radio');
+  } else if (reason === 'skip') {
+    text.textContent = `🎲 ${playedByName} skipped`;
+    badge.classList.remove('auto');
+    const icon = badge.querySelector('[data-lucide]');
+    if (icon) icon.setAttribute('data-lucide', 'shuffle');
   } else {
     text.textContent = `Played by ${playedByName}`;
     badge.classList.remove('auto');
@@ -1690,6 +1721,8 @@ function initSocket(){
       isOwner=r.isOwner||false;
       startActivityPing();
       startSyncCheck();
+      // ✅ Server se current state maango (position sync)
+      socket.emit('requestSyncState', { roomId });
       setTimeout(shareLocation,2000);
     } else if (r.pending) {
       joinScreen.classList.remove('active');
@@ -1711,13 +1744,23 @@ function initSocket(){
   });
 
   socket.on('usersUpdate',(users)=>{renderUsers(users);updatePartnerStatus(users);});
-  socket.on('stateSync',(state)=>applyRemoteState(state));
+  socket.on('stateSync',(state)=>{
+    if (state.position !== undefined) lastKnownPosition = state.position;
+    applyRemoteState(state);
+  });
 
+  /* ✅ songChanged — next, skip, auto, sync handle */
   socket.on('songChanged', ({ track, reason, playedBy }) => {
-    if (reason === 'auto') showToast('🎵 Auto-playing next...');
-    else if (reason === 'next') showToast(`🎵 ${playedBy} changed the song`);
+    if (reason === 'sync') {
+      loadTrack(track, lastKnownPosition || 0, true);
+      updatePlayedBy(playedBy, 'user');
+      return;
+    }
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
+    if (reason === 'auto') showToast('🎵 Auto-playing next');
+    else if (reason === 'next' && playedBy) showToast(`${playedBy} played next`);
+    else if (reason === 'skip' && playedBy) showToast(`${playedBy} skipped 🎲`);
   });
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
@@ -2223,11 +2266,20 @@ document.getElementById('playBtn').addEventListener('click',()=>{
   }
 });
 
+/* ✅ NEXT BUTTON — Queue based */
 document.getElementById('nextBtn').addEventListener('click',()=>{
   if(!socket||!socket.connected){showToast('Not connected','error');return;}
   if(myPermissions.play){showToast('You are blocked','error');return;}
-  showToast('⏭️ Playing next song...');
+  showToast('⏭️ Playing next');
   socket.emit('requestNext',{roomId});
+});
+
+/* ✅ SKIP BUTTON — Similar but different */
+document.getElementById('skipBtn').addEventListener('click',()=>{
+  if(!socket||!socket.connected){showToast('Not connected','error');return;}
+  if(myPermissions.play){showToast('You are blocked','error');return;}
+  showToast('🎲 Finding something new...');
+  socket.emit('requestSkip',{roomId});
 });
 
 document.getElementById('prevBtn').addEventListener('click',()=>{
@@ -2680,7 +2732,7 @@ function setupMediaSession() {
 }
 document.addEventListener('click', setupMediaSession, { once: true });
 
-/* ============ KEYBOARD SHORTCUTS (Desktop) ============ */
+/* ============ KEYBOARD SHORTCUTS ============ */
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.getAttribute('contenteditable') === 'true') return;
   switch (e.key) {
@@ -2689,6 +2741,7 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'ArrowRight': e.preventDefault(); document.getElementById('nextBtn').click(); break;
     case 'ArrowLeft': e.preventDefault(); document.getElementById('prevBtn').click(); break;
+    case 's': case 'S': e.preventDefault(); document.getElementById('skipBtn').click(); break;
     case 'm': case 'M': e.preventDefault(); document.getElementById('muteAllBtn').click(); break;
     case 'c': case 'C': e.preventDefault(); document.getElementById('chatBtn').click(); break;
     case 'Escape':
@@ -2710,7 +2763,7 @@ document.querySelectorAll('button').forEach(btn => {
   btn.addEventListener('click', () => haptic('light'), { passive: true });
 });
 
-/* ============ RIPPLE EFFECT ============ */
+/* ============ RIPPLE ============ */
 document.querySelectorAll('.btn-primary, .btn-secondary, .icon-btn, .ctrl-btn').forEach(btn => {
   btn.style.position = 'relative';
   btn.style.overflow = 'hidden';
@@ -2757,7 +2810,7 @@ window.addEventListener('popstate',(e)=>{
   }
 });
 
-/* ============ VISUAL VIEWPORT (Keyboard) ============ */
+/* ============ VISUAL VIEWPORT ============ */
 if (window.visualViewport) {
   const chatPanel = document.getElementById('chatPanel');
   const chatMessages = document.getElementById('chatMessages');
