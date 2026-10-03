@@ -20,6 +20,12 @@ const rooms = {};
 const BLOCKED_IPS = new Set();
 const BLOCKED_FINGERPRINTS = new Set();
 
+// ===== GLOBAL MUTES (username-based) =====
+const GLOBAL_MUTED_USERS = new Set();
+
+// ===== ANNOUNCEMENT STATE =====
+let currentAnnouncement = null; // { message, by, at, duration }
+
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 60 * 1000;
 
@@ -67,27 +73,33 @@ function getClientIP(socket) {
   const forwarded = handshake.headers['x-forwarded-for'];
   const realIP = handshake.headers['x-real-ip'];
   const cfIP = handshake.headers['cf-connecting-ip'];
-  
-  let ip = cfIP || realIP || forwarded || 
-           handshake.address || 
-           socket.conn.remoteAddress || 
+
+  let ip = cfIP || realIP || forwarded ||
+           handshake.address ||
+           socket.conn.remoteAddress ||
            'unknown';
-  
+
   if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
   if (ip && ip.startsWith('::ffff:')) ip = ip.substring(7);
-  
+
   return ip;
 }
 
 function isBlocked(socket, fingerprint) {
   const ip = getClientIP(socket);
-  
+
   if (BLOCKED_IPS.has(ip)) return { blocked: true, reason: 'IP', detail: ip };
   if (fingerprint && fingerprint !== 'unknown' && BLOCKED_FINGERPRINTS.has(fingerprint)) {
     return { blocked: true, reason: 'Fingerprint', detail: fingerprint };
   }
-  
+
   return { blocked: false };
+}
+
+// ===== GLOBAL MUTE HELPERS =====
+function isGloballyMuted(userName) {
+  if (!userName) return false;
+  return GLOBAL_MUTED_USERS.has(userName.toLowerCase());
 }
 
 function ensureGlobalRoom() {
@@ -100,14 +112,14 @@ function ensureGlobalRoom() {
       users: [],
       pending: [],
       messages: [],
-      state: { 
-        track: null, 
-        position: 0, 
-        isPlaying: false, 
+      state: {
+        track: null,
+        position: 0,
+        isPlaying: false,
         playedBy: null,
         playedByName: null,
         autoDj: false,
-        lastUpdated: Date.now() 
+        lastUpdated: Date.now()
       },
       playedHistory: [],
       isGlobal: true
@@ -152,7 +164,7 @@ app.get('/api/global/stats', (req, res) => {
   const room = rooms[GLOBAL_ROOM_ID];
   const now = Date.now();
   const online = room.users.filter(u => now - u.lastActive < 2 * 60 * 1000);
-  
+
   res.json({
     totalUsers: room.users.length,
     onlineUsers: online.length,
@@ -163,6 +175,7 @@ app.get('/api/global/stats', (req, res) => {
       playedBy: room.state.playedByName,
       autoDj: room.state.autoDj
     } : null,
+    announcement: currentAnnouncement,
     createdAt: room.createdAt
   });
 });
@@ -174,32 +187,32 @@ app.get('/admin', (req, res) => {
 
 app.get('/api/admin/stats', (req, res) => {
   if (!isAdmin(req.query.password)) return res.status(401).json({ error: 'Invalid password' });
-  
+
   const today = new Date().toISOString().slice(0, 10);
   const todayVisits = analytics.dailyVisits[today] || 0;
-  
+
   const last7 = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     last7.push({ date: key, count: analytics.dailyVisits[key] || 0 });
   }
-  
+
   const hourly = [];
   for (let h = 0; h < 24; h++) hourly.push({ hour: h, count: analytics.hourlyVisits[h.toString()] || 0 });
-  
+
   const activeRooms = Object.entries(rooms).map(([roomId, room]) => {
     const age = Math.floor((Date.now() - (room.createdAt || Date.now())) / 60000);
     return {
-      roomId, 
+      roomId,
       ownerName: room.ownerName || 'Global',
       userCount: room.users.length,
       onlineCount: room.users.filter(u => Date.now() - u.lastActive < 2 * 60 * 1000).length,
       messageCount: room.messages.length,
       age,
       isGlobal: room.isGlobal || false,
-      currentTrack: room.state.track ? { 
-        title: room.state.track.title, 
+      currentTrack: room.state.track ? {
+        title: room.state.track.title,
         artist: room.state.track.artist,
         playedBy: room.state.playedByName,
         autoDj: room.state.autoDj
@@ -212,11 +225,12 @@ app.get('/api/admin/stats', (req, res) => {
         fingerprint: u.fingerprint || 'unknown',
         status: Date.now() - u.lastActive < 2 * 60 * 1000 ? 'online' : 'offline',
         lastActive: u.lastActive,
-        blocked: u.blocked || { chat: false, play: false, voice: false }
+        blocked: u.blocked || { chat: false, play: false, voice: false },
+        globallyMuted: isGloballyMuted(u.name)
       }))
     };
   });
-  
+
   res.json({
     totalVisits: analytics.totalVisits,
     uniqueUsers: analytics.uniqueUsers.size,
@@ -227,6 +241,8 @@ app.get('/api/admin/stats', (req, res) => {
     activeNow: analytics.activeSessions.size,
     activeRooms: Object.keys(rooms).length,
     blockedCount: BLOCKED_IPS.size + BLOCKED_FINGERPRINTS.size,
+    globallyMutedCount: GLOBAL_MUTED_USERS.size,
+    currentAnnouncement,
     last7Days: last7, hourly,
     recentVisits: analytics.visits.slice(-30).reverse(),
     activeSessions: Array.from(analytics.activeSessions.values()),
@@ -238,19 +254,19 @@ app.get('/api/admin/stats', (req, res) => {
 app.post('/api/admin/blockUser', (req, res) => {
   const { password, userId, ip, fingerprint, reason } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-  
+
   let blocked = false;
   if (ip && ip !== 'unknown') { BLOCKED_IPS.add(ip); blocked = true; }
   if (fingerprint && fingerprint !== 'unknown') { BLOCKED_FINGERPRINTS.add(fingerprint); blocked = true; }
   if (!blocked) return res.status(400).json({ error: 'No identifier' });
-  
+
   io.sockets.sockets.forEach(s => {
     if ((ip && s.userIP === ip) || (fingerprint && s.userFingerprint === fingerprint) || (userId && s.id === userId)) {
       s.emit('blocked', { message: 'You have been blocked', reason: reason || 'Rule violation' });
       setTimeout(() => s.disconnect(true), 500);
     }
   });
-  
+
   const room = rooms[GLOBAL_ROOM_ID];
   if (room) {
     room.users = room.users.filter(u => {
@@ -259,7 +275,7 @@ app.post('/api/admin/blockUser', (req, res) => {
     });
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
   }
-  
+
   console.log(`🚫 Blocked: IP=${ip}, FP=${fingerprint}`);
   res.json({ success: true });
 });
@@ -328,6 +344,157 @@ app.get('/api/admin/roomChat', (req, res) => {
   res.json({ messages: room.messages });
 });
 
+/* ═══════════════════════════════════════════════════════════
+   ✅ FEATURE 1: GLOBAL MUTE
+   Admin kisi user ko sab ke liye mute kare (chat block)
+   ═══════════════════════════════════════════════════════════ */
+app.post('/api/admin/globalMute', (req, res) => {
+  const { password, userId, mute } = req.body;
+  if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
+
+  const room = rooms[GLOBAL_ROOM_ID];
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+
+  const user = room.users.find(u => u.id === userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const userNameKey = user.name.toLowerCase();
+
+  if (mute) GLOBAL_MUTED_USERS.add(userNameKey);
+  else GLOBAL_MUTED_USERS.delete(userNameKey);
+
+  user.globallyMuted = !!mute;
+
+  // Sabko batao
+  io.to(GLOBAL_ROOM_ID).emit('globalMuteUpdate', {
+    userId: user.id,
+    userName: user.name,
+    muted: !!mute
+  });
+
+  // Target user ko alag se
+  const targetSocket = io.sockets.sockets.get(userId);
+  if (targetSocket) {
+    targetSocket.emit('youAreMuted', { muted: !!mute, by: '👑 Admin' });
+  }
+
+  io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
+
+  console.log(`🔇 Global mute: ${user.name} → ${mute ? 'MUTED' : 'UNMUTED'}`);
+  res.json({ success: true, muted: !!mute });
+});
+
+app.get('/api/admin/globalMutedList', (req, res) => {
+  const { password } = req.query;
+  if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
+  res.json({
+    mutedUsers: Array.from(GLOBAL_MUTED_USERS),
+    total: GLOBAL_MUTED_USERS.size
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   ✅ FEATURE 2: FORCE SKIP
+   Admin directly gaana badle (search query ya Auto DJ next)
+   ═══════════════════════════════════════════════════════════ */
+app.post('/api/admin/forceSkip', async (req, res) => {
+  const { password, searchQuery } = req.body;
+  if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
+
+  const room = rooms[GLOBAL_ROOM_ID];
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+
+  let track = null;
+
+  if (searchQuery && searchQuery.trim()) {
+    track = await searchSong(searchQuery.trim());
+    console.log(`🎵 Admin force search: "${searchQuery}" → ${track?.title || 'not found'}`);
+  }
+
+  if (!track) {
+    const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
+    autoDjIndex++;
+    track = await searchSong(songName);
+    console.log(`🎵 Admin force skip: ${songName}`);
+  }
+
+  if (!track) return res.status(404).json({ error: 'Song not found' });
+
+  if (!room.playedHistory) room.playedHistory = [];
+  if (room.state.track) {
+    room.playedHistory.push(room.state.track.id);
+    if (room.playedHistory.length > 20) room.playedHistory.shift();
+  }
+
+  room.state = {
+    track: track,
+    position: 0,
+    isPlaying: true,
+    playedBy: 'admin',
+    playedByName: '👑 Admin',
+    autoDj: false,
+    lastUpdated: Date.now()
+  };
+
+  io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+  io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+    track: track,
+    reason: 'admin',
+    playedBy: '👑 Admin'
+  });
+  io.to(GLOBAL_ROOM_ID).emit('adminForceSkip', {
+    track,
+    message: `👑 Admin skipped to: ${track.title}`
+  });
+
+  console.log(`👑 Admin forced: ${track.title}`);
+  res.json({ success: true, track });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   ✅ FEATURE 3: ANNOUNCE
+   Admin sabko top banner pe message bheje
+   ═══════════════════════════════════════════════════════════ */
+app.post('/api/admin/announce', (req, res) => {
+  const { password, message, duration } = req.body;
+  if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
+
+  const announceMsg = String(message).slice(0, 300);
+  const dur = Math.min(Math.max(parseInt(duration) || 10000, 2000), 60000);
+
+  currentAnnouncement = {
+    message: announceMsg,
+    by: '👑 Admin',
+    at: Date.now(),
+    duration: dur
+  };
+
+  io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', currentAnnouncement);
+
+  console.log(`📢 Admin announce: ${announceMsg} (${dur}ms)`);
+
+  // Auto-clear
+  setTimeout(() => {
+    if (currentAnnouncement && currentAnnouncement.at === currentAnnouncement.at &&
+        Date.now() - currentAnnouncement.at >= dur - 200) {
+      currentAnnouncement = null;
+      io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', null);
+      console.log('📢 Announcement cleared');
+    }
+  }, dur);
+
+  res.json({ success: true, announcement: currentAnnouncement });
+});
+
+app.post('/api/admin/clearAnnounce', (req, res) => {
+  const { password } = req.body;
+  if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
+  currentAnnouncement = null;
+  io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', null);
+  res.json({ success: true });
+});
+
 // ============================================================
 // 🎵 SONG SEARCH + AUTO-NEXT ENGINE
 // ============================================================
@@ -373,10 +540,10 @@ async function searchSimilarSongs(query, exclude = []) {
 
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-  
+
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const title = currentTrack.title || '';
-  
+
   if (artist && artist !== 'Unknown') {
     const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
     if (artistSongs.length > 0) {
@@ -384,7 +551,7 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
       return artistSongs[0];
     }
   }
-  
+
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower];
   if (similarArtists && similarArtists.length > 0) {
@@ -396,7 +563,7 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
       }
     }
   }
-  
+
   const keyword = title.split(' ')[0];
   if (keyword && keyword.length > 3) {
     const keywordSongs = await searchSimilarSongs(keyword, [currentTrack.id, ...playedHistory]);
@@ -405,15 +572,15 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
       return keywordSongs[0];
     }
   }
-  
+
   return null;
 }
 
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-  
+
   const artist = (currentTrack.artist || '').split(',')[0].trim();
-  
+
   if (artist && artist !== 'Unknown') {
     const artistSongs = await searchSimilarSongs(artist, [currentTrack.id, ...playedHistory]);
     if (artistSongs.length > 1) {
@@ -423,7 +590,7 @@ async function getSkipSong(currentTrack, playedHistory = []) {
       return artistSongs[0];
     }
   }
-  
+
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower];
   if (similarArtists && similarArtists.length > 0) {
@@ -434,7 +601,7 @@ async function getSkipSong(currentTrack, playedHistory = []) {
       return songs[0];
     }
   }
-  
+
   const randomIndex = Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length);
   const songName = AUTO_DJ_PLAYLIST[randomIndex];
   autoDjIndex++;
@@ -445,34 +612,34 @@ async function getSkipSong(currentTrack, playedHistory = []) {
 async function playNextSong(reason = 'auto', user = null) {
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return;
-  
+
   const playedHistory = room.playedHistory || [];
   let nextSong = null;
-  
+
   if (reason === 'skip') {
     nextSong = await getSkipSong(room.state.track, playedHistory);
   } else if (reason === 'next' || reason === 'auto') {
     nextSong = await getNextSongFromContext(room.state.track, playedHistory);
   }
-  
+
   if (!nextSong) {
     const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
     autoDjIndex++;
     nextSong = await searchSong(songName);
     console.log(`🎵 Next from Auto DJ: ${songName}`);
   }
-  
+
   if (!nextSong) return;
-  
+
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
-  
+
   let playedByName;
   let autoDjFlag;
-  
+
   if (reason === 'auto') {
     playedByName = '🎵 Auto DJ';
     autoDjFlag = true;
@@ -486,7 +653,7 @@ async function playNextSong(reason = 'auto', user = null) {
     playedByName = user ? user.name : 'Someone';
     autoDjFlag = false;
   }
-  
+
   room.state = {
     track: nextSong,
     position: 0,
@@ -496,9 +663,9 @@ async function playNextSong(reason = 'auto', user = null) {
     autoDj: autoDjFlag,
     lastUpdated: Date.now()
   };
-  
+
   console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
-  
+
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: nextSong,
@@ -507,13 +674,12 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ UPDATED: Song end check — Auto DJ hamesha chale
+// ✅ Song end check — Auto DJ hamesha chale
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
-    
-    // ✅ Case 1: Koi user nahi + koi song nahi → Auto DJ
+
     if (room.users.length === 0) {
       if (!room.state.track || !room.state.isPlaying) {
         console.log(`🎵 No users, no song — Auto DJ start`);
@@ -521,15 +687,13 @@ function startSongEndCheck() {
       }
       return;
     }
-    
-    // ✅ Case 2: Users hain lekin song nahi → Auto DJ
+
     if (!room.state.track) {
       console.log(`🎵 Users present, no track — Auto DJ start`);
       await playNextSong('auto');
       return;
     }
-    
-    // ✅ Case 3: Track hai lekin isPlaying false → chalao
+
     if (room.state.track && !room.state.isPlaying) {
       const lastUpdated = room.state.lastUpdated || Date.now();
       const pausedFor = (Date.now() - lastUpdated) / 1000;
@@ -539,15 +703,14 @@ function startSongEndCheck() {
       }
       return;
     }
-    
-    // ✅ Case 4: Song chal raha hai — check if ended
+
     const duration = room.state.track.duration || 0;
     const position = room.state.position || 0;
     const lastUpdated = room.state.lastUpdated || Date.now();
-    
+
     const elapsed = (Date.now() - lastUpdated) / 1000;
     const estimatedPos = position + elapsed;
-    
+
     if (duration > 0 && estimatedPos >= duration - 2) {
       console.log(`🎵 Song ended — Auto DJ next`);
       await playNextSong('auto');
@@ -560,10 +723,10 @@ function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || !room.state.isPlaying) return;
-    
+
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
-    
+
     if (elapsed > 5) {
       room.state.position = (room.state.position || 0) + elapsed;
       room.state.lastUpdated = Date.now();
@@ -585,37 +748,36 @@ function startAutoDj() {
 // ===== SOCKET.IO =====
 io.on('connection', (socket) => {
   const ip = getClientIP(socket);
-  const fp = socket.handshake.auth?.fingerprint || 
+  const fp = socket.handshake.auth?.fingerprint ||
              socket.handshake.query?.fingerprint ||
              'unknown';
-  
+
   console.log('Connected:', socket.id, 'IP:', ip, 'FP:', fp.slice(-8));
-  
+
   const blockStatus = isBlocked(socket, fp);
   if (blockStatus.blocked) {
-    socket.emit('blocked', { 
+    socket.emit('blocked', {
       message: 'You have been blocked from this room',
       reason: blockStatus.reason
     });
     setTimeout(() => socket.disconnect(true), 1000);
     return;
   }
-  
+
   // ===== JOIN GLOBAL =====
   socket.on('joinGlobal', ({ userName, fingerprint }) => {
     ensureGlobalRoom();
     const room = rooms[GLOBAL_ROOM_ID];
     const userFp = fingerprint || fp;
-    
+
     if (BLOCKED_IPS.has(ip) || (userFp && BLOCKED_FINGERPRINTS.has(userFp))) {
       socket.emit('blocked', { message: 'You are blocked' });
       setTimeout(() => socket.disconnect(true), 500);
       return;
     }
-    
-    // Direct join
+
     let existingUser = room.users.find(u => u.fingerprint === userFp);
-    
+
     if (existingUser) {
       const oldSocket = io.sockets.sockets.get(existingUser.id);
       if (oldSocket && oldSocket.id !== socket.id) {
@@ -626,6 +788,7 @@ io.on('connection', (socket) => {
       existingUser.lastActive = Date.now();
       existingUser.status = 'online';
       existingUser.ip = ip;
+      existingUser.globallyMuted = isGloballyMuted(userName);
       delete existingUser.disconnectedAt;
       console.log(`🔄 Reconnect: ${userName}`);
     } else {
@@ -633,36 +796,44 @@ io.on('connection', (socket) => {
         id: socket.id, name: userName, ip: ip, fingerprint: userFp,
         lastActive: Date.now(), status: 'online',
         blocked: { chat: false, play: false, voice: false },
-        location: null, chatActive: false, joinedAt: Date.now()
+        location: null, chatActive: false, joinedAt: Date.now(),
+        globallyMuted: isGloballyMuted(userName)
       });
       console.log(`👋 New: ${userName}`);
     }
-    
+
     socket.join(GLOBAL_ROOM_ID);
     socket.roomId = GLOBAL_ROOM_ID;
     socket.userName = userName;
     socket.userIP = ip;
     socket.userFingerprint = userFp;
-    
+
     recordVisit(userName, GLOBAL_ROOM_ID, socket.handshake.headers['user-agent'] || 'unknown');
     analytics.activeSessions.set(socket.id, {
       name: userName, roomId: GLOBAL_ROOM_ID, joinedAt: Date.now(), role: 'member'
     });
-    
-    socket.emit('joinResult', { 
-      success: true, 
+
+    socket.emit('joinResult', {
+      success: true,
       roomId: GLOBAL_ROOM_ID,
-      isGlobal: true, 
-      isOwner: false 
+      isGlobal: true,
+      isOwner: false
     });
-    
-    // ✅ CASE 1: Song chal raha hai → same position sync
+
+    // ✅ Global mute state bhejo
+    socket.emit('globalMuteState', { muted: isGloballyMuted(userName) });
+
+    // ✅ Current announcement bhejo
+    if (currentAnnouncement) {
+      socket.emit('adminAnnounce', currentAnnouncement);
+    }
+
     if (room.state.track && room.state.isPlaying) {
       let currentPosition = room.state.position || 0;
       const lastUpdated = room.state.lastUpdated || Date.now();
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
-      
+
       socket.emit('stateSync', {
         track: room.state.track,
         position: currentPosition,
@@ -671,24 +842,23 @@ io.on('connection', (socket) => {
         autoDj: room.state.autoDj,
         lastUpdated: Date.now()
       });
-      
+
       socket.emit('songChanged', {
         track: room.state.track,
         reason: 'sync',
         playedBy: room.state.playedByName
       });
-      
+
       console.log(`🔄 Synced ${userName} to position ${currentPosition.toFixed(1)}s`);
-    } 
-    // ✅ CASE 2: Koi song nahi → Auto DJ turant start
+    }
     else {
       console.log(`🎵 No song playing — starting Auto DJ for ${userName}`);
-      
+
       setTimeout(async () => {
         const r = rooms[GLOBAL_ROOM_ID];
         if (r && (!r.state.track || !r.state.isPlaying)) {
           await playNextSong('auto');
-          
+
           setTimeout(() => {
             if (r.state.track) {
               socket.emit('stateSync', {
@@ -709,24 +879,24 @@ io.on('connection', (socket) => {
         }
       }, 500);
     }
-    
+
     socket.emit('chatHistory', room.messages);
-    
+
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
     io.to(GLOBAL_ROOM_ID).emit('globalStats', {
       totalUsers: room.users.length,
-      onlineUsers: room.users.filter(u => 
-        u.status !== 'disconnected' && 
+      onlineUsers: room.users.filter(u =>
+        u.status !== 'disconnected' &&
         Date.now() - u.lastActive < 2 * 60 * 1000
       ).length
     });
-    
+
     io.to(GLOBAL_ROOM_ID).emit('userJoined', {
       userName,
       message: `${userName} joined 🎉`,
       welcomeMessage: getRandomWelcome()
     });
-    
+
     setTimeout(() => {
       const botMsg = {
         id: 'bot-' + Date.now(),
@@ -736,10 +906,10 @@ io.on('connection', (socket) => {
       };
       socket.emit('chatMessage', botMsg);
     }, 3000);
-    
+
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
-  
+
   // ===== UPDATE STATE =====
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
@@ -747,34 +917,34 @@ io.on('connection', (socket) => {
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
-    
+
     if (user.blocked && user.blocked.play) {
       socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
       return;
     }
-    
+
     if (newState.track) {
       newState.autoDj = false;
       newState.playedBy = socket.id;
       newState.playedByName = user.name;
       console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
-      
+
       if (!room.playedHistory) room.playedHistory = [];
       if (room.state.track && room.state.track.id !== newState.track.id) {
         room.playedHistory.push(room.state.track.id);
         if (room.playedHistory.length > 20) room.playedHistory.shift();
       }
     }
-    
+
     if (newState.track && (!room.state.track || room.state.track.id !== newState.track.id)) {
       analytics.songsPlayed++;
     }
-    
+
     room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
     socket.to(room.roomId).emit('stateSync', room.state);
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
-  
+
   // ===== NEXT =====
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
@@ -782,22 +952,22 @@ io.on('connection', (socket) => {
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
-    
+
     if (user.blocked && user.blocked.play) {
       socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
       return;
     }
-    
+
     console.log(`⏭️ ${user.name} requested NEXT`);
-    
+
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
       message: `${user.name} played next ⏭️`
     });
-    
+
     await playNextSong('next', user);
   });
-  
+
   // ===== SKIP =====
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
@@ -805,41 +975,41 @@ io.on('connection', (socket) => {
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
-    
+
     if (user.blocked && user.blocked.play) {
       socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
       return;
     }
-    
+
     console.log(`🎲 ${user.name} SKIPPED`);
-    
+
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
       message: `${user.name} skipped 🎲`
     });
-    
+
     await playNextSong('skip', user);
   });
-  
+
   // ===== SYNC STATE REQUEST =====
   socket.on('requestSyncState', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
-    
+
     let currentPosition = room.state.position || 0;
-    
+
     if (room.state.track && room.state.isPlaying) {
       const lastUpdated = room.state.lastUpdated || Date.now();
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
-      
+
       if (room.state.track.duration > 0 && currentPosition >= room.state.track.duration) {
         currentPosition = 0;
       }
     }
-    
+
     console.log(`🔄 Sync request — position: ${currentPosition.toFixed(1)}s`);
-    
+
     socket.emit('stateSync', {
       track: room.state.track,
       position: currentPosition,
@@ -848,7 +1018,7 @@ io.on('connection', (socket) => {
       autoDj: room.state.autoDj,
       lastUpdated: Date.now()
     });
-    
+
     if (room.state.track) {
       socket.emit('songChanged', {
         track: room.state.track,
@@ -857,7 +1027,7 @@ io.on('connection', (socket) => {
       });
     }
   });
-  
+
   // ===== HEARTBEAT =====
   socket.on('heartbeat', ({ roomId, position, isPlaying }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
@@ -871,24 +1041,37 @@ io.on('connection', (socket) => {
     room.state.lastUpdated = Date.now();
     socket.to(room.roomId).emit('heartbeat', { position, isPlaying });
   });
-  
+
   socket.on('activity', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
     if (user) user.lastActive = Date.now();
   });
-  
+
+  // ✅ Chat — Global Mute check
   socket.on('chatMessage', ({ roomId, text, mentions }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
+
+    // Blocked check
     if (user.blocked && user.blocked.chat) {
       socket.emit('permissionDenied', { action: 'chat', message: 'You are blocked' });
       return;
     }
+
+    // ✅ Global mute check
+    if (isGloballyMuted(user.name)) {
+      socket.emit('permissionDenied', {
+        action: 'chat',
+        message: '🚫 You are globally muted by admin'
+      });
+      return;
+    }
+
     analytics.messagesSent++;
     const msg = {
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
@@ -900,7 +1083,7 @@ io.on('connection', (socket) => {
     if (room.messages.length > 100) room.messages.shift();
     io.to(room.roomId).emit('chatMessage', msg);
   });
-  
+
   socket.on('voiceSignal', ({ roomId, signal }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -908,7 +1091,7 @@ io.on('connection', (socket) => {
     if (user && user.blocked && user.blocked.voice) return;
     socket.to(room.roomId).emit('voiceSignal', { signal, from: socket.id, userName: user?.name });
   });
-  
+
   socket.on('pttState', ({ roomId, isTalking }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -918,7 +1101,7 @@ io.on('connection', (socket) => {
     if (user.blocked && user.blocked.voice) return;
     socket.to(room.roomId).emit('pttState', { userName: user.name, isTalking });
   });
-  
+
   socket.on('reaction', ({ roomId, emoji }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -927,7 +1110,7 @@ io.on('connection', (socket) => {
     analytics.reactionsSent++;
     socket.to(room.roomId).emit('reaction', { emoji, userName: user?.name });
   });
-  
+
   socket.on('chatPresence', ({ roomId, active }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -945,7 +1128,7 @@ io.on('connection', (socket) => {
       }
     });
   });
-  
+
   socket.on('typing', ({ roomId, isTyping }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -955,7 +1138,7 @@ io.on('connection', (socket) => {
       userName: user.name, userId: socket.id, isTyping: !!isTyping
     });
   });
-  
+
   socket.on('moodUpdate', ({ roomId, mood, emoji, text, color }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -963,7 +1146,7 @@ io.on('connection', (socket) => {
     if (user) user.lastActive = Date.now();
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
-  
+
   socket.on('shareLocation', ({ roomId, location }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -972,40 +1155,40 @@ io.on('connection', (socket) => {
     if (user) { user.location = location; user.lastActive = Date.now(); }
     socket.to(room.roomId).emit('partnerLocation', { location, userId: socket.id, userName: user?.name });
   });
-  
+
   socket.on('syncPing', ({ roomId, clientTime }) => {
     socket.emit('syncPong', { clientTime, serverTime: Date.now() });
   });
-  
+
   // ===== DISCONNECT =====
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     analytics.activeSessions.delete(socket.id);
-    
+
     if (roomId && rooms[roomId]) {
       const room = rooms[roomId];
       const user = room.users.find(u => u.id === socket.id);
-      
+
       if (user) {
         user.status = 'disconnected';
         user.disconnectedAt = Date.now();
-        
+
         console.log(`⏳ ${user.name} disconnected — grace`);
-        
+
         io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
         io.to(roomId).emit('globalStats', {
           totalUsers: room.users.length,
-          onlineUsers: room.users.filter(u => 
-            u.status !== 'disconnected' && 
+          onlineUsers: room.users.filter(u =>
+            u.status !== 'disconnected' &&
             Date.now() - u.lastActive < 2 * 60 * 1000
           ).length
         });
-        
+
         io.to(roomId).emit('userLeft', {
           userName: user.name,
           message: `${user.name} left`
         });
-        
+
         setTimeout(() => {
           const r = rooms[roomId];
           if (!r) return;
@@ -1027,7 +1210,8 @@ function getUsersWithStatus(room) {
     id: u.id, name: u.name, isOwner: false, isGlobal: true,
     status: u.status === 'disconnected' ? 'idle' :
             now - u.lastActive > IDLE_TIMEOUT ? 'idle' : 'online',
-    blocked: u.blocked || { chat: false, play: false, voice: false }
+    blocked: u.blocked || { chat: false, play: false, voice: false },
+    globallyMuted: isGloballyMuted(u.name)
   }));
 }
 
