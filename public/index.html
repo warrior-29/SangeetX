@@ -3021,7 +3021,7 @@ async function loadTrack(track,position=0,autoPlay=false){
   cacheSongForOffline(track);
   const setPos=()=>{try{audio.currentTime=position||0;}catch(e){}audio.removeEventListener('loadedmetadata',setPos);};
   audio.addEventListener('loadedmetadata',setPos);
-  if(autoPlay){
+    if(autoPlay){
     try{
       initAudioContext();
       await audio.play();
@@ -3033,6 +3033,24 @@ async function loadTrack(track,position=0,autoPlay=false){
       document.addEventListener('click',()=>{if(audio.paused&&currentTrack)audio.play().catch(()=>{});},{once:true});
     }
   }
+  
+  // ✅ NAYA: Force icon update after loading
+  setTimeout(() => {
+    updatePlayIcon();
+  }, 150);
+  
+  // ✅ NAYA: Listen to play/pause events for icon sync
+  audio.addEventListener('play', () => {
+    const btn = document.getElementById('playBtn');
+    if (btn) btn.dataset.state = 'paused'; // Force update
+    updatePlayIcon();
+  });
+  audio.addEventListener('pause', () => {
+    const btn = document.getElementById('playBtn');
+    if (btn) btn.dataset.state = 'playing'; // Force update
+    updatePlayIcon();
+  });
+  
   updatePlayIcon();startHeartbeat();
   if(distanceKm>100)setTimeout(showDistanceHeart,800);
   if('mediaSession' in navigator&&track){
