@@ -1876,7 +1876,6 @@ let deferredPrompt = null;
 let globalMap = null;
 let mapMarkers = [];
 
-// ✅ Next/Prev loading state
 let isLoadingNext = false;
 let isLoadingPrev = false;
 
@@ -1900,41 +1899,18 @@ function initAudioContext() {
 function saveSession(){
   if(roomId && userName){
     localStorage.setItem('musicSyncSession', JSON.stringify({
-      roomId,
-      userName,
-      isOwner,
-      savedAt: Date.now()
+      roomId, userName, isOwner, savedAt: Date.now()
     }));
   }
 }
-
 function clearSession(){
   localStorage.removeItem('musicSyncSession');
   localStorage.removeItem('sangeetxUserName');
 }
-
-function isSessionValid() {
-  try {
-    const raw = localStorage.getItem('musicSyncSession');
-    if (!raw) return false;
-    const session = JSON.parse(raw);
-    if (!session || !session.savedAt) return false;
-    const age = Date.now() - session.savedAt;
-    const isValid = age < SESSION_VALIDITY_MS;
-    console.log(`🕐 Session age: ${Math.round(age/1000)}s, valid: ${isValid}`);
-    if (!isValid) clearSession();
-    return isValid;
-  } catch (e) {
-    return false;
-  }
-}
-
 function startSessionRefresh() {
   if (sessionRefreshInterval) clearInterval(sessionRefreshInterval);
   sessionRefreshInterval = setInterval(() => {
-    if (roomId && userName) {
-      saveSession();
-    }
+    if (roomId && userName) saveSession();
   }, 10000);
 }
 function stopSessionRefresh() {
@@ -1985,7 +1961,6 @@ function isBluetoothDevice(label) {
          l.includes('soundbar') || l.includes('jbl') || l.includes('boat') ||
          l.includes('sony') || l.includes('bose') || l.includes('earbud');
 }
-
 async function detectAudioOutputDevices() {
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
@@ -1995,7 +1970,6 @@ async function detectAudioOutputDevices() {
     return outputs;
   } catch (err) { return []; }
 }
-
 function applyVoiceSinkToAll() {
   remoteAudios.forEach((entry) => {
     if (entry.audio && entry.audio.setSinkId && currentVoiceSinkId) {
@@ -2003,12 +1977,10 @@ function applyVoiceSinkToAll() {
     }
   });
 }
-
 function applyVoiceSinkToAudio(audioEl) {
   if (!audioEl || !audioEl.setSinkId || !currentVoiceSinkId) return;
   audioEl.setSinkId(currentVoiceSinkId).catch(() => {});
 }
-
 async function autoDetectAndRouteAudio() {
   const outputs = await detectAudioOutputDevices();
   if (outputs.length === 0) return;
@@ -2027,7 +1999,6 @@ async function autoDetectAndRouteAudio() {
   updateAudioOutputBadge(selectedLabel, !!btDevice);
   return { deviceId: selectedDeviceId, label: selectedLabel, isBluetooth: !!btDevice };
 }
-
 function updateAudioOutputBadge(label, isBluetooth) {
   const badge = document.getElementById('audioOutputBadge');
   const text = document.getElementById('audioOutputText');
@@ -2049,7 +2020,6 @@ function updateAudioOutputBadge(label, isBluetooth) {
     refreshIcons();
   } else { badge.classList.remove('active'); }
 }
-
 if (navigator.mediaDevices) {
   navigator.mediaDevices.addEventListener('devicechange', async () => {
     const result = await autoDetectAndRouteAudio();
@@ -2338,7 +2308,6 @@ function updateDistanceDisplay(){
   const pCity=getApproxLocation(partnerLocation.lat,partnerLocation.lng);
   const meter=document.getElementById('distanceMeter');
   const text=document.getElementById('distanceText');
-
   let msg;
   if(distanceKm<5){
     msg = `${myCity} · Same city! 🏙️ Same song 🎵`;
@@ -2359,11 +2328,7 @@ async function shareLocation(){
   if(!loc)return;
   myLocation=loc;locationShared=true;
   myTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if(socket&&socket.connected)socket.emit('shareLocation',{
-    roomId, 
-    location: loc,
-    timezone: myTimezone
-  });
+  if(socket&&socket.connected)socket.emit('shareLocation',{ roomId, location: loc, timezone: myTimezone });
   if(partnerLocation)updateDistanceDisplay();
 }
 function showDistanceHeart(){
@@ -2383,32 +2348,18 @@ function openGlobalMap() {
   if (!globalMap) {
     setTimeout(() => {
       try {
-        globalMap = L.map('globalMap', {
-          zoomControl: true,
-          attributionControl: false
-        }).setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 18,
-          minZoom: 2
-        }).addTo(globalMap);
-      } catch (e) {
-        console.error('Map init error:', e);
-      }
+        globalMap = L.map('globalMap', { zoomControl: true, attributionControl: false }).setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, minZoom: 2 }).addTo(globalMap);
+      } catch (e) {}
     }, 100);
   } else {
-    setTimeout(() => {
-      if (globalMap) globalMap.invalidateSize();
-    }, 100);
+    setTimeout(() => { if (globalMap) globalMap.invalidateSize(); }, 100);
   }
-  if (socket && socket.connected) {
-    socket.emit('requestGlobalListeners', { roomId });
-  }
+  if (socket && socket.connected) socket.emit('requestGlobalListeners', { roomId });
 }
-
 function closeGlobalMap() {
   document.getElementById('globalMapModal').classList.remove('active');
 }
-
 function renderGlobalMap({ listeners, currentTrack }) {
   if (!globalMap) return;
   mapMarkers.forEach(m => globalMap.removeLayer(m));
@@ -2417,35 +2368,19 @@ function renderGlobalMap({ listeners, currentTrack }) {
     if (!l.lat || !l.lng) return;
     const marker = L.circleMarker([l.lat, l.lng], {
       radius: Math.min(6 + l.userCount * 2, 18),
-      fillColor: '#EC4899',
-      color: '#fff',
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.8
+      fillColor: '#EC4899', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8
     }).addTo(globalMap);
-    marker.bindPopup(
-      `<div style="font-family: Inter, sans-serif;">
-        <b>📍 ${l.city}</b><br>
-        <span style="color: #EC4899; font-weight: 800;">${l.userCount}</span> listener${l.userCount > 1 ? 's' : ''}
-      </div>`
-    );
+    marker.bindPopup(`<div style="font-family: Inter, sans-serif;"><b>📍 ${l.city}</b><br><span style="color: #EC4899; font-weight: 800;">${l.userCount}</span> listener${l.userCount > 1 ? 's' : ''}</div>`);
     mapMarkers.push(marker);
   });
   const nowPlayingEl = document.getElementById('mapNowPlaying');
   const cityListEl = document.getElementById('mapCityList');
-  nowPlayingEl.textContent = currentTrack 
-    ? `${currentTrack.title} — ${currentTrack.artist}` 
-    : 'No song playing';
+  nowPlayingEl.textContent = currentTrack ? `${currentTrack.title} — ${currentTrack.artist}` : 'No song playing';
   const sorted = [...listeners].sort((a, b) => b.userCount - a.userCount);
   if (sorted.length === 0) {
     cityListEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);">No listeners with location yet</div>';
   } else {
-    cityListEl.innerHTML = sorted.map(l => `
-      <div class="city-row">
-        <span class="city-name">📍 ${l.city}</span>
-        <span class="city-count">${l.userCount} 🎵</span>
-      </div>
-    `).join('');
+    cityListEl.innerHTML = sorted.map(l => `<div class="city-row"><span class="city-name">📍 ${l.city}</span><span class="city-count">${l.userCount} 🎵</span></div>`).join('');
   }
   refreshIcons();
 }
@@ -2454,17 +2389,9 @@ function renderGlobalMap({ listeners, currentTrack }) {
 window.addEventListener('online',()=>{
   isOnline=true;hideOfflineBanner();
   showToast('✅ Back online!','success');
-  if(socket) {
-    if(!socket.connected) {
-      socket.connect();
-    }
-  }
+  if(socket) { if(!socket.connected) socket.connect(); }
   setTimeout(flushMessageQueue, 1500);
-  setTimeout(() => {
-    if(socket && socket.connected && roomId) {
-      socket.emit('requestSyncState', { roomId });
-    }
-  }, 2000);
+  setTimeout(() => { if(socket && socket.connected && roomId) socket.emit('requestSyncState', { roomId }); }, 2000);
 });
 window.addEventListener('offline',()=>{
   isOnline=false;showOfflineBanner();
@@ -2490,9 +2417,7 @@ function flushMessageQueue(){
   if(!socket||!socket.connected)return;
   const toSend=[...messageQueue];
   messageQueue=[];updateOfflineCount();
-  toSend.forEach(m=>{
-    socket.emit('chatMessage',{roomId:m.roomId||roomId,text:m.text,mentions:[],queuedAt:m.time});
-  });
+  toSend.forEach(m=>{ socket.emit('chatMessage',{roomId:m.roomId||roomId,text:m.text,mentions:[],queuedAt:m.time}); });
   showToast(`✅ ${toSend.length} messages sent`,'success');
 }
 async function cacheSongForOffline(track){
@@ -2526,16 +2451,10 @@ function initSocket(){
   socket = io({
     auth: { fingerprint: myFingerprint },
     query: { fingerprint: myFingerprint },
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    reconnectionAttempts: Infinity,
-    timeout: 20000,
-    transports: ['websocket', 'polling'],
-    upgrade: true,
-    rememberUpgrade: true,
-    forceNew: false,
-    multiplex: true
+    reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity, timeout: 20000,
+    transports: ['websocket', 'polling'], upgrade: true,
+    rememberUpgrade: true, forceNew: false, multiplex: true
   });
 
   socket.on('connect',()=>{
@@ -2581,10 +2500,7 @@ function initSocket(){
   socket.on('disconnect',()=>{
     document.getElementById('connectionDot').classList.remove('online','idle');
     if(!navigator.onLine){isOnline=false;showOfflineBanner();}
-    if (roomId && userName) {
-      saveSession();
-      console.log('💾 Session saved (socket disconnect)');
-    }
+    if (roomId && userName) saveSession();
   });
 
   socket.on('usersUpdate',(users)=>{
@@ -2596,35 +2512,31 @@ function initSocket(){
       sub.textContent = `${onlineCount} online`;
     }
   });
-  
-  // ✅ stateSync handler — sahi position + drift correction
+
+  // ✅ stateSync — server ki position authoritative hai
   socket.on('stateSync',(state)=>{
     if (state.position !== undefined) lastKnownPosition = state.position;
     applyRemoteState(state);
   });
 
-  // ✅ songChanged — same track pe skip, sirf position sync
+  // ✅ songChanged — same track pe sirf position sync
   socket.on('songChanged', ({ track, reason, playedBy }) => {
-    if (!track || !track.audioUrl) {
-      console.warn('⚠️ songChanged: invalid track', track);
-      return;
-    }
+    if (!track || !track.audioUrl) return;
     console.log(`🎵 songChanged: ${track.title} (${reason})`);
 
-    // ✅ Agar same track already chal raha hai — sirf position sync karo
+    // Same track — sirf position sync
     if (currentTrack && currentTrack.id === track.id) {
-      console.log('⏭️ Same track — syncing position only');
-      if (reason === 'sync' && lastKnownPosition) {
+      if (reason === 'sync' && lastKnownPosition !== undefined) {
         const drift = Math.abs(audio.currentTime - lastKnownPosition);
         if (drift > 2) {
           audio.currentTime = lastKnownPosition;
-          console.log(`🎯 Position corrected: ${lastKnownPosition.toFixed(1)}s`);
+          console.log(`🎯 Position synced: ${lastKnownPosition.toFixed(1)}s`);
         }
       }
       return;
     }
 
-    // ✅ Naya track
+    // Naya track
     if (reason === 'sync') {
       const syncPos = lastKnownPosition || 0;
       loadTrack(track, syncPos, true);
@@ -2632,11 +2544,9 @@ function initSocket(){
       setTimeout(() => updatePlayIcon(), 100);
       return;
     }
-
     loadTrack(track, 0, true);
     updatePlayedBy(playedBy, reason);
     setTimeout(() => updatePlayIcon(), 200);
-
     if (reason === 'auto') showToast('🎵 Auto next');
     else if (reason === 'next') showToast(`⏭️ Next`);
     else if (reason === 'prev') showToast(`⏮️ Previous`);
@@ -2645,12 +2555,10 @@ function initSocket(){
   });
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
-
   socket.on('userJoined', ({ userName: joinedName, message, welcomeMessage }) => {
     showWelcomeToast(joinedName, welcomeMessage);
     showToast(message, 'success');
   });
-
   socket.on('userLeft', ({ userName, message }) => { showToast(message); });
 
   socket.on('globalStats', (stats) => {
@@ -2698,9 +2606,7 @@ function initSocket(){
     partnerLocation=location;updateDistanceDisplay();
   });
 
-  socket.on('globalListeners', (data) => {
-    renderGlobalMap(data);
-  });
+  socket.on('globalListeners', (data) => { renderGlobalMap(data); });
 
   socket.on('chatMessage',(msg)=>{
     renderChat([msg],false);
@@ -2733,27 +2639,20 @@ function initSocket(){
   socket.on('userTyping',({userName:typer,isTyping:typingNow})=>{updateTypingIndicator(typer,typingNow);});
   socket.on('autoDjTrack', ({ track }) => { loadTrack(track, 0, true); updatePlayedBy('🎵 Auto DJ', 'auto'); });
 
-  // ✅ ACK handlers — next/prev loading state reset
   socket.on('nextAck', ({ status, track }) => {
     isLoadingNext = false;
     const btn = document.getElementById('nextBtn');
     if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
-    if (status === 'success' || status === 'fallback') {
-      showToast(`⏭️ ${track || 'Next'}`, 'success');
-    } else {
-      showToast('⏭️ Next failed', 'error');
-    }
+    if (status === 'success' || status === 'fallback') showToast(`⏭️ ${track || 'Next'}`, 'success');
+    else showToast('⏭️ Next failed', 'error');
   });
 
   socket.on('prevAck', ({ status, track }) => {
     isLoadingPrev = false;
     const btn = document.getElementById('prevBtn');
     if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
-    if (status === 'success' || status === 'fallback') {
-      showToast(`⏮️ ${track || 'Previous'}`, 'success');
-    } else {
-      showToast('⏮️ No previous song', 'warning');
-    }
+    if (status === 'success' || status === 'fallback') showToast(`⏮️ ${track || 'Previous'}`, 'success');
+    else showToast('⏮️ No previous song', 'warning');
   });
 
   socket.on('globalMuteState', ({ muted }) => {
@@ -2763,9 +2662,7 @@ function initSocket(){
       if (pttCard) pttCard.classList.add('blocked');
       document.getElementById('pttToggle').disabled = true;
       document.getElementById('alwaysOnToggle').disabled = true;
-      if (localStream) {
-        localStream.getAudioTracks().forEach(t => t.enabled = false);
-      }
+      if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
       showToast('🔇 You have been muted by admin', 'error');
     } else {
       globalMutedByAdmin = false;
@@ -2780,20 +2677,10 @@ function initSocket(){
 
   socket.on('globalMuteUpdate', ({ userId, userName: mutedName, muted }) => {
     remoteAudios.forEach((entry) => {
-      if (entry.userName === mutedName) {
-        entry.audio.muted = muted || muteAll;
-      }
+      if (entry.userName === mutedName) entry.audio.muted = muted || muteAll;
     });
-    if (muted) {
-      showToast(`🔇 ${mutedName} muted by admin`, 'warning');
-    } else {
-      showToast(`🔊 ${mutedName} unmuted by admin`, 'success');
-    }
-    if (muted) {
-      mutedUsers.add(mutedName.toLowerCase());
-    } else {
-      mutedUsers.delete(mutedName.toLowerCase());
-    }
+    if (muted) { showToast(`🔇 ${mutedName} muted by admin`, 'warning'); mutedUsers.add(mutedName.toLowerCase()); }
+    else { showToast(`🔊 ${mutedName} unmuted by admin`, 'success'); mutedUsers.delete(mutedName.toLowerCase()); }
     saveMuteState();
   });
 
@@ -2805,9 +2692,7 @@ function initSocket(){
       if (pttCard) pttCard.classList.add('blocked');
       document.getElementById('pttToggle').disabled = true;
       document.getElementById('alwaysOnToggle').disabled = true;
-      if (localStream) {
-        localStream.getAudioTracks().forEach(t => t.enabled = false);
-      }
+      if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = false);
     } else {
       showToast(`🔊 You have been unmuted`, 'success');
       const pttCard = document.getElementById('pttCard');
@@ -2820,7 +2705,6 @@ function initSocket(){
   });
 
   socket.on('adminForceSkip', ({ track, message }) => {
-    console.log('👑 Admin force skip:', track.title);
     showToast(`👑 ${message}`, 'warning');
   });
 
@@ -2837,26 +2721,17 @@ function showAdminAnnounce(message) {
   banner.id = 'adminAnnounceBanner';
   banner.className = 'admin-announce-banner';
   banner.innerHTML = `
-    <div class="announce-icon">
-      <i data-lucide="megaphone"></i>
-    </div>
+    <div class="announce-icon"><i data-lucide="megaphone"></i></div>
     <div class="announce-text">
       <div class="announce-label">👑 ADMIN ANNOUNCEMENT</div>
       <div class="announce-message">${esc(message)}</div>
     </div>
-    <button class="announce-close" onclick="this.parentElement.remove()">
-      <i data-lucide="x"></i>
-    </button>
+    <button class="announce-close" onclick="this.parentElement.remove()"><i data-lucide="x"></i></button>
   `;
   document.body.appendChild(banner);
   refreshIcons();
-  requestAnimationFrame(() => {
-    setTimeout(() => banner.classList.add('show'), 50);
-  });
-  setTimeout(() => {
-    banner.classList.remove('show');
-    setTimeout(() => banner.remove(), 500);
-  }, 8000);
+  requestAnimationFrame(() => { setTimeout(() => banner.classList.add('show'), 50); });
+  setTimeout(() => { banner.classList.remove('show'); setTimeout(() => banner.remove(), 500); }, 8000);
 }
 
 /* ============ PERMISSIONS ============ */
@@ -2892,9 +2767,7 @@ const mainScreen=document.getElementById('mainScreen');
 function startActivityPing(){
   if(activityInterval)clearInterval(activityInterval);
   activityInterval=setInterval(()=>{
-    if(socket && socket.connected && roomId) {
-      socket.emit('activity',{roomId});
-    }
+    if(socket && socket.connected && roomId) socket.emit('activity',{roomId});
   }, 60000);
 }
 let lastActivityPing = 0;
@@ -2932,10 +2805,7 @@ function renderUsers(users){
         <span class="user-item-name">${esc(u.name)}${isMe?' (You)':''}</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
-        ${!isMe?`<button class="mute-btn ${isMuted?'muted':''}" data-mute-name="${esc(u.name)}">
-          <i data-lucide="${isMuted?'volume-x':'volume-2'}"></i>
-          <span>${isMuted?'Unmute':'Mute'}</span>
-        </button>`:''}
+        ${!isMe?`<button class="mute-btn ${isMuted?'muted':''}" data-mute-name="${esc(u.name)}"><i data-lucide="${isMuted?'volume-x':'volume-2'}"></i><span>${isMuted?'Unmute':'Mute'}</span></button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -3008,11 +2878,7 @@ chatInputEl.addEventListener('keydown', (e) => {
     isTyping=false;
     if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
     if (window.innerWidth <= 768) {
-      setTimeout(() => {
-        if (document.activeElement !== chatInputEl) {
-          chatInputEl.focus();
-        }
-      }, 50);
+      setTimeout(() => { if (document.activeElement !== chatInputEl) chatInputEl.focus(); }, 50);
     }
   }
 });
@@ -3021,10 +2887,7 @@ chatInputEl.addEventListener('input', (e) => {
   if(!socket||!socket.connected)return;
   if(!isTyping){isTyping=true;socket.emit('typing',{roomId,isTyping:true,userName});}
   clearTimeout(typingTimer);
-  typingTimer=setTimeout(()=>{
-    isTyping=false;
-    socket.emit('typing',{roomId,isTyping:false,userName});
-  },1500);
+  typingTimer=setTimeout(()=>{ isTyping=false; socket.emit('typing',{roomId,isTyping:false,userName}); },1500);
 });
 
 chatInputEl.addEventListener('paste', (e) => {
@@ -3040,14 +2903,8 @@ const emojiBtn = document.getElementById('chatEmojiBtn');
 if (emojiBtn && emojiPickerEl) {
   emojiBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isOpen = emojiPickerEl.classList.contains('show');
-    if (isOpen) {
-      emojiPickerEl.classList.remove('show');
-      emojiBtn.classList.remove('active');
-    } else {
-      emojiPickerEl.classList.add('show');
-      emojiBtn.classList.add('active');
-    }
+    emojiPickerEl.classList.toggle('show');
+    emojiBtn.classList.toggle('active');
   });
   emojiPickerEl.querySelectorAll('[data-emoji]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -3119,14 +2976,12 @@ function renderChat(messages,replace){
     const time = new Date(m.time).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
     row.innerHTML = `
-  <div class="chat-msg-sender">
-    <span>${esc(senderName)}</span>
-  </div>
-  <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${m.id}">
-    <span class="chat-msg-text">${esc(m.text)}</span>
-    <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
-  </div>
-`;
+      <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
+      <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${m.id}">
+        <span class="chat-msg-text">${esc(m.text)}</span>
+        <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
+      </div>
+    `;
     box.appendChild(row);
   });
   box.scrollTop=box.scrollHeight;
@@ -3191,10 +3046,7 @@ function showWelcomeToast(userName, message) {
   `;
   document.body.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('show'));
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 500);
-  }, 3000);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 500); }, 3000);
 }
 
 /* ============ SHARE ============ */
@@ -3211,10 +3063,7 @@ document.getElementById('shareBtn').addEventListener('click',async()=>{
 /* ============ LOAD ============ */
 window.addEventListener('load', async () => {
   if (localStorage.getItem('sangeetxBlocked') === 'true') {
-    document.body.innerHTML = `<div style="position:fixed;inset:0;background:#08080C;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;font-family:'Inter',sans-serif;color:#FAFAFC;">
-      <div style="font-size:80px;margin-bottom:20px;">🚫</div>
-      <h1 style="font-size:26px;font-weight:900;color:#EF4444;">You Are Blocked</h1>
-    </div>`;
+    document.body.innerHTML = `<div style="position:fixed;inset:0;background:#08080C;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;font-family:'Inter',sans-serif;color:#FAFAFC;"><div style="font-size:80px;margin-bottom:20px;">🚫</div><h1 style="font-size:26px;font-weight:900;color:#EF4444;">You Are Blocked</h1></div>`;
     return;
   }
   checkMicPermission();
@@ -3227,10 +3076,7 @@ window.addEventListener('load', async () => {
     localStorage.setItem('sangeetxFingerprint', myFingerprint);
   }
   const lastSavedName = localStorage.getItem('sangeetxUserName');
-  if (lastSavedName) {
-    document.getElementById('userNameInput').value = lastSavedName;
-    console.log(`💡 Suggested name: ${lastSavedName}`);
-  }
+  if (lastSavedName) document.getElementById('userNameInput').value = lastSavedName;
   try {
     const res = await fetch('/api/global/stats');
     const stats = await res.json();
@@ -3252,9 +3098,7 @@ window.addEventListener('load', async () => {
     try {
       const session = JSON.parse(sessionRaw);
       const age = Date.now() - (session.savedAt || 0);
-      console.log(`🕐 Last session: ${Math.round(age/1000)}s ago`);
       if (age < SESSION_VALIDITY_MS && session.userName) {
-        console.log(`✅ Auto-rejoin: ${session.userName} (session valid)`);
         userName = session.userName;
         roomId = session.roomId || 'global';
         isOwner = false;
@@ -3265,42 +3109,47 @@ window.addEventListener('load', async () => {
           socket.on('connect', () => socket.emit('joinGlobal', { userName, fingerprint: myFingerprint }));
         }, 300);
       } else {
-        console.log(`⏰ Session expired (${Math.round(age/1000)}s ago) — please enter name`);
         clearSession();
         showToast('🕐 Session expired — please re-enter your name', 'warning');
       }
-    } catch (e) {
-      clearSession();
-    }
+    } catch (e) { clearSession(); }
   }
 });
 
-/* ============ APPLY REMOTE STATE ============ */
-async function applyRemoteState(state){
+/* ============ APPLY REMOTE STATE — server authoritative ============ */
+async function applyRemoteState(state) {
   isRemoteUpdate = true;
   try {
-    if (state.track && (!currentTrack || currentTrack.id !== state.track.id)) {
-      await loadTrack(state.track, state.position, state.isPlaying);
+    if (!state.track) return;
+
+    // ✅ Naya track — server ki position se load karo
+    if (!currentTrack || currentTrack.id !== state.track.id) {
+      console.log(`🎵 Loading from server: ${state.track.title} at ${(state.position||0).toFixed(1)}s`);
+      await loadTrack(state.track, state.position || 0, state.isPlaying);
       if (state.playedByName) updatePlayedBy(state.playedByName, state.autoDj ? 'auto' : 'user');
-    } else if (currentTrack) {
-      if (state.isPlaying && audio.paused) {
-        await audio.play().catch(()=>{});
-      }
-      if (!state.isPlaying && !audio.paused) {
-        audio.pause();
-      }
+      return;
+    }
+
+    // ✅ Same track — server ki position follow karo
+    if (currentTrack.id === state.track.id) {
+      if (state.isPlaying && audio.paused) await audio.play().catch(() => {});
+      if (!state.isPlaying && !audio.paused) audio.pause();
+
       if (state.isPlaying && !audio.paused && state.position !== undefined) {
         const drift = audio.currentTime - state.position;
         const abs = Math.abs(drift);
-        if (abs < 0.3) audio.playbackRate = 1.0;
-        else if (abs < 2.0) {
+
+        if (abs < 0.3) {
+          audio.playbackRate = 1.0;
+        } else if (abs < 2.0) {
           audio.playbackRate = drift > 0 ? 0.97 : 1.03;
           clearTimeout(window._rateResetTimeout);
           window._rateResetTimeout = setTimeout(() => { audio.playbackRate = 1.0; }, 3000);
         } else {
+          // ✅ Bada drift — server ki position pe jump karo
           audio.currentTime = state.position;
           audio.playbackRate = 1.0;
-          console.log(`🎯 State position corrected: ${state.position.toFixed(1)}s`);
+          console.log(`🎯 Jump to server position: ${state.position.toFixed(1)}s (drift ${drift.toFixed(1)}s)`);
         }
       }
     }
@@ -3322,22 +3171,14 @@ function updatePlayIcon() {
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><rect x="6" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/></svg>`;
   const iconEl = btn.querySelector('svg') || btn.querySelector('[data-lucide]');
-  if (iconEl) {
-    iconEl.outerHTML = svg;
-  } else {
-    btn.insertAdjacentHTML('beforeend', svg);
-  }
+  if (iconEl) iconEl.outerHTML = svg;
+  else btn.insertAdjacentHTML('beforeend', svg);
 }
 
-/* ============ LOAD TRACK ============ */
+/* ============ LOAD TRACK — robust position ============ */
 async function loadTrack(track, position = 0, autoPlay = false) {
-  if (!track) {
-    console.error('❌ loadTrack: track is null');
-    return;
-  }
-  if (!track.audioUrl) {
-    console.error('❌ loadTrack: no audioUrl', track);
-    showToast('⚠️ Song has no audio', 'error');
+  if (!track || !track.audioUrl) {
+    console.error('❌ loadTrack: invalid track');
     return;
   }
 
@@ -3358,44 +3199,33 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   audio.crossOrigin = 'anonymous';
   audio.load();
 
-  const loadTimeout = setTimeout(() => {
-    if (!audio.duration || isNaN(audio.duration)) {
-      console.warn('⚠️ Audio load timeout — retrying...');
-      audio.load();
-    }
-  }, 15000);
-
-  const clearLoadTimeout = () => clearTimeout(loadTimeout);
-  audio.addEventListener('canplay', clearLoadTimeout, { once: true });
-  audio.addEventListener('error', (e) => {
-    clearLoadTimeout();
-    console.error('❌ Audio error:', e);
-    setTimeout(() => {
-      if (currentTrack && currentTrack.audioUrl === track.audioUrl) {
-        console.log('🔄 Retrying audio load...');
-        audio.src = track.audioUrl;
-        audio.load();
-      }
-    }, 3000);
-  }, { once: true });
-
-  cacheSongForOffline(track);
-
-  // ✅ Robust position setting — slow network pe bhi sahi jagah se chalega
-  const setPos = () => {
+  // ✅ Position set — HAR event pe try
+  let posSet = false;
+  const applyPosition = () => {
+    if (posSet) return;
     if (position > 0) {
       try {
         audio.currentTime = position;
-        console.log(`🎯 Position set: ${position.toFixed(1)}s`);
-      } catch (e) {
-        console.warn('Position set failed:', e);
-      }
+        posSet = true;
+        console.log(`🎯 Position applied: ${position.toFixed(1)}s`);
+      } catch (e) {}
+    } else {
+      posSet = true;
     }
-    audio.removeEventListener('loadedmetadata', setPos);
-    audio.removeEventListener('canplay', setPos);
   };
-  audio.addEventListener('loadedmetadata', setPos);
-  audio.addEventListener('canplay', setPos);
+
+  audio.addEventListener('loadedmetadata', applyPosition, { once: true });
+  audio.addEventListener('canplay', applyPosition, { once: true });
+
+  const loadTimeout = setTimeout(() => {
+    if (!audio.duration || isNaN(audio.duration)) {
+      console.warn('⚠️ Audio load timeout — retry');
+      audio.load();
+    }
+  }, 15000);
+  audio.addEventListener('canplay', () => clearTimeout(loadTimeout), { once: true });
+
+  cacheSongForOffline(track);
 
   if (autoPlay) {
     try {
@@ -3407,15 +3237,15 @@ async function loadTrack(track, position = 0, autoPlay = false) {
       startWaveform();
       startBeatDetection();
 
-      // ✅ Play ke baad drift fix — network slow hone pe position correct karo
+      // ✅ Play ke baad drift fix
       if (position > 0) {
         setTimeout(() => {
           const drift = Math.abs(audio.currentTime - position);
           if (drift > 1.5) {
             audio.currentTime = position;
-            console.log(`🔧 Drift corrected after play: ${drift.toFixed(1)}s`);
+            console.log(`🔧 Drift corrected: ${drift.toFixed(1)}s`);
           }
-        }, 2000);
+        }, 3000);
       }
     } catch (e) {
       document.addEventListener('click', () => {
@@ -3501,7 +3331,6 @@ document.getElementById('forwardBtn').addEventListener('click', () => {
   showToast('⏩ +10s');
 });
 
-// ✅ PREV — with loading indicator + ACK
 document.getElementById('prevBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -3513,25 +3342,20 @@ document.getElementById('prevBtn').addEventListener('click', () => {
   }
   if (!socket || !socket.connected) { showToast('Not connected', 'error'); return; }
   if (isLoadingPrev) { showToast('⏳ Already loading...'); return; }
-
   isLoadingPrev = true;
   const btn = document.getElementById('prevBtn');
-  btn.style.opacity = '0.5';
-  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
   showToast('⏮️ Loading previous...');
   socket.emit('requestPrev', { roomId });
 });
 
-// ✅ NEXT — with loading indicator + ACK
 document.getElementById('nextBtn').addEventListener('click', () => {
   if (!socket || !socket.connected) { showToast('Not connected', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
   if (isLoadingNext) { showToast('⏳ Already loading...'); return; }
-
   isLoadingNext = true;
   const btn = document.getElementById('nextBtn');
-  btn.style.opacity = '0.5';
-  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
   showToast('⏭️ Loading next...');
   socket.emit('requestNext', { roomId });
 });
@@ -3549,15 +3373,11 @@ function getSeekPercent(clientX) {
   let pct = (clientX - rect.left) / rect.width;
   return Math.max(0, Math.min(1, pct));
 }
-
 function updateSeekVisual(pct) {
   progressFillEl.style.width = (pct * 100) + '%';
   progressThumbEl.style.left = (pct * 100) + '%';
-  if (audio.duration) {
-    document.getElementById('currentTime').textContent = fmt(pct * audio.duration);
-  }
+  if (audio.duration) document.getElementById('currentTime').textContent = fmt(pct * audio.duration);
 }
-
 function startDrag(e) {
   if (!currentTrack || !audio.duration) return;
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
@@ -3569,35 +3389,27 @@ function startDrag(e) {
   updateSeekVisual(pct);
   e.preventDefault();
 }
-
 function moveDrag(e) {
   if (!isDragging) return;
   const pct = getSeekPercent(e.clientX);
   updateSeekVisual(pct);
   e.preventDefault();
 }
-
 function endDrag(e) {
   if (!isDragging) return;
   isDragging = false;
   progressBarEl.classList.remove('dragging');
   const pct = getSeekPercent(e.clientX);
-  try {
-    audio.currentTime = pct * audio.duration;
-  } catch (err) {}
+  try { audio.currentTime = pct * audio.duration; } catch (err) {}
   broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
-  if (wasPlayingBeforeDrag && audio.paused) {
-    audio.play().catch(() => {});
-  }
+  if (wasPlayingBeforeDrag && audio.paused) audio.play().catch(() => {});
   if (navigator.vibrate) navigator.vibrate(15);
   e.preventDefault();
 }
-
 progressBarEl.addEventListener('pointerdown', startDrag);
 progressBarEl.addEventListener('pointermove', moveDrag);
 progressBarEl.addEventListener('pointerup', endDrag);
 progressBarEl.addEventListener('pointercancel', endDrag);
-
 progressBarEl.addEventListener('keydown', (e) => {
   if (!currentTrack || !audio.duration) return;
   if (e.key === 'ArrowRight') {
@@ -3628,10 +3440,35 @@ audio.addEventListener('ended',()=>{
 
 function fmt(s){if(!s||isNaN(s))return'0:00';const m=Math.floor(s/60);const x=Math.floor(s%60).toString().padStart(2,'0');return m+':'+x;}
 
-function broadcastState(partial){
-  if(isRemoteUpdate)return;
-  if(!socket||!socket.connected)return;
-  socket.emit('updateState',{roomId,newState:{track:currentTrack,position:audio.currentTime,isPlaying:!audio.paused,...partial}});
+// ✅ Broadcast with throttle — chhote drift skip
+let lastBroadcastTime = 0;
+let lastBroadcastPosition = 0;
+
+function broadcastState(partial) {
+  if (isRemoteUpdate) return;
+  if (!socket || !socket.connected) return;
+
+  const now = Date.now();
+  const position = partial.position !== undefined ? partial.position : audio.currentTime;
+
+  // Throttle: 2 second me ek baar
+  if (now - lastBroadcastTime < 2000 && partial.isPlaying === undefined) return;
+
+  // Same position + 3s se kam — skip
+  if (Math.abs(position - lastBroadcastPosition) < 3 && partial.isPlaying === undefined) return;
+
+  lastBroadcastTime = now;
+  lastBroadcastPosition = position;
+
+  socket.emit('updateState', {
+    roomId,
+    newState: {
+      track: currentTrack,
+      position: position,
+      isPlaying: !audio.paused,
+      ...partial
+    }
+  });
 }
 
 function startHeartbeat(){
@@ -4097,7 +3934,6 @@ function haptic(type = 'light') {
   const patterns = { light:[10], medium:[20], heavy:[30], success:[10,50,10], error:[50,30,50] };
   try { navigator.vibrate(patterns[type] || patterns.light); } catch(e) {}
 }
-
 document.querySelectorAll('button').forEach(btn => {
   btn.addEventListener('click', () => haptic('light'), { passive: true });
 });
@@ -4105,17 +3941,11 @@ document.querySelectorAll('button').forEach(btn => {
 /* ============ RIPPLE ============ */
 document.querySelectorAll('.btn-primary, .btn-secondary, .icon-btn, .ctrl-btn').forEach(btn => {
   btn.style.position = 'relative';
-  if (btn.classList.contains('icon-btn')) {
-    btn.style.overflow = 'visible';
-  } else {
-    btn.style.overflow = 'hidden';
-  }
+  if (btn.classList.contains('icon-btn')) btn.style.overflow = 'visible';
+  else btn.style.overflow = 'hidden';
   btn.addEventListener('click', function(e) {
     const ripple = document.createElement('span');
-    ripple.style.cssText = `
-      position:absolute; border-radius:50%; background:rgba(255,255,255,0.3);
-      transform:scale(0); animation:rippleAnim 0.6s ease-out; pointer-events:none;
-    `;
+    ripple.style.cssText = `position:absolute; border-radius:50%; background:rgba(255,255,255,0.3); transform:scale(0); animation:rippleAnim 0.6s ease-out; pointer-events:none;`;
     const rect = this.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height);
     ripple.style.width = ripple.style.height = size + 'px';
@@ -4129,17 +3959,12 @@ document.querySelectorAll('.btn-primary, .btn-secondary, .icon-btn, .ctrl-btn').
 /* ============ VISIBILITY ============ */
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden&&socket&&!socket.connected)socket.connect();
-  if (document.hidden && roomId && userName) {
-    saveSession();
-    console.log('💾 Session saved (page hidden)');
-  }
+  if (document.hidden && roomId && userName) saveSession();
 });
 
 /* ============ BEFORE UNLOAD ============ */
 window.addEventListener('beforeunload', () => {
-  if (roomId && userName) {
-    saveSession();
-  }
+  if (roomId && userName) saveSession();
 });
 
 /* ============ BACK BUTTON ============ */
