@@ -591,14 +591,27 @@ async function playNextSong(reason = 'auto', user = null) {
     nextSong = await getNextSongFromContext(room.state.track, playedHistory);
   }
 
+  // ✅ Auto DJ fallback — try multiple times
   if (!nextSong) {
-    const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
-    autoDjIndex++;
-    nextSong = await searchSong(songName);
-    console.log(`🎵 Next from Auto DJ: ${songName}`);
+    for (let i = 0; i < 3; i++) {
+      const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
+      autoDjIndex++;
+      nextSong = await searchSong(songName);
+      if (nextSong) break;
+      console.log(`⚠️ Auto DJ try ${i+1} failed, retrying...`);
+      await new Promise(r => setTimeout(r, 500));
+    }
   }
 
-  if (!nextSong) return;
+  // ✅ Agar phir bhi null, toh error emit karo
+  if (!nextSong) {
+    console.error('❌ playNextSong: no song found after all attempts');
+    io.to(GLOBAL_ROOM_ID).emit('skipNotice', {
+      userName: 'System',
+      message: '⚠️ Song load failed, try again'
+    });
+    return;
+  }
 
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track) {
@@ -906,6 +919,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
+  // ✅ NEXT — chhota message
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -926,8 +940,84 @@ io.on('connection', (socket) => {
     });
 
     await playNextSong('next', user);
-});
+  });
 
+  // ✅ NAYA: PREV — history me peeche jaane ke liye
+  socket.on('requestPrev', async ({ roomId }) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    user.lastActive = Date.now();
+
+    if (user.blocked && user.blocked.play) {
+      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
+      return;
+    }
+
+    console.log(`⏮️ ${user.name} requested PREV`);
+
+    // ✅ Played history se last song nikalo
+    if (room.playedHistory && room.playedHistory.length > 0) {
+      const prevId = room.playedHistory.pop();
+      // History se track dhoondo (already full track nahi hai, sirf ID hai)
+      // Toh search karo by ID
+      try {
+        const r = await axios.get(
+          'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
+          { timeout: 8000 }
+        );
+        const s = r.data?.data?.[0];
+        if (s) {
+          const prevTrack = {
+            id: s.id, title: s.name,
+            artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
+            duration: s.duration,
+            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
+            audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
+          };
+
+          if (room.state.track) {
+            // Current ko wapas history me daalo
+            room.playedHistory.push(room.state.track.id);
+          }
+
+          room.state = {
+            track: prevTrack,
+            position: 0,
+            isPlaying: true,
+            playedBy: user.id,
+            playedByName: user.name,
+            autoDj: false,
+            lastUpdated: Date.now()
+          };
+
+          io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+          io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+            track: prevTrack,
+            reason: 'next',
+            playedBy: user.name
+          });
+          io.to(room.roomId).emit('skipNotice', {
+            userName: user.name,
+            message: `⏮️ Previous`
+          });
+          return;
+        }
+      } catch (e) {
+        console.log('Prev search failed:', e.message);
+      }
+    }
+
+    // ✅ Fallback — agar history empty hai toh next hi chala do
+    io.to(room.roomId).emit('skipNotice', {
+      userName: user.name,
+      message: `⏮️ Previous`
+    });
+    await playNextSong('next', user);
+  });
+
+  // ✅ SKIP — chhota message
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -944,7 +1034,7 @@ io.on('connection', (socket) => {
 
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
-      message: `${user.name} skipped 🎲`
+      message: `🎲 Skipped`
     });
 
     await playNextSong('skip', user);
