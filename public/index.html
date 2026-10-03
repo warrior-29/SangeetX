@@ -140,7 +140,7 @@ body::before {
 #mainScreen.active { display:flex; }
 
 /* ============ TOP BAR ============ */
-.topbar { display:flex; justify-content:space-between; align-items:center; gap:6px; flex-shrink:0; }
+.topbar { display:flex; justify-content:space-between; align-items:center; gap:6px; flex-shrink:0; overflow:visible; padding-top:4px; }
 .status {
   display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600;
   color:var(--text-dim); background:rgba(255,255,255,0.04);
@@ -163,24 +163,28 @@ body::before {
 .sync-meter .sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:pulse 1.5s infinite; }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
-.topbar-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; }
+.topbar-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; overflow:visible; padding:4px 6px 4px 4px; }
 .icon-btn {
   background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--text);
   width:38px; height:38px; border-radius:50%; cursor:pointer; font-family:inherit;
   display:flex; align-items:center; justify-content:center;
   position:relative; flex-shrink:0; backdrop-filter:blur(10px);
   transition:all 0.25s var(--spring);
+  overflow:visible;
 }
 .icon-btn [data-lucide] { width:17px; height:17px; stroke-width:2.2; }
 .icon-btn:active { transform:scale(0.9); }
 .icon-btn.primary { background:linear-gradient(135deg, var(--primary), var(--accent)); border:none; box-shadow:0 6px 16px var(--primary-glow); }
 .badge {
-  position:absolute; top:-3px; right:-3px;
+  position:absolute; top:-2px; right:-2px;
   background:var(--danger); color:white; font-size:9px; font-weight:800;
   min-width:16px; height:16px; border-radius:8px; padding:0 4px;
   display:flex; align-items:center; justify-content:center;
   border:2px solid var(--bg);
+  animation:badgePulse 2s infinite;
+  z-index:5; line-height:1; box-sizing:border-box;
 }
+@keyframes badgePulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
 
 /* ============ AUDIO OUTPUT BADGE ============ */
 .audio-output-badge {
@@ -223,7 +227,6 @@ body::before {
 .album-art img { width:100%; height:100%; object-fit:cover; border-radius:17px; animation:imgFadeIn 0.6s var(--ease); }
 @keyframes imgFadeIn { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
 .album-art .placeholder { font-size:56px; opacity:0.15; }
-/* ✅ No transform animation on play (UI stable) */
 .album-art.playing {
   box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 40px var(--dynamic-1), 0 0 60px rgba(139,92,246,0.4);
   border-color:rgba(139,92,246,0.4);
@@ -268,16 +271,17 @@ body::before {
 .progress-fill { height:100%; background:linear-gradient(90deg, var(--dynamic-1), var(--dynamic-2)); border-radius:3px; width:0%; box-shadow:0 0 10px var(--dynamic-1); transition:width 0.1s linear; }
 .time-row { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; font-weight:600; padding:0 2px; }
 
-/* ============ CONTROLS — 4 buttons ============ */
+/* ============ CONTROLS — 5 buttons ============ */
 .controls {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-shrink: 0;
 }
+
 .ctrl-btn {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: rgba(0,0,0,0.6);
   border: 1.5px solid rgba(255,255,255,0.15);
@@ -303,9 +307,38 @@ body::before {
   background: rgba(139,92,246,0.3);
 }
 
+/* ✅ Rewind — 10 sec peeche */
+.ctrl-btn.rewind [data-lucide],
+.ctrl-btn.forward [data-lucide] {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.ctrl-btn.rewind {
+  background: rgba(59,130,246,0.12);
+  border-color: rgba(59,130,246,0.25);
+}
+.ctrl-btn.rewind [data-lucide] { color: #60A5FA; }
+.ctrl-btn.rewind:active {
+  background: rgba(59,130,246,0.25);
+  transform: scale(0.9);
+}
+
+/* ✅ Fast-forward — 10 sec aage */
+.ctrl-btn.forward {
+  background: rgba(59,130,246,0.12);
+  border-color: rgba(59,130,246,0.25);
+}
+.ctrl-btn.forward [data-lucide] { color: #60A5FA; }
+.ctrl-btn.forward:active {
+  background: rgba(59,130,246,0.25);
+  transform: scale(0.9);
+}
+
+/* ✅ Play — center me bada */
 .ctrl-btn.play {
-  width: 64px;
-  height: 64px;
+  width: 62px;
+  height: 62px;
   background: linear-gradient(135deg, var(--dynamic-1), var(--dynamic-2));
   border: 3px solid rgba(255,255,255,0.9);
   box-shadow: 0 12px 32px var(--dynamic-1), 0 0 0 4px rgba(0,0,0,0.3), 0 0 24px rgba(139,92,246,0.6);
@@ -323,27 +356,18 @@ body::before {
   transform: scale(0.96);
 }
 
-/* ✅ Skip button */
-.ctrl-btn.skip {
-  background: rgba(139,92,246,0.15);
-  border-color: rgba(139,92,246,0.3);
-  color: var(--primary-2);
-}
-.ctrl-btn.skip [data-lucide] {
-  color: var(--primary-2);
-  fill: none;
-  stroke-width: 2.5;
-}
-.ctrl-btn.skip:active {
-  background: rgba(139,92,246,0.3);
-  transform: scale(0.9);
+@media (max-width: 380px) {
+  .controls { gap: 6px; }
+  .ctrl-btn { width: 36px; height: 36px; }
+  .ctrl-btn [data-lucide] { width: 15px; height: 15px; }
+  .ctrl-btn.play { width: 54px; height: 54px; }
+  .ctrl-btn.play [data-lucide] { width: 22px; height: 22px; }
 }
 
-@media (max-width: 380px) {
-  .controls { gap: 10px; }
-  .ctrl-btn { width: 40px; height: 40px; }
+@media (max-height: 700px) {
+  .ctrl-btn { width: 38px; height: 38px; }
   .ctrl-btn [data-lucide] { width: 16px; height: 16px; }
-  .ctrl-btn.play { width: 58px; height: 58px; }
+  .ctrl-btn.play { width: 54px; height: 54px; }
   .ctrl-btn.play [data-lucide] { width: 22px; height: 22px; }
 }
 
@@ -435,29 +459,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .reaction-btn:active { transform:scale(0.88); background:rgba(139,92,246,0.2); border-color:var(--primary); }
 
-/* ============ MODAL ============ */
-.modal {
-  display:none; position:fixed; inset:0;
-  background:rgba(0,0,0,0.8); backdrop-filter:blur(12px);
-  z-index:100; align-items:center; justify-content:center; padding:20px;
-}
-.modal.active { display:flex; }
-.modal-box {
-  background:var(--surface); border-radius:22px; padding:24px;
-  max-width:380px; width:100%; border:1px solid var(--border);
-  box-shadow:0 24px 60px rgba(0,0,0,0.7);
-}
-.modal-box h3 { font-size:17px; font-weight:800; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
-.modal-box h3 [data-lucide] { width:18px; height:18px; color:var(--primary-2); }
-.modal-box p { color:var(--text-dim); font-size:13px; margin-bottom:20px; line-height:1.6; }
-.modal-actions { display:flex; gap:8px; }
-.modal-actions button {
-  flex:1; padding:13px; border-radius:12px; border:none;
-  font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
-}
-.btn-allow { background:linear-gradient(135deg, var(--primary), var(--accent)); color:white; }
-.btn-deny { background:rgba(255,255,255,0.06); color:var(--text); border:1px solid var(--border); }
-
 /* ============ USERS PANEL ============ */
 #usersPanel {
   display:none; position:fixed; inset:0;
@@ -502,7 +503,7 @@ input:checked + .slider:before { transform:translateX(16px); }
   z-index:105; justify-content:flex-end; flex-direction:column;
   height:100vh; height:100dvh; overflow:hidden;
 }
-#chatPanel.active { display:flex; }
+#chatPanel.active { display:flex; position:relative; }
 .chat-header {
   display:flex; justify-content:space-between; align-items:center;
   padding:14px 18px; background:var(--surface);
@@ -557,7 +558,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-msg {
   max-width:78%; padding:10px 14px; border-radius:16px;
   font-size:13px; line-height:1.5; word-wrap:break-word;
-  font-weight:500;
+  font-weight:500; position:relative;
 }
 .chat-msg.mine {
   align-self:flex-end;
@@ -598,7 +599,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 #typingText { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 
-/* ✅ CHAT INPUT — contenteditable */
 .chat-input-row {
   display:flex; gap:8px; padding:10px 14px;
   background:var(--surface); border-top:1px solid var(--border);
@@ -1013,19 +1013,26 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
     
-    <!-- ✅ 4 BUTTONS -->
+    <!-- ✅ 5 BUTTONS — Prev / Rewind / Play / Forward / Next -->
     <div class="controls">
       <button class="ctrl-btn" id="prevBtn" title="Previous song">
         <i data-lucide="skip-back"></i>
       </button>
-      <button class="ctrl-btn play" id="playBtn" title="Play/Pause">
+      
+      <button class="ctrl-btn rewind" id="rewindBtn" title="Rewind 10 seconds">
+        <i data-lucide="rewind"></i>
+      </button>
+      
+      <button class="ctrl-btn play" id="playBtn" title="Play / Pause">
         <i data-lucide="play"></i>
       </button>
+      
+      <button class="ctrl-btn forward" id="forwardBtn" title="Fast-forward 10 seconds">
+        <i data-lucide="fast-forward"></i>
+      </button>
+      
       <button class="ctrl-btn" id="nextBtn" title="Next song">
         <i data-lucide="skip-forward"></i>
-      </button>
-      <button class="ctrl-btn skip" id="skipBtn" title="Skip — play similar">
-        <i data-lucide="shuffle"></i>
       </button>
     </div>
   </div>
@@ -1720,7 +1727,6 @@ function initSocket(){
       isOwner=r.isOwner||false;
       startActivityPing();
       startSyncCheck();
-      // ✅ Server se current state maango
       socket.emit('requestSyncState', { roomId });
       setTimeout(shareLocation,2000);
     } else if (r.pending) {
@@ -1744,18 +1750,14 @@ function initSocket(){
 
   socket.on('usersUpdate',(users)=>{renderUsers(users);updatePartnerStatus(users);});
   
-  // ✅ stateSync — save position
   socket.on('stateSync',(state)=>{
     if (state.position !== undefined) lastKnownPosition = state.position;
     applyRemoteState(state);
   });
 
-  // ✅ songChanged — sync, next, skip, auto handle
   socket.on('songChanged', ({ track, reason, playedBy }) => {
     if (reason === 'sync') {
-      // ✅ Same position pe load karo
       const syncPos = lastKnownPosition || 0;
-      console.log(`🔄 Syncing to position: ${syncPos.toFixed(1)}s`);
       loadTrack(track, syncPos, true);
       updatePlayedBy(playedBy, 'user');
       return;
@@ -2270,28 +2272,54 @@ document.getElementById('playBtn').addEventListener('click',()=>{
   }
 });
 
-/* ✅ NEXT BUTTON — Queue based */
+/* ✅ REWIND — 10 sec peeche */
+document.getElementById('rewindBtn').addEventListener('click', () => {
+  if (!currentTrack) { showToast('No song playing', 'error'); return; }
+  if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
+  
+  const newTime = Math.max(0, audio.currentTime - 10);
+  audio.currentTime = newTime;
+  broadcastState({ isPlaying: !audio.paused, position: newTime });
+  
+  if (navigator.vibrate) navigator.vibrate(15);
+  showToast('⏪ -10s');
+});
+
+/* ✅ FAST-FORWARD — 10 sec aage */
+document.getElementById('forwardBtn').addEventListener('click', () => {
+  if (!currentTrack || !audio.duration) { showToast('No song playing', 'error'); return; }
+  if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
+  
+  const newTime = Math.min(audio.duration - 1, audio.currentTime + 10);
+  audio.currentTime = newTime;
+  broadcastState({ isPlaying: !audio.paused, position: newTime });
+  
+  if (navigator.vibrate) navigator.vibrate(15);
+  showToast('⏩ +10s');
+});
+
+/* ✅ PREV BUTTON — Pichla gaana / restart */
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (!currentTrack) { showToast('No song playing', 'error'); return; }
+  if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
+  
+  // Agar 3 sec se zyada suna hai → restart
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+    broadcastState({ isPlaying: true, position: 0 });
+    showToast('⏮️ Restarted');
+  } else {
+    if (socket && socket.connected) socket.emit('requestPrev', { roomId });
+    showToast('⏮️ Previous');
+  }
+});
+
+/* ✅ NEXT BUTTON */
 document.getElementById('nextBtn').addEventListener('click',()=>{
   if(!socket||!socket.connected){showToast('Not connected','error');return;}
   if(myPermissions.play){showToast('You are blocked','error');return;}
-  showToast('⏭️ Playing next');
   socket.emit('requestNext',{roomId});
-});
-
-/* ✅ SKIP BUTTON — Different song */
-document.getElementById('skipBtn').addEventListener('click',()=>{
-  if(!socket||!socket.connected){showToast('Not connected','error');return;}
-  if(myPermissions.play){showToast('You are blocked','error');return;}
-  showToast('🎲 Finding something new...');
-  socket.emit('requestSkip',{roomId});
-});
-
-document.getElementById('prevBtn').addEventListener('click',()=>{
-  if(!currentTrack){showToast('No song playing','error');return;}
-  if(myPermissions.play){showToast('You are blocked','error');return;}
-  audio.currentTime=0;
-  if(audio.paused)audio.play().catch(()=>{});
-  broadcastState({isPlaying:true,position:0});
+  showToast('⏭️ Next');
 });
 
 document.getElementById('progressBar').addEventListener('click',(e)=>{
@@ -2733,6 +2761,11 @@ function setupMediaSession() {
   navigator.mediaSession.setActionHandler('nexttrack', () => {
     if (socket && socket.connected) socket.emit('requestNext', { roomId });
   });
+  navigator.mediaSession.setActionHandler('previoustrack', () => {
+    if (audio.currentTime > 3) {
+      audio.currentTime = 0;
+    }
+  });
 }
 document.addEventListener('click', setupMediaSession, { once: true });
 
@@ -2743,9 +2776,26 @@ document.addEventListener('keydown', (e) => {
     case ' ':
       if (!pttModeEnabled) { e.preventDefault(); document.getElementById('playBtn').click(); }
       break;
-    case 'ArrowRight': e.preventDefault(); document.getElementById('nextBtn').click(); break;
-    case 'ArrowLeft': e.preventDefault(); document.getElementById('prevBtn').click(); break;
-    case 's': case 'S': e.preventDefault(); document.getElementById('skipBtn').click(); break;
+    case 'ArrowRight': 
+      if (e.shiftKey) {
+        e.preventDefault(); 
+        document.getElementById('nextBtn').click();
+      } else {
+        e.preventDefault(); 
+        document.getElementById('forwardBtn').click();
+      }
+      break;
+    case 'ArrowLeft': 
+      if (e.shiftKey) {
+        e.preventDefault(); 
+        document.getElementById('prevBtn').click();
+      } else {
+        e.preventDefault(); 
+        document.getElementById('rewindBtn').click();
+      }
+      break;
+    case 'j': case 'J': e.preventDefault(); document.getElementById('rewindBtn').click(); break;
+    case 'l': case 'L': e.preventDefault(); document.getElementById('forwardBtn').click(); break;
     case 'm': case 'M': e.preventDefault(); document.getElementById('muteAllBtn').click(); break;
     case 'c': case 'C': e.preventDefault(); document.getElementById('chatBtn').click(); break;
     case 'Escape':
