@@ -1711,12 +1711,17 @@ async function updateDynamicBackground(url){
     img.crossOrigin='anonymous';
     img.onload=async()=>{
       const c=await extractColorsFromImage(img);
-      document.documentElement.style.setProperty('--dynamic-1',c.c1);
-      document.documentElement.style.setProperty('--dynamic-2',c.c2);
+      // ✅ Batch both in one frame
+      requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--dynamic-1',c.c1);
+        document.documentElement.style.setProperty('--dynamic-2',c.c2);
+      });
     };
     img.onerror=()=>{
-      document.documentElement.style.setProperty('--dynamic-1','#8B5CF6');
-      document.documentElement.style.setProperty('--dynamic-2','#EC4899');
+      requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--dynamic-1','#8B5CF6');
+        document.documentElement.style.setProperty('--dynamic-2','#EC4899');
+      });
     };
     img.src=url;
   }catch(e){}
