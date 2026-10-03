@@ -2914,26 +2914,40 @@ window.addEventListener('load', async () => {
 
 /* ============ APPLY REMOTE STATE ============ */
 async function applyRemoteState(state){
-  isRemoteUpdate=true;
-  if(state.track&&(!currentTrack||currentTrack.id!==state.track.id)){
-    await loadTrack(state.track,state.position,state.isPlaying);
-    if(state.playedByName) updatePlayedBy(state.playedByName,state.autoDj?'auto':'user');
-  }else if(currentTrack){
-    if(state.isPlaying&&audio.paused)await audio.play().catch(()=>{});
-    if(!state.isPlaying&&!audio.paused)audio.pause();
-    if(state.isPlaying&&!audio.paused){
-      const drift=audio.currentTime-state.position;
-      const abs=Math.abs(drift);
-      if(abs<0.3)audio.playbackRate=1.0;
-      else if(abs<2.0){
-        audio.playbackRate=drift>0?0.97:1.03;
-        clearTimeout(window._rateResetTimeout);
-        window._rateResetTimeout=setTimeout(()=>{audio.playbackRate=1.0;},3000);
-      }else{audio.currentTime=state.position;audio.playbackRate=1.0;}
+  isRemoteUpdate = true;
+  try {
+    if (state.track && (!currentTrack || currentTrack.id !== state.track.id)) {
+      await loadTrack(state.track, state.position, state.isPlaying);
+      if (state.playedByName) updatePlayedBy(state.playedByName, state.autoDj ? 'auto' : 'user');
+    } else if (currentTrack) {
+      // ✅ Play/pause sync
+      if (state.isPlaying && audio.paused) {
+        await audio.play().catch(()=>{});
+      }
+      if (!state.isPlaying && !audio.paused) {
+        audio.pause();
+      }
+      
+      // ✅ Sync position
+      if (state.isPlaying && !audio.paused) {
+        const drift = audio.currentTime - state.position;
+        const abs = Math.abs(drift);
+        if (abs < 0.3) audio.playbackRate = 1.0;
+        else if (abs < 2.0) {
+          audio.playbackRate = drift > 0 ? 0.97 : 1.03;
+          clearTimeout(window._rateResetTimeout);
+          window._rateResetTimeout = setTimeout(() => { audio.playbackRate = 1.0; }, 3000);
+        } else {
+          audio.currentTime = state.position;
+          audio.playbackRate = 1.0;
+        }
+      }
     }
+  } finally {
+    // ✅ ALWAYS update icon (even if error)
     updatePlayIcon();
+    isRemoteUpdate = false;
   }
-  isRemoteUpdate=false;
 }
 
 /* ✅ updatePlayIcon — Direct SVG, no UI shift */
