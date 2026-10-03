@@ -2825,15 +2825,14 @@ function renderChat(messages,replace){
     /* DYNAMIC SENDER NAME: uses m.userName for others, "You" for own */
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
     row.innerHTML = `
-    <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
-    <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${m.id}">
-      <span class="chat-msg-text">${esc(m.text)}</span>
-      <span class="chat-msg-meta">
-        <span>${time}</span>
-        ${mine?'<span class="chat-msg-tick">✓✓</span>':''}
-      </span>
-    </div>
-  `;
+  <div class="chat-msg-sender">
+    <span>${esc(senderName)}</span>
+  </div>
+  <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${m.id}">
+    <span class="chat-msg-text">${esc(m.text)}</span>
+    <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
+  </div>
+`;
     box.appendChild(row);
   });
   box.scrollTop=box.scrollHeight;
