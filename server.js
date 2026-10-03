@@ -25,6 +25,7 @@ let currentAnnouncement = null;
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 60 * 1000;
 
+// ✅ Auto DJ playlist — only when NO real song is playing
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
   'Tum Hi Ho Arijit Singh',
@@ -36,12 +37,22 @@ const AUTO_DJ_PLAYLIST = [
   'Dil Diyan Gallan Atif Aslam',
   'Bekhayali Sachet Tandon',
   'Agar Tum Saath Ho Alka Yagnik',
-  'Malang Malang',
   'Kabira Arijit Singh',
   'Hawayein Arijit Singh',
-  'Pehla Pyaar',
   'Muskurane Arijit Singh'
 ];
+
+// ✅ SILENT AMBIENT tracks — jab koi real song nahi
+// Ye royalty-free / chill ambient tracks hain jo irritate nahi karte
+const SILENT_AMBIENT_TRACK = {
+  id: 'ambient-silent-default',
+  title: '🎧 Chill Vibes',
+  artist: 'SangeetX Radio',
+  duration: 99999, // Almost never ends
+  image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
+  // ✅ Silent / very quiet ambient audio
+  audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3'
+};
 
 let autoDjIndex = 0;
 
@@ -111,6 +122,7 @@ function ensureGlobalRoom() {
         playedBy: null,
         playedByName: null,
         autoDj: false,
+        isAmbient: false,
         lastUpdated: Date.now()
       },
       playedHistory: [],
@@ -122,6 +134,32 @@ function ensureGlobalRoom() {
 }
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 30000);
+
+// ✅ Start ambient music — silent background
+function startAmbientMusic() {
+  const room = rooms[GLOBAL_ROOM_ID];
+  if (!room) return;
+  if (room.state.track && !room.state.isAmbient) return; // Real song already playing
+
+  room.state = {
+    track: { ...SILENT_AMBIENT_TRACK },
+    position: 0,
+    isPlaying: true,
+    playedBy: null,
+    playedByName: '🎧 SangeetX Radio',
+    autoDj: false,
+    isAmbient: true,
+    lastUpdated: Date.now()
+  };
+
+  console.log('🎧 Ambient music started');
+  io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+  io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+    track: room.state.track,
+    reason: 'ambient',
+    playedBy: '🎧 SangeetX Radio'
+  });
+}
 
 function recordVisit(name, roomId, userAgent) {
   const now = new Date();
@@ -164,7 +202,8 @@ app.get('/api/global/stats', (req, res) => {
       artist: room.state.track.artist,
       isPlaying: room.state.isPlaying,
       playedBy: room.state.playedByName,
-      autoDj: room.state.autoDj
+      autoDj: room.state.autoDj,
+      isAmbient: room.state.isAmbient || false
     } : null,
     announcement: currentAnnouncement,
     createdAt: room.createdAt
@@ -205,7 +244,8 @@ app.get('/api/admin/stats', (req, res) => {
         title: room.state.track.title,
         artist: room.state.track.artist,
         playedBy: room.state.playedByName,
-        autoDj: room.state.autoDj
+        autoDj: room.state.autoDj,
+        isAmbient: room.state.isAmbient || false
       } : null,
       isPlaying: room.state.isPlaying,
       users: room.users.map(u => ({
@@ -400,7 +440,7 @@ app.post('/api/admin/forceSkip', async (req, res) => {
   if (!track) return res.status(404).json({ error: 'Song not found' });
 
   if (!room.playedHistory) room.playedHistory = [];
-  if (room.state.track) {
+  if (room.state.track && !room.state.isAmbient) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
@@ -412,6 +452,7 @@ app.post('/api/admin/forceSkip', async (req, res) => {
     playedBy: 'admin',
     playedByName: '👑 Admin',
     autoDj: false,
+    isAmbient: false,
     lastUpdated: Date.now()
   };
 
@@ -469,172 +510,163 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
+// ✅ Parallel API search — faster, no 502
 async function searchSong(query) {
   const q = encodeURIComponent(query);
 
-  // ✅ API 1: saavn.dev (primary)
-  try {
-    const r = await axios.get(
-      `https://saavn.dev/api/search/songs?query=${q}&limit=1`,
-      { timeout: 6000 }
-    );
-    const list = r.data?.data?.results || [];
-    if (list.length > 0) {
-      const s = list[0];
-      const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url;
-      if (audioUrl) {
-        console.log(`✅ API1 (saavn.dev): ${s.name}`);
-        return {
-          id: s.id, title: s.name,
-          artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-          duration: s.duration,
-          image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-          audioUrl
-        };
+  const tryAPI1 = async () => {
+    try {
+      const r = await axios.get(
+        `https://saavn.dev/api/search/songs?query=${q}&limit=1`,
+        { timeout: 5000 }
+      );
+      const list = r.data?.data?.results || [];
+      if (list.length > 0) {
+        const s = list[0];
+        const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url;
+        if (audioUrl) {
+          return {
+            id: s.id, title: s.name,
+            artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
+            duration: s.duration,
+            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
+            audioUrl,
+            _src: 'API1'
+          };
+        }
       }
-    }
-  } catch (e) { console.log('❌ API1 failed:', e.message); }
+    } catch (e) {}
+    return null;
+  };
 
-  // ✅ API 2: saavnapi-nine.vercel.app
-  try {
-    const r = await axios.get(
-      `https://saavnapi-nine.vercel.app/result?query=${q}`,
-      { timeout: 6000 }
-    );
-    const list = Array.isArray(r.data) ? r.data : [];
-    if (list.length > 0) {
-      const s = list[0];
-      const audioUrl = s.media_url || s.download_url || s.url;
-      if (audioUrl) {
-        console.log(`✅ API2 (saavn-nine): ${s.song || s.title}`);
-        return {
-          id: s.id || Date.now().toString(),
-          title: s.song || s.title || query,
-          artist: s.primary_artists || s.singers || 'Unknown',
-          duration: parseInt(s.duration) || 0,
-          image: s.image,
-          audioUrl
-        };
+  const tryAPI2 = async () => {
+    try {
+      const r = await axios.get(
+        `https://saavnapi-nine.vercel.app/result?query=${q}`,
+        { timeout: 5000 }
+      );
+      const list = Array.isArray(r.data) ? r.data : [];
+      if (list.length > 0) {
+        const s = list[0];
+        const audioUrl = s.media_url || s.download_url || s.url;
+        if (audioUrl) {
+          return {
+            id: s.id || Date.now().toString(),
+            title: s.song || s.title || query,
+            artist: s.primary_artists || s.singers || 'Unknown',
+            duration: parseInt(s.duration) || 0,
+            image: s.image,
+            audioUrl,
+            _src: 'API2'
+          };
+        }
       }
-    }
-  } catch (e) { console.log('❌ API2 failed:', e.message); }
+    } catch (e) {}
+    return null;
+  };
 
-  // ✅ API 3: jiosaavn-api (backup)
-  try {
-    const r = await axios.get(
-      `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-      { timeout: 6000 }
-    );
-    const list = r.data?.data?.results || r.data?.results || [];
-    if (list.length > 0) {
-      const s = list[0];
-      const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url;
-      if (audioUrl) {
-        console.log(`✅ API3 (backup): ${s.name || s.title}`);
-        return {
-          id: s.id || Date.now().toString(),
-          title: s.name || s.title,
-          artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
-          duration: s.duration || 0,
-          image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
-          audioUrl
-        };
+  const tryAPI3 = async () => {
+    try {
+      const r = await axios.get(
+        `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
+        { timeout: 5000 }
+      );
+      const list = r.data?.data?.results || r.data?.results || [];
+      if (list.length > 0) {
+        const s = list[0];
+        const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url;
+        if (audioUrl) {
+          return {
+            id: s.id || Date.now().toString(),
+            title: s.name || s.title,
+            artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
+            duration: s.duration || 0,
+            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
+            audioUrl,
+            _src: 'API3'
+          };
+        }
       }
-    }
-  } catch (e) { console.log('❌ API3 failed:', e.message); }
+    } catch (e) {}
+    return null;
+  };
 
-  // ✅ API 4: saavn-api-jio (naya backup)
   try {
-    const r = await axios.get(
-      `https://saavn-api-jio.vercel.app/search/songs?query=${q}`,
-      { timeout: 6000 }
-    );
-    const list = r.data?.data?.results || r.data?.results || [];
-    if (list.length > 0) {
-      const s = list[0];
-      const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url;
-      if (audioUrl) {
-        console.log(`✅ API4 (saavn-jio): ${s.name || s.title}`);
-        return {
-          id: s.id || Date.now().toString(),
-          title: s.name || s.title,
-          artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-          duration: s.duration || 0,
-          image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
-          audioUrl
-        };
-      }
-    }
-  } catch (e) { console.log('❌ API4 failed:', e.message); }
+    const result = await Promise.any([
+      tryAPI1(),
+      tryAPI2(),
+      tryAPI3()
+    ].filter(p => p !== null));
 
-  console.log('❌ ALL APIs failed for:', query);
+    if (result) {
+      console.log(`✅ Search success (${result._src}): ${result.title}`);
+      delete result._src;
+      return result;
+    }
+  } catch (e) {}
+
+  console.log('❌ ALL search APIs failed for:', query);
   return null;
 }
 
 async function searchSimilarSongs(query, exclude = []) {
   const q = encodeURIComponent(query);
 
-  // ✅ API 1
-  try {
-    const r = await axios.get(
-      `https://saavn.dev/api/search/songs?query=${q}&limit=10`,
-      { timeout: 6000 }
-    );
-    const list = r.data?.data?.results || [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id, title: s.name,
-      artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-      duration: s.duration,
-      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-    })).filter(s => s.audioUrl);
-    if (mapped.length > 0) return mapped;
-  } catch (e) { console.log('Similar API1 failed:', e.message); }
+  const tryAPI1 = async () => {
+    try {
+      const r = await axios.get(
+        `https://saavn.dev/api/search/songs?query=${q}&limit=10`,
+        { timeout: 5000 }
+      );
+      const list = r.data?.data?.results || [];
+      const filtered = list.filter(s => !exclude.includes(s.id));
+      const mapped = filtered.map(s => ({
+        id: s.id, title: s.name,
+        artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
+        duration: s.duration,
+        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
+        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
+      })).filter(s => s.audioUrl);
+      if (mapped.length > 0) return mapped;
+    } catch (e) {}
+    return null;
+  };
 
-  // ✅ API 2
-  try {
-    const r = await axios.get(
-      `https://saavnapi-nine.vercel.app/result?query=${q}`,
-      { timeout: 6000 }
-    );
-    const list = Array.isArray(r.data) ? r.data : [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id || Date.now().toString() + Math.random(),
-      title: s.song || s.title || query,
-      artist: s.primary_artists || s.singers || 'Unknown',
-      duration: parseInt(s.duration) || 0,
-      image: s.image,
-      audioUrl: s.media_url || s.download_url || s.url
-    })).filter(s => s.audioUrl);
-    if (mapped.length > 0) return mapped;
-  } catch (e) { console.log('Similar API2 failed:', e.message); }
+  const tryAPI2 = async () => {
+    try {
+      const r = await axios.get(
+        `https://saavnapi-nine.vercel.app/result?query=${q}`,
+        { timeout: 5000 }
+      );
+      const list = Array.isArray(r.data) ? r.data : [];
+      const filtered = list.filter(s => !exclude.includes(s.id));
+      const mapped = filtered.map(s => ({
+        id: s.id || Date.now().toString() + Math.random(),
+        title: s.song || s.title || query,
+        artist: s.primary_artists || s.singers || 'Unknown',
+        duration: parseInt(s.duration) || 0,
+        image: s.image,
+        audioUrl: s.media_url || s.download_url || s.url
+      })).filter(s => s.audioUrl);
+      if (mapped.length > 0) return mapped;
+    } catch (e) {}
+    return null;
+  };
 
-  // ✅ API 3
   try {
-    const r = await axios.get(
-      `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-      { timeout: 6000 }
-    );
-    const list = r.data?.data?.results || r.data?.results || [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id || Date.now().toString() + Math.random(),
-      title: s.name || s.title,
-      artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
-      duration: s.duration || 0,
-      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
-      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
-    })).filter(s => s.audioUrl);
-    if (mapped.length > 0) return mapped;
-  } catch (e) { console.log('Similar API3 failed:', e.message); }
+    const result = await Promise.any([
+      tryAPI1(),
+      tryAPI2()
+    ].filter(p => p !== null));
+    if (result) return result;
+  } catch (e) {}
 
   return [];
 }
 
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
+  if (currentTrack.isAmbient) return null;
 
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const title = currentTrack.title || '';
@@ -673,6 +705,7 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
 
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
+  if (currentTrack.isAmbient) return null;
 
   const artist = (currentTrack.artist || '').split(',')[0].trim();
 
@@ -711,32 +744,40 @@ async function playNextSong(reason = 'auto', user = null) {
   const playedHistory = room.playedHistory || [];
   let nextSong = null;
 
-  if (reason === 'skip') {
-    nextSong = await getSkipSong(room.state.track, playedHistory);
-  } else if (reason === 'next' || reason === 'auto') {
-    nextSong = await getNextSongFromContext(room.state.track, playedHistory);
+  // ✅ If current track is ambient, don't try to get "next from context"
+  const currentIsAmbient = room.state.isAmbient || false;
+
+  if (!currentIsAmbient) {
+    if (reason === 'skip') {
+      nextSong = await getSkipSong(room.state.track, playedHistory);
+    } else if (reason === 'next' || reason === 'auto') {
+      nextSong = await getNextSongFromContext(room.state.track, playedHistory);
+    }
   }
 
-  // ✅ Auto DJ fallback — 5 retries with 1.5s delay
+  // ✅ Auto DJ fallback — 3 retries
   if (!nextSong) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
-      console.log(`🎵 Auto DJ attempt ${i+1}/5: ${songName}`);
+      console.log(`🎵 Auto DJ attempt ${i+1}/3: ${songName}`);
       nextSong = await searchSong(songName);
       if (nextSong) {
         console.log(`✅ Auto DJ got: ${nextSong.title}`);
         break;
       }
-      if (i < 4) {
-        await new Promise(r => setTimeout(r, 1500));
+      if (i < 2) {
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
   }
 
-  // ✅ Agar phir bhi null, toh silent retry (no user popup)
+  // ✅ If still null → keep ambient playing
   if (!nextSong) {
-    console.error('❌ playNextSong: all APIs failed');
+    console.error('❌ playNextSong: all APIs failed → keeping ambient');
+    if (!room.state.isAmbient) {
+      startAmbientMusic();
+    }
     setTimeout(() => {
       console.log('🔄 Auto-retry playNextSong in 5s...');
       playNextSong(reason, user);
@@ -745,7 +786,7 @@ async function playNextSong(reason = 'auto', user = null) {
   }
 
   if (!room.playedHistory) room.playedHistory = [];
-  if (room.state.track) {
+  if (room.state.track && !room.state.isAmbient) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
@@ -774,6 +815,7 @@ async function playNextSong(reason = 'auto', user = null) {
     playedBy: user ? user.id : null,
     playedByName: playedByName,
     autoDj: autoDjFlag,
+    isAmbient: false,
     lastUpdated: Date.now()
   };
 
@@ -787,23 +829,25 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
-// ✅ FIXED: Aggressive Auto DJ — chahe user ho ya na ho
+// ✅ Aggressive Auto DJ — chahe user ho ya na ho
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
 
-    // ✅ Agar koi song nahi chal raha — turant Auto DJ start karo
+    // ✅ Agar koi song nahi chal raha — ambient start karo
     if (!room.state.track || !room.state.isPlaying) {
-      // ✅ Anti-spam: agar 5 sec pehle try kiya aur fail hua, skip karo
       const lastAttempt = room._lastAutoDjAttempt || 0;
-      if (Date.now() - lastAttempt < 5000) return;
+      if (Date.now() - lastAttempt < 10000) return;
       room._lastAutoDjAttempt = Date.now();
 
-      console.log(`🎵 No song playing — Auto DJ start`);
-      await playNextSong('auto');
+      console.log(`🎧 No song playing — starting ambient`);
+      startAmbientMusic();
       return;
     }
+
+    // ✅ Ambient hai toh skip
+    if (room.state.isAmbient) return;
 
     // ✅ Song end check
     const duration = room.state.track.duration || 0;
@@ -814,7 +858,8 @@ function startSongEndCheck() {
     const estimatedPos = position + elapsed;
 
     if (duration > 0 && estimatedPos >= duration - 2) {
-      console.log(`🎵 Song ended — Auto DJ next`);
+      room._lastAutoDjAttempt = Date.now();
+      console.log(`🎵 Song ended — next`);
       await playNextSong('auto');
     }
   }, 3000);
@@ -824,6 +869,7 @@ function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || !room.state.isPlaying) return;
+    if (room.state.isAmbient) return; // Ambient doesn't need position update
 
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
@@ -836,13 +882,13 @@ function startPositionUpdater() {
 }
 
 function startAutoDj() {
-  setTimeout(async () => {
+  setTimeout(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (room && !room.state.track) {
-      console.log('🎵 Initial Auto DJ start');
-      await playNextSong('auto');
+      console.log('🎧 Initial ambient music start');
+      startAmbientMusic();
     }
-  }, 3000);
+  }, 2000);
 }
 
 io.on('connection', (socket) => {
@@ -926,9 +972,11 @@ io.on('connection', (socket) => {
 
     if (room.state.track && room.state.isPlaying) {
       let currentPosition = room.state.position || 0;
-      const lastUpdated = room.state.lastUpdated || Date.now();
-      const elapsed = (Date.now() - lastUpdated) / 1000;
-      currentPosition = (room.state.position || 0) + elapsed;
+      if (!room.state.isAmbient) {
+        const lastUpdated = room.state.lastUpdated || Date.now();
+        const elapsed = (Date.now() - lastUpdated) / 1000;
+        currentPosition = (room.state.position || 0) + elapsed;
+      }
 
       socket.emit('stateSync', {
         track: room.state.track,
@@ -936,6 +984,7 @@ io.on('connection', (socket) => {
         isPlaying: true,
         playedByName: room.state.playedByName,
         autoDj: room.state.autoDj,
+        isAmbient: room.state.isAmbient || false,
         lastUpdated: Date.now()
       });
 
@@ -945,60 +994,27 @@ io.on('connection', (socket) => {
         playedBy: room.state.playedByName
       });
 
-      console.log(`🔄 Synced ${userName} to position ${currentPosition.toFixed(1)}s`);
+      console.log(`🔄 Synced ${userName} to ${room.state.isAmbient ? 'ambient' : 'position ' + currentPosition.toFixed(1) + 's'}`);
     }
     else {
-      console.log(`🎵 No song playing — starting Auto DJ for ${userName}`);
-
-      // ✅ Turant try karo
-      setTimeout(async () => {
-        const r = rooms[GLOBAL_ROOM_ID];
-        if (r && (!r.state.track || !r.state.isPlaying)) {
-          console.log(`🎵 Auto DJ starting for new user...`);
-          await playNextSong('auto');
-
-          // ✅ Song mil gaya toh bhejo
-          if (r.state.track) {
-            socket.emit('stateSync', {
-              track: r.state.track,
-              position: r.state.position || 0,
-              isPlaying: r.state.isPlaying,
-              playedByName: r.state.playedByName,
-              autoDj: r.state.autoDj,
-              lastUpdated: Date.now()
-            });
-            socket.emit('songChanged', {
-              track: r.state.track,
-              reason: 'sync',
-              playedBy: r.state.playedByName
-            });
-            console.log(`✅ Synced Auto DJ song to ${userName}: ${r.state.track.title}`);
-          } else {
-            // ✅ Nahi mila toh 3 second baad phir try karo
-            console.log(`⚠️ Auto DJ failed, retry in 3s...`);
-            setTimeout(async () => {
-              const r2 = rooms[GLOBAL_ROOM_ID];
-              if (r2 && (!r2.state.track || !r2.state.isPlaying)) {
-                await playNextSong('auto');
-                if (r2.state.track) {
-                  socket.emit('stateSync', {
-                    track: r2.state.track,
-                    position: r2.state.position || 0,
-                    isPlaying: r2.state.isPlaying,
-                    playedByName: r2.state.playedByName,
-                    autoDj: r2.state.autoDj,
-                    lastUpdated: Date.now()
-                  });
-                  socket.emit('songChanged', {
-                    track: r2.state.track,
-                    reason: 'sync',
-                    playedBy: r2.state.playedByName
-                  });
-                  console.log(`✅ Retry success: ${r2.state.track.title}`);
-                }
-              }
-            }, 3000);
-          }
+      console.log(`🎧 No song — starting ambient for ${userName}`);
+      startAmbientMusic();
+      setTimeout(() => {
+        if (room.state.track) {
+          socket.emit('stateSync', {
+            track: room.state.track,
+            position: 0,
+            isPlaying: true,
+            playedByName: room.state.playedByName,
+            autoDj: room.state.autoDj,
+            isAmbient: room.state.isAmbient || false,
+            lastUpdated: Date.now()
+          });
+          socket.emit('songChanged', {
+            track: room.state.track,
+            reason: 'sync',
+            playedBy: room.state.playedByName
+          });
         }
       }, 500);
     }
@@ -1047,12 +1063,13 @@ io.on('connection', (socket) => {
 
     if (newState.track) {
       newState.autoDj = false;
+      newState.isAmbient = false;
       newState.playedBy = socket.id;
       newState.playedByName = user.name;
       console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
 
       if (!room.playedHistory) room.playedHistory = [];
-      if (room.state.track && room.state.track.id !== newState.track.id) {
+      if (room.state.track && !room.state.isAmbient && room.state.track.id !== newState.track.id) {
         room.playedHistory.push(room.state.track.id);
         if (room.playedHistory.length > 20) room.playedHistory.shift();
       }
@@ -1067,7 +1084,6 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
   });
 
-  // ✅ NEXT — chhota message
   socket.on('requestNext', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1090,7 +1106,6 @@ io.on('connection', (socket) => {
     await playNextSong('next', user);
   });
 
-  // ✅ NAYA: PREV — history me peeche jaane ke liye
   socket.on('requestPrev', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1105,11 +1120,8 @@ io.on('connection', (socket) => {
 
     console.log(`⏮️ ${user.name} requested PREV`);
 
-    // ✅ Played history se last song nikalo
     if (room.playedHistory && room.playedHistory.length > 0) {
       const prevId = room.playedHistory.pop();
-      // History se track dhoondo (already full track nahi hai, sirf ID hai)
-      // Toh search karo by ID
       try {
         const r = await axios.get(
           'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
@@ -1125,8 +1137,7 @@ io.on('connection', (socket) => {
             audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
           };
 
-          if (room.state.track) {
-            // Current ko wapas history me daalo
+          if (room.state.track && !room.state.isAmbient) {
             room.playedHistory.push(room.state.track.id);
           }
 
@@ -1137,6 +1148,7 @@ io.on('connection', (socket) => {
             playedBy: user.id,
             playedByName: user.name,
             autoDj: false,
+            isAmbient: false,
             lastUpdated: Date.now()
           };
 
@@ -1157,7 +1169,6 @@ io.on('connection', (socket) => {
       }
     }
 
-    // ✅ Fallback — agar history empty hai toh next hi chala do
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
       message: `⏮️ Previous`
@@ -1165,7 +1176,6 @@ io.on('connection', (socket) => {
     await playNextSong('next', user);
   });
 
-  // ✅ SKIP — chhota message
   socket.on('requestSkip', async ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1194,7 +1204,7 @@ io.on('connection', (socket) => {
 
     let currentPosition = room.state.position || 0;
 
-    if (room.state.track && room.state.isPlaying) {
+    if (room.state.track && room.state.isPlaying && !room.state.isAmbient) {
       const lastUpdated = room.state.lastUpdated || Date.now();
       const elapsed = (Date.now() - lastUpdated) / 1000;
       currentPosition = (room.state.position || 0) + elapsed;
@@ -1212,6 +1222,7 @@ io.on('connection', (socket) => {
       isPlaying: room.state.isPlaying,
       playedByName: room.state.playedByName,
       autoDj: room.state.autoDj,
+      isAmbient: room.state.isAmbient || false,
       lastUpdated: Date.now()
     });
 
@@ -1231,6 +1242,7 @@ io.on('connection', (socket) => {
     if (!user) return;
     user.lastActive = Date.now();
     if (user.blocked && user.blocked.play) return;
+    if (room.state.isAmbient) return;
     room.state.position = position;
     room.state.isPlaying = isPlaying;
     room.state.lastUpdated = Date.now();
@@ -1454,7 +1466,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
-  console.log('🎵 Starting Auto DJ...');
+  console.log('🎧 Starting ambient music...');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
