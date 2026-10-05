@@ -6,7 +6,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+  cors: { origin: '*' },
+  pingTimeout: 30000,
+  pingInterval: 25000,
+  maxHttpBufferSize: 1e6
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -24,6 +29,10 @@ let currentAnnouncement = null;
 
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 30 * 1000;
+
+// ✅ Search cache — same query 5 min tak cached
+const searchCache = new Map();
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
@@ -95,26 +104,21 @@ function getClientIP(socket) {
   const forwarded = handshake.headers['x-forwarded-for'];
   const realIP = handshake.headers['x-real-ip'];
   const cfIP = handshake.headers['cf-connecting-ip'];
-
   let ip = cfIP || realIP || forwarded ||
            handshake.address ||
            socket.conn.remoteAddress ||
            'unknown';
-
   if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
   if (ip && ip.startsWith('::ffff:')) ip = ip.substring(7);
-
   return ip;
 }
 
 function isBlocked(socket, fingerprint) {
   const ip = getClientIP(socket);
-
   if (BLOCKED_IPS.has(ip)) return { blocked: true, reason: 'IP', detail: ip };
   if (fingerprint && fingerprint !== 'unknown' && BLOCKED_FINGERPRINTS.has(fingerprint)) {
     return { blocked: true, reason: 'Fingerprint', detail: fingerprint };
   }
-
   return { blocked: false };
 }
 
@@ -151,18 +155,15 @@ function ensureGlobalRoom() {
   }
 }
 ensureGlobalRoom();
-setInterval(ensureGlobalRoom, 30000);
+setInterval(ensureGlobalRoom, 60000);
 
-// ✅ Real-time position calculator — hamesha live position deta hai
+// ✅ Real-time position
 function getCurrentPosition(room) {
   if (!room || !room.state.track) return 0;
   if (!room.state.isPlaying) return room.state.position || 0;
-
   const lastUpdated = room.state.lastUpdated || Date.now();
   const elapsed = (Date.now() - lastUpdated) / 1000;
   let pos = (room.state.position || 0) + elapsed;
-
-  // Agar duration se zyada ho gaya to 0 kar do
   if (room.state.track.duration > 0 && pos >= room.state.track.duration) {
     pos = 0;
   }
@@ -231,7 +232,6 @@ app.get('/api/global/stats', (req, res) => {
   const room = rooms[GLOBAL_ROOM_ID];
   const now = Date.now();
   const online = room.users.filter(u => now - u.lastActive < 2 * 60 * 1000);
-
   res.json({
     totalUsers: room.users.length,
     onlineUsers: online.length,
@@ -253,20 +253,16 @@ app.get('/admin', (req, res) => {
 
 app.get('/api/admin/stats', (req, res) => {
   if (!isAdmin(req.query.password)) return res.status(401).json({ error: 'Invalid password' });
-
   const today = new Date().toISOString().slice(0, 10);
   const todayVisits = analytics.dailyVisits[today] || 0;
-
   const last7 = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     last7.push({ date: key, count: analytics.dailyVisits[key] || 0 });
   }
-
   const hourly = [];
   for (let h = 0; h < 24; h++) hourly.push({ hour: h, count: analytics.hourlyVisits[h.toString()] || 0 });
-
   const activeRooms = Object.entries(rooms).map(([roomId, room]) => {
     const age = Math.floor((Date.now() - (room.createdAt || Date.now())) / 60000);
     return {
@@ -296,7 +292,6 @@ app.get('/api/admin/stats', (req, res) => {
       }))
     };
   });
-
   res.json({
     totalVisits: analytics.totalVisits,
     uniqueUsers: analytics.uniqueUsers.size,
@@ -319,19 +314,16 @@ app.get('/api/admin/stats', (req, res) => {
 app.post('/api/admin/blockUser', (req, res) => {
   const { password, userId, ip, fingerprint, reason } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-
   let blocked = false;
   if (ip && ip !== 'unknown') { BLOCKED_IPS.add(ip); blocked = true; }
   if (fingerprint && fingerprint !== 'unknown') { BLOCKED_FINGERPRINTS.add(fingerprint); blocked = true; }
   if (!blocked) return res.status(400).json({ error: 'No identifier' });
-
   io.sockets.sockets.forEach(s => {
     if ((ip && s.userIP === ip) || (fingerprint && s.userFingerprint === fingerprint) || (userId && s.id === userId)) {
       s.emit('blocked', { message: 'You have been blocked', reason: reason || 'Rule violation' });
       setTimeout(() => s.disconnect(true), 500);
     }
   });
-
   const room = rooms[GLOBAL_ROOM_ID];
   if (room) {
     room.users = room.users.filter(u => {
@@ -340,7 +332,6 @@ app.post('/api/admin/blockUser', (req, res) => {
     });
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
   }
-
   console.log(`🚫 Blocked: IP=${ip}, FP=${fingerprint}`);
   res.json({ success: true });
 });
@@ -366,11 +357,8 @@ app.get('/api/admin/blockedList', (req, res) => {
 app.post('/api/admin/kickUser', (req, res) => {
   const { password, userId, roomId } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-
   console.log(`👢 Kick request: userId=${userId}, roomId=${roomId}`);
-
   let s = io.sockets.sockets.get(userId);
-
   if (!s && roomId && rooms[roomId]) {
     const room = rooms[roomId];
     const user = room.users.find(u => u.id === userId || u.name === userId);
@@ -383,7 +371,6 @@ app.post('/api/admin/kickUser', (req, res) => {
       }
     }
   }
-
   if (s) {
     s.emit('kicked', { message: 'Admin removed you' });
     if (roomId && rooms[roomId]) {
@@ -440,33 +427,24 @@ app.get('/api/admin/roomChat', (req, res) => {
 app.post('/api/admin/globalMute', (req, res) => {
   const { password, userId, mute } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return res.status(404).json({ error: 'Room not found' });
-
   const user = room.users.find(u => u.id === userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
-
   const userNameKey = user.name.toLowerCase();
-
   if (mute) GLOBAL_MUTED_USERS.add(userNameKey);
   else GLOBAL_MUTED_USERS.delete(userNameKey);
-
   user.globallyMuted = !!mute;
-
   io.to(GLOBAL_ROOM_ID).emit('globalMuteUpdate', {
     userId: user.id,
     userName: user.name,
     muted: !!mute
   });
-
   const targetSocket = io.sockets.sockets.get(userId);
   if (targetSocket) {
     targetSocket.emit('youAreMuted', { muted: !!mute, by: '👑 Admin' });
   }
-
   io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
-
   console.log(`🔇 Global mute: ${user.name} → ${mute ? 'MUTED' : 'UNMUTED'}`);
   res.json({ success: true, muted: !!mute });
 });
@@ -483,32 +461,25 @@ app.get('/api/admin/globalMutedList', (req, res) => {
 app.post('/api/admin/forceSkip', async (req, res) => {
   const { password, searchQuery } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
-
   const room = rooms[GLOBAL_ROOM_ID];
   if (!room) return res.status(404).json({ error: 'Room not found' });
-
   let track = null;
-
   if (searchQuery && searchQuery.trim()) {
     track = await searchSong(searchQuery.trim());
     console.log(`🎵 Admin force search: "${searchQuery}" → ${track?.title || 'not found'}`);
   }
-
   if (!track) {
     const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
     autoDjIndex++;
     track = await searchSong(songName);
     console.log(`🎵 Admin force skip: ${songName}`);
   }
-
   if (!track) return res.status(404).json({ error: 'Song not found' });
-
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track && !room.state.isAmbient) {
     room.playedHistory.push(room.state.track.id);
     if (room.playedHistory.length > 20) room.playedHistory.shift();
   }
-
   room.state = {
     track: track,
     position: 0,
@@ -519,7 +490,6 @@ app.post('/api/admin/forceSkip', async (req, res) => {
     isAmbient: false,
     lastUpdated: Date.now()
   };
-
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: track,
@@ -530,7 +500,6 @@ app.post('/api/admin/forceSkip', async (req, res) => {
     track,
     message: `👑 Admin skipped to: ${track.title}`
   });
-
   console.log(`👑 Admin forced: ${track.title}`);
   res.json({ success: true, track });
 });
@@ -539,21 +508,16 @@ app.post('/api/admin/announce', (req, res) => {
   const { password, message, duration } = req.body;
   if (!isAdmin(password)) return res.status(401).json({ error: 'Unauthorized' });
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
-
   const announceMsg = String(message).slice(0, 300);
   const dur = Math.min(Math.max(parseInt(duration) || 10000, 2000), 60000);
-
   currentAnnouncement = {
     message: announceMsg,
     by: '👑 Admin',
     at: Date.now(),
     duration: dur
   };
-
   io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', currentAnnouncement);
-
   console.log(`📢 Admin announce: ${announceMsg} (${dur}ms)`);
-
   setTimeout(() => {
     if (currentAnnouncement && currentAnnouncement.at === currentAnnouncement.at &&
         Date.now() - currentAnnouncement.at >= dur - 200) {
@@ -562,7 +526,6 @@ app.post('/api/admin/announce', (req, res) => {
       console.log('📢 Announcement cleared');
     }
   }, dur);
-
   res.json({ success: true, announcement: currentAnnouncement });
 });
 
@@ -574,14 +537,21 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
+// ✅ Cached search — same query 5 min tak instant
 async function searchSong(query) {
+  const cacheKey = query.toLowerCase().trim();
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
+    return cached.data;
+  }
+
   const q = encodeURIComponent(query);
 
   const tryAPI1 = async () => {
     try {
       const r = await axios.get(
         `https://saavn.dev/api/search/songs?query=${q}&limit=1`,
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const list = r.data?.data?.results || [];
       if (list.length > 0) {
@@ -606,7 +576,7 @@ async function searchSong(query) {
     try {
       const r = await axios.get(
         `https://saavnapi-nine.vercel.app/result?query=${q}`,
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const list = Array.isArray(r.data) ? r.data : [];
       if (list.length > 0) {
@@ -632,7 +602,7 @@ async function searchSong(query) {
     try {
       const r = await axios.get(
         `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const list = r.data?.data?.results || r.data?.results || [];
       if (list.length > 0) {
@@ -664,6 +634,13 @@ async function searchSong(query) {
     if (result) {
       console.log(`✅ Search success (${result._src}): ${result.title}`);
       delete result._src;
+      // ✅ Cache me store karo
+      searchCache.set(cacheKey, { data: result, time: Date.now() });
+      // Cache size limit
+      if (searchCache.size > 200) {
+        const firstKey = searchCache.keys().next().value;
+        searchCache.delete(firstKey);
+      }
       return result;
     }
   } catch (e) {}
@@ -679,7 +656,7 @@ async function searchSimilarSongs(query, exclude = []) {
     try {
       const r = await axios.get(
         `https://saavn.dev/api/search/songs?query=${q}&limit=10`,
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const list = r.data?.data?.results || [];
       const filtered = list.filter(s => !exclude.includes(s.id));
@@ -699,7 +676,7 @@ async function searchSimilarSongs(query, exclude = []) {
     try {
       const r = await axios.get(
         `https://saavnapi-nine.vercel.app/result?query=${q}`,
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const list = Array.isArray(r.data) ? r.data : [];
       const filtered = list.filter(s => !exclude.includes(s.id));
@@ -729,7 +706,6 @@ async function searchSimilarSongs(query, exclude = []) {
 
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const title = currentTrack.title || '';
   const currentId = currentTrack.id;
@@ -745,13 +721,13 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
 
   const artistLower = artist.toLowerCase();
   const similarArtists = SIMILAR_ARTISTS[artistLower] || [];
-  similarArtists.slice(0, 3).forEach(simArtist => {
+  similarArtists.slice(0, 2).forEach(simArtist => {
     promises.push(
       searchSimilarSongs(simArtist, fullExclude).then(songs => ({ priority: 2, songs }))
     );
   });
 
-  const keywords = title.split(' ').filter(w => w.length > 3).slice(0, 2);
+  const keywords = title.split(' ').filter(w => w.length > 3).slice(0, 1);
   keywords.forEach(keyword => {
     promises.push(
       searchSimilarSongs(keyword, fullExclude).then(songs => ({ priority: 3, songs }))
@@ -777,13 +753,12 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     console.error('Parallel search error:', e);
   }
 
-  console.log('⚠️ No context match found — will use Auto DJ');
+  console.log('⚠️ No context match — Auto DJ');
   return null;
 }
 
 async function getSkipSong(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-
   const artist = (currentTrack.artist || '').split(',')[0].trim();
   const currentId = currentTrack.id;
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
@@ -837,22 +812,20 @@ async function playNextSong(reason = 'auto', user = null) {
   }
 
   if (!nextSong) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
-      console.log(`🎵 Auto DJ attempt ${i+1}/3: ${songName}`);
+      console.log(`🎵 Auto DJ attempt ${i+1}/2: ${songName}`);
       nextSong = await searchSong(songName);
       if (nextSong) {
         console.log(`✅ Auto DJ got: ${nextSong.title}`);
         break;
       }
-      if (i < 2) await new Promise(r => setTimeout(r, 500));
     }
   }
 
   if (!nextSong) {
-    console.error('❌ playNextSong: all APIs failed, retrying in 10s');
-    setTimeout(() => playNextSong(reason, user), 10000);
+    console.error('❌ playNextSong: all APIs failed');
     return;
   }
 
@@ -898,7 +871,7 @@ async function getPreviousSong(prevId) {
     async () => {
       const r = await axios.get(
         'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const s = r.data?.data?.[0];
       if (!s) return null;
@@ -913,7 +886,7 @@ async function getPreviousSong(prevId) {
     async () => {
       const r = await axios.get(
         'https://jiosaavn-api-2-harsh-patel.vercel.app/song?id=' + encodeURIComponent(prevId),
-        { timeout: 5000 }
+        { timeout: 4000 }
       );
       const s = r.data?.data?.[0] || r.data?.[0];
       if (!s) return null;
@@ -923,21 +896,6 @@ async function getPreviousSong(prevId) {
         duration: s.duration,
         image: s.image?.[2]?.url || s.image?.[1]?.url || s.image,
         audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
-      };
-    },
-    async () => {
-      const r = await axios.get(
-        'https://saavnapi-nine.vercel.app/song?id=' + encodeURIComponent(prevId),
-        { timeout: 5000 }
-      );
-      const s = r.data?.data || r.data?.[0];
-      if (!s) return null;
-      return {
-        id: s.id, title: s.song || s.title,
-        artist: s.primary_artists || s.singers || 'Unknown',
-        duration: parseInt(s.duration) || 0,
-        image: s.image,
-        audioUrl: s.media_url || s.download_url || s.url
       };
     }
   ];
@@ -956,14 +914,12 @@ async function getPreviousSong(prevId) {
   return null;
 }
 
+// ✅ Song end check — 5s (pehle 3s tha)
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
-
-    if (!room.state.track || !room.state.isPlaying) {
-      return;
-    }
+    if (!room.state.track || !room.state.isPlaying) return;
 
     const duration = room.state.track.duration || 0;
     const currentPos = getCurrentPosition(room);
@@ -973,22 +929,21 @@ function startSongEndCheck() {
       console.log(`🎵 Song ended — next`);
       await playNextSong('auto');
     }
-  }, 3000);
+  }, 5000);
 }
 
+// ✅ Position updater — 5s (pehle 2s tha, CPU heavy tha)
 function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || !room.state.isPlaying) return;
-
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
-
     if (elapsed > 5) {
       room.state.position = (room.state.position || 0) + elapsed;
       room.state.lastUpdated = Date.now();
     }
-  }, 2000);
+  }, 5000);
 }
 
 function startAutoDj() {
@@ -1074,7 +1029,7 @@ io.on('connection', (socket) => {
       socket.emit('adminAnnounce', currentAnnouncement);
     }
 
-    // ✅ Real-time position bhejo — actual jahan gaana chal raha hai
+    // ✅ Real-time position — actual jahan chal raha hai
     if (room.state.track && room.state.isPlaying) {
       const currentPosition = getCurrentPosition(room);
 
@@ -1093,7 +1048,7 @@ io.on('connection', (socket) => {
         playedBy: room.state.playedByName
       });
 
-      console.log(`🔄 Synced ${userName} to position ${currentPosition.toFixed(1)}s`);
+      console.log(`🔄 Synced ${userName} → ${currentPosition.toFixed(1)}s`);
     }
 
     socket.emit('chatHistory', room.messages);
@@ -1126,7 +1081,7 @@ io.on('connection', (socket) => {
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
 
-  // ✅ updateState — drift > 3s reject karo
+  // ✅ updateState — drift > 5s reject (3s bahut strict tha → slow lagta tha)
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1143,7 +1098,7 @@ io.on('connection', (socket) => {
     const isTrackChange = newState.track &&
       (!room.state.track || room.state.track.id !== newState.track.id);
 
-    // ✅ TRACK CHANGE — allow
+    // TRACK CHANGE — allow
     if (isTrackChange) {
       newState.autoDj = false;
       newState.isAmbient = false;
@@ -1165,7 +1120,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // ✅ SAME TRACK — position validation
+    // SAME TRACK — position validation
     if (room.state.track && newState.track &&
         room.state.track.id === newState.track.id &&
         newState.position !== undefined) {
@@ -1173,10 +1128,9 @@ io.on('connection', (socket) => {
       const clientPos = newState.position;
       const drift = Math.abs(clientPos - serverPos);
 
-      // ✅ Drift > 3s — reject + correct position bhejo
-      if (drift > 3) {
-        console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s (server: ${serverPos.toFixed(1)}s, client: ${clientPos.toFixed(1)}s)`);
-
+      // ✅ Drift > 5s — reject (3s → 5s)
+      if (drift > 5) {
+        console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s`);
         socket.emit('stateSync', {
           track: room.state.track,
           position: serverPos,
@@ -1188,16 +1142,13 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // ✅ Drift chhota — accept
       room.state.position = clientPos;
       room.state.isPlaying = newState.isPlaying !== undefined ? newState.isPlaying : room.state.isPlaying;
       room.state.lastUpdated = Date.now();
-
       socket.to(room.roomId).emit('stateSync', room.state);
       return;
     }
 
-    // ✅ Baaki updates
     room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
     socket.to(room.roomId).emit('stateSync', room.state);
   });
@@ -1215,13 +1166,7 @@ io.on('connection', (socket) => {
     }
 
     console.log(`⏭️ ${user.name} requested NEXT`);
-
     socket.emit('nextAck', { status: 'loading' });
-
-    io.to(room.roomId).emit('skipNotice', {
-      userName: user.name,
-      message: `⏭️ Loading next song...`
-    });
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
@@ -1274,21 +1219,17 @@ io.on('connection', (socket) => {
     }
 
     console.log(`⏮️ ${user.name} requested PREV`);
-
     socket.emit('prevAck', { status: 'loading' });
 
     if (room.playedHistory && room.playedHistory.length > 0) {
       const prevId = room.playedHistory[room.playedHistory.length - 1];
-
       const prevTrack = await getPreviousSong(prevId);
 
       if (prevTrack && prevTrack.audioUrl) {
         room.playedHistory.pop();
-
         if (room.state.track && !room.state.isAmbient) {
           room.playedHistory.push(room.state.track.id);
         }
-
         room.state = {
           track: prevTrack,
           position: 0,
@@ -1299,16 +1240,11 @@ io.on('connection', (socket) => {
           isAmbient: false,
           lastUpdated: Date.now()
         };
-
         io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
         io.to(GLOBAL_ROOM_ID).emit('songChanged', {
           track: prevTrack,
           reason: 'prev',
           playedBy: user.name
-        });
-        io.to(room.roomId).emit('skipNotice', {
-          userName: user.name,
-          message: `⏮️ Previous`
         });
         socket.emit('prevAck', { status: 'success', track: prevTrack.title });
         return;
@@ -1353,23 +1289,18 @@ io.on('connection', (socket) => {
     }
 
     console.log(`🎲 ${user.name} SKIPPED`);
-
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
       message: `🎲 Skipped`
     });
-
     await playNextSong('skip', user);
   });
 
   socket.on('requestSyncState', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
-
     const currentPosition = getCurrentPosition(room);
-
-    console.log(`🔄 Sync request — position: ${currentPosition.toFixed(1)}s`);
-
+    console.log(`🔄 Sync request → ${currentPosition.toFixed(1)}s`);
     socket.emit('stateSync', {
       track: room.state.track,
       position: currentPosition,
@@ -1378,7 +1309,6 @@ io.on('connection', (socket) => {
       autoDj: room.state.autoDj,
       lastUpdated: Date.now()
     });
-
     if (room.state.track) {
       socket.emit('songChanged', {
         track: room.state.track,
@@ -1388,6 +1318,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ✅ Heartbeat — drift > 5s reject
   socket.on('heartbeat', ({ roomId, position, isPlaying }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1396,12 +1327,11 @@ io.on('connection', (socket) => {
     user.lastActive = Date.now();
     if (user.blocked && user.blocked.play) return;
 
-    // ✅ Heartbeat me bhi drift check
     const serverPos = getCurrentPosition(room);
     const drift = Math.abs(position - serverPos);
 
-    if (drift > 3) {
-      console.log(`🚫 Heartbeat drift rejected: ${drift.toFixed(1)}s`);
+    if (drift > 5) {
+      console.log(`🚫 Heartbeat drift: ${drift.toFixed(1)}s`);
       socket.emit('stateSync', {
         track: room.state.track,
         position: serverPos,
@@ -1437,7 +1367,6 @@ io.on('connection', (socket) => {
       socket.emit('permissionDenied', { action: 'chat', message: 'You are blocked' });
       return;
     }
-
     if (isGloballyMuted(user.name)) {
       socket.emit('permissionDenied', {
         action: 'chat',
@@ -1565,8 +1494,6 @@ io.on('connection', (socket) => {
       totalCities: listeners.length,
       totalListeners: listeners.reduce((sum, l) => sum + l.userCount, 0)
     });
-
-    console.log(`🌍 Global listeners: ${listeners.length} cities, ${listeners.reduce((s, l) => s + l.userCount, 0)} users`);
   });
 
   socket.on('syncPing', ({ roomId, clientTime }) => {
@@ -1584,7 +1511,6 @@ io.on('connection', (socket) => {
       if (user) {
         user.status = 'disconnected';
         user.disconnectedAt = Date.now();
-
         console.log(`⏳ ${user.name} disconnected — 30s grace`);
 
         io.to(roomId).emit('usersUpdate', getUsersWithStatus(room));
@@ -1630,7 +1556,7 @@ function getUsersWithStatus(room) {
 async function searchFromSaavnDev(query) {
   const r = await axios.get(
     'https://saavn.dev/api/search/songs?query=' + encodeURIComponent(query) + '&limit=15',
-    { timeout: 10000 }
+    { timeout: 8000 }
   );
   const list = r.data?.data?.results || [];
   return list.map(s => ({
@@ -1645,7 +1571,7 @@ async function searchFromSaavnDev(query) {
 async function searchFromSaavnNine(query) {
   const r = await axios.get(
     'https://saavnapi-nine.vercel.app/result',
-    { params: { query }, timeout: 10000 }
+    { params: { query }, timeout: 8000 }
   );
   const list = Array.isArray(r.data) ? r.data : [];
   return list.slice(0, 15).map(s => ({
@@ -1660,13 +1586,27 @@ async function searchFromSaavnNine(query) {
 app.get('/api/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.json({ results: [] });
+
+  // ✅ Cache check
+  const cacheKey = 'search:' + query.toLowerCase().trim();
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
+    return res.json({ results: cached.data, cached: true });
+  }
+
   try {
     const songs = await searchFromSaavnDev(query);
-    if (songs.length > 0) return res.json({ results: songs });
+    if (songs.length > 0) {
+      searchCache.set(cacheKey, { data: songs, time: Date.now() });
+      return res.json({ results: songs });
+    }
   } catch (e) { console.log('API 1 failed:', e.message); }
   try {
     const songs = await searchFromSaavnNine(query);
-    if (songs.length > 0) return res.json({ results: songs });
+    if (songs.length > 0) {
+      searchCache.set(cacheKey, { data: songs, time: Date.now() });
+      return res.json({ results: songs });
+    }
   } catch (e) { console.log('API 2 failed:', e.message); }
   res.json({ results: [], error: 'Search failed' });
 });
@@ -1677,6 +1617,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('🌍 Global room mode');
   console.log('🎵 Auto DJ: Waiting for user to play a song...');
   console.log('⏱️  Session grace: 30 seconds');
+  console.log('⚡ Optimized: search cache, drift 5s, heartbeat throttle');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
