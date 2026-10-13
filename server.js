@@ -30,7 +30,6 @@ let currentAnnouncement = null;
 const IDLE_TIMEOUT = 2 * 60 * 1000;
 const DISCONNECT_GRACE = 30 * 1000;
 
-// ✅ Search cache — same query 5 min tak cached
 const searchCache = new Map();
 const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 
@@ -159,7 +158,6 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 60000);
 
-// ✅ Real-time position
 function getCurrentPosition(room) {
   if (!room || !room.state.track) return 0;
   if (!room.state.isPlaying) return room.state.position || 0;
@@ -186,7 +184,6 @@ function recordVisit(name, roomId, userAgent) {
 
 function isAdmin(password) { return password === ADMIN_PASSWORD; }
 
-// ✅ Nearest city with distance
 function getApproxLocation(lat, lng) {
   const cities = [
     {name:'Delhi',lat:28.6139,lng:77.2090},{name:'Mumbai',lat:19.0760,lng:72.8777},
@@ -486,7 +483,7 @@ app.post('/api/admin/forceSkip', async (req, res) => {
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track && !room.state.isAmbient) {
     room.playedHistory.push(room.state.track.id);
-    if (room.playedHistory.length > 20) room.playedHistory.shift();
+    if (room.playedHistory.length > 30) room.playedHistory.shift();
   }
   room.state = {
     track: track,
@@ -545,7 +542,7 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Cached search
+// ✅ Cached search — same query 5 min tak instant
 async function searchSong(query) {
   const cacheKey = query.toLowerCase().trim();
   const cached = searchCache.get(cacheKey);
@@ -559,7 +556,7 @@ async function searchSong(query) {
     try {
       const r = await axios.get(
         `https://saavn.dev/api/search/songs?query=${q}&limit=1`,
-        { timeout: 4000 }
+        { timeout: 5000 }
       );
       const list = r.data?.data?.results || [];
       if (list.length > 0) {
@@ -584,7 +581,7 @@ async function searchSong(query) {
     try {
       const r = await axios.get(
         `https://saavnapi-nine.vercel.app/result?query=${q}`,
-        { timeout: 4000 }
+        { timeout: 5000 }
       );
       const list = Array.isArray(r.data) ? r.data : [];
       if (list.length > 0) {
@@ -610,7 +607,7 @@ async function searchSong(query) {
     try {
       const r = await axios.get(
         `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-        { timeout: 4000 }
+        { timeout: 5000 }
       );
       const list = r.data?.data?.results || r.data?.results || [];
       if (list.length > 0) {
@@ -655,111 +652,153 @@ async function searchSong(query) {
   return null;
 }
 
+// ✅ Similar songs search — 8s timeout, 2 retries, parallel
 async function searchSimilarSongs(query, exclude = []) {
   const q = encodeURIComponent(query);
+  const seenIds = new Set();
 
-  const tryAPI1 = async () => {
-    try {
-      const r = await axios.get(
-        `https://saavn.dev/api/search/songs?query=${q}&limit=10`,
-        { timeout: 4000 }
-      );
-      const list = r.data?.data?.results || [];
-      const filtered = list.filter(s => !exclude.includes(s.id));
-      const mapped = filtered.map(s => ({
-        id: s.id, title: s.name,
-        artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-        duration: s.duration,
-        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-      })).filter(s => s.audioUrl);
-      if (mapped.length > 0) return mapped;
-    } catch (e) {}
+  const fetchWithRetry = async (fn, retries = 2) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const result = await fn();
+        if (result && result.length > 0) return result;
+      } catch (e) {
+        console.log(`  retry ${i+1}/${retries}: ${e.message}`);
+      }
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 500));
+    }
     return null;
   };
 
-  const tryAPI2 = async () => {
-    try {
-      const r = await axios.get(
-        `https://saavnapi-nine.vercel.app/result?query=${q}`,
-        { timeout: 4000 }
-      );
-      const list = Array.isArray(r.data) ? r.data : [];
-      const filtered = list.filter(s => !exclude.includes(s.id));
-      const mapped = filtered.map(s => ({
-        id: s.id || Date.now().toString() + Math.random(),
-        title: s.song || s.title || query,
-        artist: s.primary_artists || s.singers || 'Unknown',
-        duration: parseInt(s.duration) || 0,
-        image: s.image,
-        audioUrl: s.media_url || s.download_url || s.url
-      })).filter(s => s.audioUrl);
-      if (mapped.length > 0) return mapped;
-    } catch (e) {}
-    return null;
-  };
+  const tryAPI1 = () => fetchWithRetry(async () => {
+    const r = await axios.get(
+      `https://saavn.dev/api/search/songs?query=${q}&limit=15`,
+      { timeout: 8000 }
+    );
+    const list = r.data?.data?.results || [];
+    const filtered = list.filter(s => !exclude.includes(s.id));
+    const mapped = filtered.map(s => ({
+      id: s.id, title: s.name,
+      artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
+      duration: s.duration,
+      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
+      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
+    })).filter(s => s.audioUrl);
+    return mapped;
+  });
+
+  const tryAPI2 = () => fetchWithRetry(async () => {
+    const r = await axios.get(
+      `https://saavnapi-nine.vercel.app/result?query=${q}`,
+      { timeout: 8000 }
+    );
+    const list = Array.isArray(r.data) ? r.data : [];
+    const filtered = list.filter(s => !exclude.includes(s.id));
+    const mapped = filtered.map(s => ({
+      id: s.id || Date.now().toString() + Math.random(),
+      title: s.song || s.title || query,
+      artist: s.primary_artists || s.singers || 'Unknown',
+      duration: parseInt(s.duration) || 0,
+      image: s.image,
+      audioUrl: s.media_url || s.download_url || s.url
+    })).filter(s => s.audioUrl);
+    return mapped;
+  });
+
+  const tryAPI3 = () => fetchWithRetry(async () => {
+    const r = await axios.get(
+      `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
+      { timeout: 8000 }
+    );
+    const list = r.data?.data?.results || r.data?.results || [];
+    const filtered = list.filter(s => !exclude.includes(s.id));
+    const mapped = filtered.map(s => ({
+      id: s.id || Date.now().toString() + Math.random(),
+      title: s.name || s.title || query,
+      artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
+      duration: s.duration || 0,
+      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
+      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
+    })).filter(s => s.audioUrl);
+    return mapped;
+  });
 
   try {
-    const result = await Promise.any([
-      tryAPI1(),
-      tryAPI2()
-    ].filter(p => p !== null));
-    if (result) return result;
-  } catch (e) {}
+    const result = await Promise.any([tryAPI1(), tryAPI2(), tryAPI3()]);
+    if (result && result.length > 0) {
+      const unique = result.filter(s => {
+        if (seenIds.has(s.id)) return false;
+        seenIds.add(s.id);
+        return true;
+      });
+      return unique;
+    }
+  } catch (e) {
+    console.log(`searchSimilarSongs all failed: ${e.message}`);
+  }
 
   return [];
 }
 
+// ✅ SAME ARTIST FOCUS — 3-level fallback
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
-  const artist = (currentTrack.artist || '').split(',')[0].trim();
-  const title = currentTrack.title || '';
+
+  const rawArtist = (currentTrack.artist || '').trim();
   const currentId = currentTrack.id;
+
+  // Artist name saaf karo
+  const artistList = rawArtist
+    .split(/[,&]|\bfeat\.?\b|\bft\.?\b/i)
+    .map(a => a.trim())
+    .filter(a => a && a.length > 1 && a.toLowerCase() !== 'unknown');
+
+  console.log(`🎯 Auto-next: artist="${rawArtist}" → [${artistList.join(', ')}]`);
+
+  // Level 1: Exact artist ke gaane (played history exclude)
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
-  const promises = [];
-
-  if (artist && artist !== 'Unknown') {
-    promises.push(
-      searchSimilarSongs(artist, fullExclude).then(songs => ({ priority: 1, songs }))
-    );
-  }
-
-  const artistLower = artist.toLowerCase();
-  const similarArtists = SIMILAR_ARTISTS[artistLower] || [];
-  similarArtists.slice(0, 2).forEach(simArtist => {
-    promises.push(
-      searchSimilarSongs(simArtist, fullExclude).then(songs => ({ priority: 2, songs }))
-    );
-  });
-
-  const keywords = title.split(' ').filter(w => w.length > 3).slice(0, 1);
-  keywords.forEach(keyword => {
-    promises.push(
-      searchSimilarSongs(keyword, fullExclude).then(songs => ({ priority: 3, songs }))
-    );
-  });
-
-  if (promises.length === 0) return null;
-
-  try {
-    const results = await Promise.allSettled(promises);
-    const fulfilled = results
-      .filter(r => r.status === 'fulfilled' && r.value.songs && r.value.songs.length > 0)
-      .map(r => r.value)
-      .sort((a, b) => a.priority - b.priority);
-
-    if (fulfilled.length > 0) {
-      const best = fulfilled[0];
-      const pick = best.songs[Math.floor(Math.random() * Math.min(3, best.songs.length))];
-      console.log(`🎵 Next found (priority ${best.priority}): ${pick.title}`);
+  for (const artist of artistList) {
+    const songs = await searchSimilarSongs(artist, fullExclude);
+    if (songs && songs.length > 0) {
+      const pick = songs[Math.floor(Math.random() * Math.min(5, songs.length))];
+      console.log(`🎵 Next (L1 - exact artist "${artist}"): ${pick.title}`);
       return pick;
     }
-  } catch (e) {
-    console.error('Parallel search error:', e);
   }
 
-  console.log('⚠️ No context match — Auto DJ');
+  // Level 2: Same artist ke gaane (repeat allow)
+  console.log(`⚠️ L1 failed — trying L2 (same artist, allow repeats)`);
+  for (const artist of artistList) {
+    const songs = await searchSimilarSongs(artist, [currentId]);
+    if (songs && songs.length > 0) {
+      const filtered = songs.filter(s => s.id !== currentId);
+      if (filtered.length > 0) {
+        const pick = filtered[Math.floor(Math.random() * Math.min(5, filtered.length))];
+        console.log(`🎵 Next (L2 - same artist repeat): ${pick.title}`);
+        return pick;
+      }
+    }
+  }
+
+  // Level 3: Similar artists
+  console.log(`⚠️ L2 failed — trying L3 (similar artists)`);
+  const primaryArtist = artistList[0]?.toLowerCase();
+  if (primaryArtist) {
+    const similar = SIMILAR_ARTISTS[primaryArtist] || [];
+    const shuffled = [...similar].sort(() => Math.random() - 0.5);
+    for (const simArtist of shuffled.slice(0, 3)) {
+      const songs = await searchSimilarSongs(simArtist, fullExclude);
+      if (songs && songs.length > 0) {
+        const pick = songs[Math.floor(Math.random() * Math.min(3, songs.length))];
+        console.log(`🎵 Next (L3 - similar "${simArtist}"): ${pick.title}`);
+        return pick;
+      }
+    }
+  }
+
+  // Level 4: Auto DJ
+  console.log(`⚠️ All levels failed — Auto DJ random`);
   return null;
 }
 
@@ -808,6 +847,10 @@ async function playNextSong(reason = 'auto', user = null) {
 
   const currentIsAmbient = room.state.isAmbient || false;
   const currentTrackId = room.state.track?.id;
+  const currentArtist = room.state.track?.artist || 'Unknown';
+
+  console.log(`\n🎵 ========== playNextSong (${reason}) ==========`);
+  console.log(`🎵 Current: "${room.state.track?.title}" by ${currentArtist}`);
 
   if (!currentIsAmbient && currentTrackId) {
     if (reason === 'skip') {
@@ -817,11 +860,13 @@ async function playNextSong(reason = 'auto', user = null) {
     }
   }
 
+  // Last resort — Auto DJ playlist
   if (!nextSong) {
-    for (let i = 0; i < 2; i++) {
+    console.log(`⚠️ Context failed — Auto DJ playlist`);
+    for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
-      console.log(`🎵 Auto DJ attempt ${i+1}/2: ${songName}`);
+      console.log(`  Auto DJ ${i+1}/3: ${songName}`);
       nextSong = await searchSong(songName);
       if (nextSong) {
         console.log(`✅ Auto DJ got: ${nextSong.title}`);
@@ -831,14 +876,14 @@ async function playNextSong(reason = 'auto', user = null) {
   }
 
   if (!nextSong) {
-    console.error('❌ playNextSong: all APIs failed');
+    console.error('❌ playNextSong: ALL failed — keeping current track');
     return;
   }
 
   if (!room.playedHistory) room.playedHistory = [];
   if (room.state.track && !room.state.isAmbient && room.state.track.id !== nextSong.id) {
     room.playedHistory.push(room.state.track.id);
-    if (room.playedHistory.length > 20) room.playedHistory.shift();
+    if (room.playedHistory.length > 30) room.playedHistory.shift();
   }
 
   let playedByName = 'Someone';
@@ -864,7 +909,8 @@ async function playNextSong(reason = 'auto', user = null) {
 
   room._lastKnownDuration = nextSong.duration || 0;
 
-  console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
+  console.log(`🎵 NOW PLAYING: "${nextSong.title}" by ${nextSong.artist}`);
+  console.log(`🎵 ==========================================\n`);
 
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
@@ -879,7 +925,7 @@ async function getPreviousSong(prevId) {
     async () => {
       const r = await axios.get(
         'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
-        { timeout: 4000 }
+        { timeout: 5000 }
       );
       const s = r.data?.data?.[0];
       if (!s) return null;
@@ -894,7 +940,7 @@ async function getPreviousSong(prevId) {
     async () => {
       const r = await axios.get(
         'https://jiosaavn-api-2-harsh-patel.vercel.app/song?id=' + encodeURIComponent(prevId),
-        { timeout: 4000 }
+        { timeout: 5000 }
       );
       const s = r.data?.data?.[0] || r.data?.[0];
       if (!s) return null;
@@ -1126,7 +1172,7 @@ io.on('connection', (socket) => {
       if (!room.playedHistory) room.playedHistory = [];
       if (room.state.track && room.state.track.id !== newState.track.id) {
         room.playedHistory.push(room.state.track.id);
-        if (room.playedHistory.length > 20) room.playedHistory.shift();
+        if (room.playedHistory.length > 30) room.playedHistory.shift();
       }
 
       analytics.songsPlayed++;
@@ -1169,7 +1215,6 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('stateSync', room.state);
   });
 
-  // ✅ Client se duration report
   socket.on('reportDuration', ({ roomId, trackId, duration }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room || !room.state.track) return;
@@ -1197,7 +1242,7 @@ io.on('connection', (socket) => {
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 10000)
+        setTimeout(() => reject(new Error('Timeout')), 15000)
       );
       await Promise.race([
         playNextSong('next', user),
@@ -1479,7 +1524,6 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  // ✅ Location share — exact address + accuracy
   socket.on('shareLocation', ({ roomId, location, timezone, address, manualAddress }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1684,7 +1728,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
-  console.log('🎵 Auto DJ: Waiting for user to play a song...');
+  console.log('🎵 Auto DJ: Same artist focus (3-level fallback)');
   console.log('⏱️  Session grace: 30 seconds');
   console.log('⚡ Optimized: search cache, drift 5s, 1s song-end check');
   console.log('📍 Location: 5-15m accuracy + reverse geocode');
