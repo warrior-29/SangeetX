@@ -149,7 +149,9 @@ function ensureGlobalRoom() {
       },
       playedHistory: [],
       isGlobal: true,
-      _lastAutoDjAttempt: 0
+      _lastAutoDjAttempt: 0,
+      _loadingNext: false,
+      _lastKnownDuration: 0
     };
     console.log('🌍 Global room created');
   }
@@ -184,6 +186,7 @@ function recordVisit(name, roomId, userAgent) {
 
 function isAdmin(password) { return password === ADMIN_PASSWORD; }
 
+// ✅ Nearest city with distance
 function getApproxLocation(lat, lng) {
   const cities = [
     {name:'Delhi',lat:28.6139,lng:77.2090},{name:'Mumbai',lat:19.0760,lng:72.8777},
@@ -206,12 +209,15 @@ function getApproxLocation(lat, lng) {
     {name:'Moscow',lat:55.7558,lng:37.6173},{name:'São Paulo',lat:-23.5505,lng:-46.6333},
     {name:'Cape Town',lat:-33.9249,lng:18.4241},{name:'Seoul',lat:37.5665,lng:126.9780}
   ];
-  let n=cities[0],md=Infinity;
-  cities.forEach(c=>{
-    const d=Math.sqrt((c.lat-lat)**2+(c.lng-lng)**2);
-    if(d<md){md=d;n=c;}
+  let nearest = cities[0], minDist = Infinity;
+  cities.forEach(c => {
+    const d = Math.sqrt((c.lat - lat) ** 2 + (c.lng - lng) ** 2);
+    if (d < minDist) { minDist = d; nearest = c; }
   });
-  return n.name;
+  const distKm = minDist * 111;
+  if (distKm < 5) return nearest.name;
+  if (distKm < 30) return `Near ${nearest.name}`;
+  return nearest.name;
 }
 
 const WELCOME_MESSAGES = [
@@ -288,7 +294,9 @@ app.get('/api/admin/stats', (req, res) => {
         status: Date.now() - u.lastActive < 2 * 60 * 1000 ? 'online' : 'offline',
         lastActive: u.lastActive,
         blocked: u.blocked || { chat: false, play: false, voice: false },
-        globallyMuted: isGloballyMuted(u.name)
+        globallyMuted: isGloballyMuted(u.name),
+        location: u.location || null,
+        address: u.address || null
       }))
     };
   });
@@ -537,7 +545,7 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Cached search — same query 5 min tak instant
+// ✅ Cached search
 async function searchSong(query) {
   const cacheKey = query.toLowerCase().trim();
   const cached = searchCache.get(cacheKey);
@@ -634,9 +642,7 @@ async function searchSong(query) {
     if (result) {
       console.log(`✅ Search success (${result._src}): ${result.title}`);
       delete result._src;
-      // ✅ Cache me store karo
       searchCache.set(cacheKey, { data: result, time: Date.now() });
-      // Cache size limit
       if (searchCache.size > 200) {
         const firstKey = searchCache.keys().next().value;
         searchCache.delete(firstKey);
@@ -856,6 +862,8 @@ async function playNextSong(reason = 'auto', user = null) {
     lastUpdated: Date.now()
   };
 
+  room._lastKnownDuration = nextSong.duration || 0;
+
   console.log(`🎵 Playing: ${nextSong.title} (${reason} by ${playedByName})`);
 
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
@@ -914,25 +922,36 @@ async function getPreviousSong(prevId) {
   return null;
 }
 
-// ✅ Song end check — 5s (pehle 3s tha)
+// ✅ Song end check — 1s interval + duration fallback
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
     if (!room.state.track || !room.state.isPlaying) return;
+    if (room._loadingNext) return;
 
-    const duration = room.state.track.duration || 0;
+    let duration = room.state.track.duration || 0;
+    if (!duration || duration <= 0) {
+      duration = room._lastKnownDuration || 0;
+    }
+
     const currentPos = getCurrentPosition(room);
 
-    if (duration > 0 && currentPos >= duration - 2) {
-      room._lastAutoDjAttempt = Date.now();
-      console.log(`🎵 Song ended — next`);
-      await playNextSong('auto');
+    const shouldTrigger = duration > 0 && currentPos >= duration - 1.5;
+    const fallbackTrigger = !duration && currentPos > 360;
+
+    if (shouldTrigger || fallbackTrigger) {
+      room._loadingNext = true;
+      console.log(`🎵 Song ended (pos=${currentPos.toFixed(1)}s, dur=${duration}s) — next`);
+      try {
+        await playNextSong('auto');
+      } finally {
+        setTimeout(() => { room._loadingNext = false; }, 3000);
+      }
     }
-  }, 5000);
+  }, 1000);
 }
 
-// ✅ Position updater — 5s (pehle 2s tha, CPU heavy tha)
 function startPositionUpdater() {
   setInterval(() => {
     const room = rooms[GLOBAL_ROOM_ID];
@@ -999,7 +1018,8 @@ io.on('connection', (socket) => {
         id: socket.id, name: userName, ip: ip, fingerprint: userFp,
         lastActive: Date.now(), status: 'online',
         blocked: { chat: false, play: false, voice: false },
-        location: null, timezone: null, chatActive: false, joinedAt: Date.now(),
+        location: null, address: null, manualAddress: null,
+        timezone: null, chatActive: false, joinedAt: Date.now(),
         globallyMuted: isGloballyMuted(userName)
       });
       console.log(`👋 New: ${userName}`);
@@ -1029,7 +1049,6 @@ io.on('connection', (socket) => {
       socket.emit('adminAnnounce', currentAnnouncement);
     }
 
-    // ✅ Real-time position — actual jahan chal raha hai
     if (room.state.track && room.state.isPlaying) {
       const currentPosition = getCurrentPosition(room);
 
@@ -1081,7 +1100,6 @@ io.on('connection', (socket) => {
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
 
-  // ✅ updateState — drift > 5s reject (3s bahut strict tha → slow lagta tha)
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1098,7 +1116,6 @@ io.on('connection', (socket) => {
     const isTrackChange = newState.track &&
       (!room.state.track || room.state.track.id !== newState.track.id);
 
-    // TRACK CHANGE — allow
     if (isTrackChange) {
       newState.autoDj = false;
       newState.isAmbient = false;
@@ -1113,6 +1130,7 @@ io.on('connection', (socket) => {
       }
 
       analytics.songsPlayed++;
+      room._lastKnownDuration = newState.track.duration || 0;
 
       room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
       socket.to(room.roomId).emit('stateSync', room.state);
@@ -1120,7 +1138,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // SAME TRACK — position validation
     if (room.state.track && newState.track &&
         room.state.track.id === newState.track.id &&
         newState.position !== undefined) {
@@ -1128,7 +1145,6 @@ io.on('connection', (socket) => {
       const clientPos = newState.position;
       const drift = Math.abs(clientPos - serverPos);
 
-      // ✅ Drift > 5s — reject (3s → 5s)
       if (drift > 5) {
         console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s`);
         socket.emit('stateSync', {
@@ -1151,6 +1167,17 @@ io.on('connection', (socket) => {
 
     room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
     socket.to(room.roomId).emit('stateSync', room.state);
+  });
+
+  // ✅ Client se duration report
+  socket.on('reportDuration', ({ roomId, trackId, duration }) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room || !room.state.track) return;
+    if (room.state.track.id === trackId && duration > 0) {
+      room.state.track.duration = duration;
+      room._lastKnownDuration = duration;
+      console.log(`📏 Duration updated: ${room.state.track.title} → ${duration}s`);
+    }
   });
 
   socket.on('requestNext', async ({ roomId }) => {
@@ -1193,6 +1220,7 @@ io.on('connection', (socket) => {
           isAmbient: false,
           lastUpdated: Date.now()
         };
+        room._lastKnownDuration = fallbackTrack.duration || 0;
         io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
         io.to(GLOBAL_ROOM_ID).emit('songChanged', {
           track: fallbackTrack,
@@ -1240,6 +1268,7 @@ io.on('connection', (socket) => {
           isAmbient: false,
           lastUpdated: Date.now()
         };
+        room._lastKnownDuration = prevTrack.duration || 0;
         io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
         io.to(GLOBAL_ROOM_ID).emit('songChanged', {
           track: prevTrack,
@@ -1264,6 +1293,7 @@ io.on('connection', (socket) => {
         isAmbient: false,
         lastUpdated: Date.now()
       };
+      room._lastKnownDuration = fallbackTrack.duration || 0;
       io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
       io.to(GLOBAL_ROOM_ID).emit('songChanged', {
         track: fallbackTrack,
@@ -1318,7 +1348,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ✅ Heartbeat — drift > 5s reject
   socket.on('heartbeat', ({ roomId, position, isPlaying }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
@@ -1450,49 +1479,90 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  socket.on('shareLocation', ({ roomId, location, timezone }) => {
+  // ✅ Location share — exact address + accuracy
+  socket.on('shareLocation', ({ roomId, location, timezone, address, manualAddress }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
+
     const user = room.users.find(u => u.id === socket.id);
-    if (user) { 
-      user.location = location; 
+    if (user) {
+      user.location = {
+        lat: location.lat,
+        lng: location.lng,
+        accuracy: location.accuracy || null
+      };
       if (timezone) user.timezone = timezone;
-      user.lastActive = Date.now(); 
+      if (address) user.address = address;
+      if (manualAddress) user.manualAddress = manualAddress;
+      user.lastActive = Date.now();
+
+      const acc = location.accuracy ? `±${Math.round(location.accuracy)}m` : '?';
+      const label = manualAddress || address?.shortLabel || 'unknown';
+      console.log(`📍 ${user.name}: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} ${acc} — ${label}`);
     }
-    socket.to(room.roomId).emit('partnerLocation', { location, userId: socket.id, userName: user?.name });
+
+    io.to(room.roomId).emit('locationUpdate', {
+      userId: socket.id,
+      userName: user?.name,
+      location: user?.location,
+      address: user?.address || null,
+      manualAddress: user?.manualAddress || null,
+      timezone: user?.timezone || 'unknown'
+    });
   });
 
   socket.on('requestGlobalListeners', ({ roomId }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
 
+    const usersWithLocation = room.users
+      .filter(u => u.location && u.location.lat && u.location.lng)
+      .map(u => {
+        const cityName = getApproxLocation(u.location.lat, u.location.lng);
+        return {
+          id: u.id,
+          name: u.name,
+          lat: u.location.lat,
+          lng: u.location.lng,
+          accuracy: u.location.accuracy || null,
+          city: cityName,
+          address: u.address || null,
+          manualAddress: u.manualAddress || null,
+          timezone: u.timezone || 'unknown',
+          status: Date.now() - u.lastActive < 2 * 60 * 1000 ? 'online' : 'idle',
+          joinedAt: u.joinedAt
+        };
+      });
+
     const cityCounts = {};
-    room.users.forEach(u => {
-      if (u.location && u.location.lat && u.location.lng) {
-        const city = getApproxLocation(u.location.lat, u.location.lng);
-        if (!cityCounts[city]) {
-          cityCounts[city] = {
-            city,
-            lat: u.location.lat,
-            lng: u.location.lng,
-            userCount: 0
-          };
-        }
-        cityCounts[city].userCount++;
+    usersWithLocation.forEach(u => {
+      if (!cityCounts[u.city]) {
+        cityCounts[u.city] = {
+          city: u.city,
+          lat: u.lat,
+          lng: u.lng,
+          userCount: 0,
+          users: []
+        };
       }
+      cityCounts[u.city].userCount++;
+      cityCounts[u.city].users.push({ id: u.id, name: u.name });
     });
 
     const listeners = Object.values(cityCounts);
 
     socket.emit('globalListeners', {
       listeners,
+      users: usersWithLocation,
       currentTrack: room.state.track ? {
         title: room.state.track.title,
-        artist: room.state.track.artist
+        artist: room.state.track.artist,
+        playedBy: room.state.playedByName
       } : null,
       totalCities: listeners.length,
-      totalListeners: listeners.reduce((sum, l) => sum + l.userCount, 0)
+      totalListeners: usersWithLocation.length,
+      myId: socket.id
     });
   });
 
@@ -1587,7 +1657,6 @@ app.get('/api/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.json({ results: [] });
 
-  // ✅ Cache check
   const cacheKey = 'search:' + query.toLowerCase().trim();
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
@@ -1617,7 +1686,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('🌍 Global room mode');
   console.log('🎵 Auto DJ: Waiting for user to play a song...');
   console.log('⏱️  Session grace: 30 seconds');
-  console.log('⚡ Optimized: search cache, drift 5s, heartbeat throttle');
+  console.log('⚡ Optimized: search cache, drift 5s, 1s song-end check');
+  console.log('📍 Location: 5-15m accuracy + reverse geocode');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
