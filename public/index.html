@@ -222,13 +222,13 @@ body::before {
 .album-art {
   width:min(48vw, 190px); aspect-ratio:1; border-radius:18px;
   position:relative; display:flex; align-items:center; justify-content:center;
-  overflow:hidden; background:var(--surface); border:1px solid var(--border);
+  overflow:hidden; background:linear-gradient(135deg, var(--primary), var(--accent)); border:1px solid var(--border);
   box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 30px var(--dynamic-1);
   flex-shrink:0; transition: none;
 }
 .album-art img { width:100%; height:100%; object-fit:cover; border-radius:17px; animation:imgFadeIn 0.6s var(--ease); }
 @keyframes imgFadeIn { from { opacity:0; transform:scale(1.05); } to { opacity:1; transform:scale(1); } }
-.album-art .placeholder { font-size:56px; opacity:0.15; }
+.album-art .placeholder { font-size:56px;}
 .album-art.playing {
   box-shadow:0 16px 40px rgba(0,0,0,0.6), 0 0 30px var(--dynamic-1);
   border-color:rgba(139,92,246,0.4);
