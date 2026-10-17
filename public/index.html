@@ -2321,9 +2321,15 @@ function initSocket(){
 
   socket.on('chatHistory',(m)=>renderChat(m,true));
 
-  socket.on('messageDeleted',({messageId})=>{
+    socket.on('messageDeleted',({messageId})=>{
     const el=document.querySelector(`[data-msg-id="${messageId}"]`);
-    if(el){el.style.opacity='0';el.style.transform='scale(0.8)';setTimeout(()=>el.remove(),300);}
+    if(el){
+      el.style.transition='opacity 0.3s ease, transform 0.3s ease';
+      el.style.opacity='0';
+      el.style.transform='scale(0.85)';
+      // ✅ Yeh line 'Music Bot' ke naam wale box ko bhi delete kar degi
+      setTimeout(()=>el.closest('.chat-msg-row')?.remove(),300); 
+    }
   });
 
   socket.on('permissionsUpdate',({blocked})=>{myPermissions=blocked;applyPermissions();});
@@ -2843,6 +2849,7 @@ function renderChat(messages,replace){
   const empty=box.querySelector('.chat-empty');
   if(empty)empty.remove();
   messages.forEach(m=>{
+     if (m.type === 'bot' && m.expiresAt && Date.now() > m.expiresAt) return;
     const mine = m.userId === socket?.id || m.pending;
     const isBot = m.type === 'bot';
     const row = document.createElement('div');
