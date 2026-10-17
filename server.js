@@ -17,12 +17,13 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// 🔐 Password ab sirf environment variable se aata hai (code me hardcode nahi).
-// Agar set nahi hai to har start par random password banta hai aur console me dikhta hai.
+// 🔐 Password ab code me hardcode nahi hai.
+// Server pe environment variable ADMIN_PASSWORD set karo.
+// Agar set nahi hai to har start pe random password banega aur console me dikhega.
 let ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 if (!ADMIN_PASSWORD) {
-  ADMIN_PASSWORD = crypto.randomBytes(9).toString('base64url');
-  console.log('⚠️  ADMIN_PASSWORD env set nahi hai. Temporary admin password:', ADMIN_PASSWORD);
+  ADMIN_PASSWORD = crypto.randomBytes(6).toString('hex');
+  console.log('⚠️  ADMIN_PASSWORD env set nahi hai. Is session ka admin password:', ADMIN_PASSWORD);
 }
 
 const GLOBAL_ROOM_ID = 'global';
@@ -39,6 +40,11 @@ const DISCONNECT_GRACE = 30 * 1000;
 
 const searchCache = new Map();
 const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+
+const similarCache = new Map();
+const SIMILAR_TTL = 10 * 60 * 1000;
+
+const API_TIMEOUT = 4000;
 
 const AUTO_DJ_PLAYLIST = [
   'Kesariya Arijit Singh',
@@ -105,6 +111,10 @@ const analytics = {
   activeSessions: new Map(), dailyVisits: {}, hourlyVisits: {}
 };
 
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// ===================== HELPERS =====================
+
 function getClientIP(socket) {
   const handshake = socket.handshake;
   const forwarded = handshake.headers['x-forwarded-for'];
@@ -153,11 +163,18 @@ function ensureGlobalRoom() {
         isAmbient: false,
         lastUpdated: Date.now()
       },
-      playedHistory: [],
+      playedHistory: [],      // ab poore track objects save hote hain (sirf ID nahi)
       isGlobal: true,
       _lastAutoDjAttempt: 0,
       _loadingNext: false,
-      _lastKnownDuration: 0
+      _lastKnownDuration: 0,
+      _prefetch: null,
+      _prefetchingFor: null,
+      _changing: false,
+      _lastChangeAt: 0,
+      _seekAt: 0,
+      _lastChatAt: 0,
+      _lastBotAt: 0
     };
     console.log('🌍 Global room created');
   }
@@ -165,21 +182,15 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 60000);
 
-// Raw position (gana khatam hone ke baad bhi wrap nahi hota) — song-end check ke liye
-function getRawPosition(room) {
+// ✅ Fix: gaane ke end pe position 0 nahi hoti, duration pe clamp hoti hai
+function getCurrentPosition(room) {
   if (!room || !room.state.track) return 0;
   if (!room.state.isPlaying) return room.state.position || 0;
   const lastUpdated = room.state.lastUpdated || Date.now();
   const elapsed = (Date.now() - lastUpdated) / 1000;
-  return (room.state.position || 0) + elapsed;
-}
-
-function getCurrentPosition(room) {
-  if (!room || !room.state.track) return 0;
-  let pos = getRawPosition(room);
-  if (room.state.track.duration > 0 && pos >= room.state.track.duration) {
-    pos = 0;
-  }
+  let pos = (room.state.position || 0) + elapsed;
+  const dur = room.state.track.duration || room._lastKnownDuration || 0;
+  if (dur > 0 && pos > dur) pos = dur;
   return pos;
 }
 
@@ -230,6 +241,8 @@ function getApproxLocation(lat, lng) {
   return nearest.name;
 }
 
+// ===================== CHAT BOT (funny) =====================
+
 const WELCOME_MESSAGES = [
   "Kaise ho? Music sunte hain! 🎵",
   "Welcome! Aaj kya sunna hai?",
@@ -240,8 +253,65 @@ const WELCOME_MESSAGES = [
 ];
 
 function getRandomWelcome() {
-  return WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
+  return pick(WELCOME_MESSAGES);
 }
+
+const FUNNY_MESSAGES = [
+  "Itna sannata kyun hai bhai? Koi toh bolo 😅",
+  "Mujhe lagta hai sab headphones me so gaye hain 😴🎧",
+  "Gaana accha hai ya main bas overthink kar raha hoon? 🤔",
+  "Koi hai? Ya main akela hi bot hoon yahan? 👻",
+  "Fun fact: Arijit ka gaana sunke 90% log emotional ho jate hain, baaki 10% jhooth bolte hain 😭",
+  "Chai pee li? Nahi? Toh pehle chai, phir gaana ☕🎶",
+  "Mera naam Music Bot hai, kaam: ghoomna, nachna, kuch nahi karna 💃",
+  "Skip mat karna, mujhe ye gaana pasand hai! 🥺",
+  "Bhai ne 3 baar 'Kesariya' laga di, ab kasam se meri bhi shaadi ho jayegi 😂",
+  "Aaj kisi ne kuch bola nahi, kya sab mute pe hain? 🔇",
+  "Ek gaana suggest karo, warna main khud Auto DJ ban jaunga 🎧😎",
+  "Dil ki baat: WiFi slow ho toh gaana bhi ruk jata hai, jaise crush ka reply 😔"
+];
+
+const FUNNY_WELCOMES = [
+  n => `${n} aa gaye! Ab mehfil jamegi 🎉`,
+  n => `Arre ${n}! Itni der kahan the? Gaana chal raha hai 🎶`,
+  n => `${n} bhai, swagat hai! Pehle chai pilao ☕😄`,
+  n => `Welcome ${n}! Yahan sab free hai, bas gaane ki fees: ek suggestion 🎤`,
+  n => `${n} entry maar chuke hain! Sab log sambhal ke 😎`
+];
+
+function botSay(room, text) {
+  const msg = {
+    id: 'bot-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    userId: 'bot', userName: '🤖 Music Bot',
+    text, time: Date.now(), type: 'bot'
+  };
+  room.messages.push(msg);
+  if (room.messages.length > 100) room.messages.shift();
+  io.to(room.roomId).emit('chatMessage', msg);
+}
+
+// Koi na bole to bhi bot khud kuch funny bolega (har 2+ min me, chat chalu ho to chup)
+function startFunnyBot() {
+  setInterval(() => {
+    const room = rooms[GLOBAL_ROOM_ID];
+    if (!room) return;
+    const now = Date.now();
+    const online = room.users.filter(u =>
+      u.status !== 'disconnected' && now - u.lastActive < IDLE_TIMEOUT
+    ).length;
+    if (!online) return;
+    if (now - (room._lastChatAt || 0) < 90000) return;
+    if (now - (room._lastBotAt || 0) < 120000) return;
+    room._lastBotAt = now;
+    let text = pick(FUNNY_MESSAGES);
+    if (room.state.track && Math.random() < 0.3) {
+      text = `"${room.state.track.title}" chal raha hai... mast hai na? 😍`;
+    }
+    botSay(room, text);
+  }, 15000);
+}
+
+// ===================== HTTP ROUTES =====================
 
 app.get('/api/global/stats', (req, res) => {
   ensureGlobalRoom();
@@ -493,27 +563,12 @@ app.post('/api/admin/forceSkip', async (req, res) => {
     console.log(`🎵 Admin force skip: ${songName}`);
   }
   if (!track) return res.status(404).json({ error: 'Song not found' });
-  if (!room.playedHistory) room.playedHistory = [];
-  if (room.state.track && !room.state.isAmbient) {
-    room.playedHistory.push(room.state.track.id);
-    if (room.playedHistory.length > 30) room.playedHistory.shift();
-  }
-  room.state = {
-    track: track,
-    position: 0,
-    isPlaying: true,
+
+  setRoomTrack(room, track, {
     playedBy: 'admin',
     playedByName: '👑 Admin',
     autoDj: false,
-    isAmbient: false,
-    lastUpdated: Date.now()
-  };
-  room._lastKnownDuration = track.duration || 0;
-  io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-  io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-    track: track,
-    reason: 'admin',
-    playedBy: '👑 Admin'
+    reason: 'admin'
   });
   io.to(GLOBAL_ROOM_ID).emit('adminForceSkip', {
     track,
@@ -529,18 +584,18 @@ app.post('/api/admin/announce', (req, res) => {
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
   const announceMsg = String(message).slice(0, 300);
   const dur = Math.min(Math.max(parseInt(duration) || 10000, 2000), 60000);
-  const announcement = {
+  const at = Date.now();
+  currentAnnouncement = {
     message: announceMsg,
     by: '👑 Admin',
-    at: Date.now(),
+    at,
     duration: dur
   };
-  currentAnnouncement = announcement;
   io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', currentAnnouncement);
   console.log(`📢 Admin announce: ${announceMsg} (${dur}ms)`);
   setTimeout(() => {
-    // sirf tab clear karo jab beech me nayi announcement na aayi ho
-    if (currentAnnouncement === announcement) {
+    // ✅ Fix: sirf wahi announcement clear ho jo isi call ne banayi thi
+    if (currentAnnouncement && currentAnnouncement.at === at) {
       currentAnnouncement = null;
       io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', null);
       console.log('📢 Announcement cleared');
@@ -557,208 +612,98 @@ app.post('/api/admin/clearAnnounce', (req, res) => {
   res.json({ success: true });
 });
 
-// ✅ Cached search — same query 5 min tak instant
+// ===================== SONG SEARCH (fast) =====================
+
+const mapDev = s => ({
+  id: s.id,
+  title: s.name || s.title,
+  artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
+  duration: s.duration || 0,
+  image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url ||
+         (typeof s.image === 'string' ? s.image : undefined),
+  audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
+});
+
+const mapNine = s => ({
+  id: s.id || String(s.media_url || s.download_url || Math.random()),
+  title: s.song || s.title,
+  artist: s.primary_artists || s.singers || 'Unknown',
+  duration: parseInt(s.duration) || 0,
+  image: s.image,
+  audioUrl: s.media_url || s.download_url || s.url
+});
+
+// ✅ Teeno APIs ek saath. Jo pehle SAHI result de wahi jeetta hai.
+// (Purana bug: fail hone wali API null return karti thi aur Promise.any wahi pakad leta tha)
+async function fetchSongList(query, limit = 15) {
+  const q = encodeURIComponent(query);
+  const get = async (url, pickFn) => {
+    const r = await axios.get(url, { timeout: API_TIMEOUT });
+    const out = pickFn(r.data).filter(s => s.audioUrl && s.id);
+    if (!out.length) throw new Error('empty');
+    return out;
+  };
+  try {
+    return await Promise.any([
+      get(`https://saavn.dev/api/search/songs?query=${q}&limit=${limit}`,
+          d => (d?.data?.results || []).map(mapDev)),
+      get(`https://saavnapi-nine.vercel.app/result?query=${q}`,
+          d => (Array.isArray(d) ? d : []).map(mapNine)),
+      get(`https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
+          d => (d?.data?.results || d?.results || []).map(mapDev))
+    ]);
+  } catch (e) {
+    return [];
+  }
+}
+
+function cacheSet(map, key, data, max) {
+  map.set(key, { data, time: Date.now() });
+  if (map.size > max) map.delete(map.keys().next().value);
+}
+
 async function searchSong(query) {
   const cacheKey = query.toLowerCase().trim();
   const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
-    return cached.data;
+  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) return cached.data;
+
+  const list = await fetchSongList(query, 5);
+  if (list.length > 0) {
+    const song = list[0];
+    cacheSet(searchCache, cacheKey, song, 200);
+    return song;
   }
-
-  const q = encodeURIComponent(query);
-
-  const tryAPI1 = async () => {
-    try {
-      const r = await axios.get(
-        `https://saavn.dev/api/search/songs?query=${q}&limit=1`,
-        { timeout: 5000 }
-      );
-      const list = r.data?.data?.results || [];
-      if (list.length > 0) {
-        const s = list[0];
-        const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url;
-        if (audioUrl) {
-          return {
-            id: s.id, title: s.name,
-            artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-            duration: s.duration,
-            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-            audioUrl,
-            _src: 'API1'
-          };
-        }
-      }
-    } catch (e) {}
-    return null;
-  };
-
-  const tryAPI2 = async () => {
-    try {
-      const r = await axios.get(
-        `https://saavnapi-nine.vercel.app/result?query=${q}`,
-        { timeout: 5000 }
-      );
-      const list = Array.isArray(r.data) ? r.data : [];
-      if (list.length > 0) {
-        const s = list[0];
-        const audioUrl = s.media_url || s.download_url || s.url;
-        if (audioUrl) {
-          return {
-            id: s.id || Date.now().toString(),
-            title: s.song || s.title || query,
-            artist: s.primary_artists || s.singers || 'Unknown',
-            duration: parseInt(s.duration) || 0,
-            image: s.image,
-            audioUrl,
-            _src: 'API2'
-          };
-        }
-      }
-    } catch (e) {}
-    return null;
-  };
-
-  const tryAPI3 = async () => {
-    try {
-      const r = await axios.get(
-        `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-        { timeout: 5000 }
-      );
-      const list = r.data?.data?.results || r.data?.results || [];
-      if (list.length > 0) {
-        const s = list[0];
-        const audioUrl = s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url;
-        if (audioUrl) {
-          return {
-            id: s.id || Date.now().toString(),
-            title: s.name || s.title,
-            artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
-            duration: s.duration || 0,
-            image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
-            audioUrl,
-            _src: 'API3'
-          };
-        }
-      }
-    } catch (e) {}
-    return null;
-  };
-
-  // FIX: Promise.any ko "null" result nahi chahiye — null aane par reject karo
-  // taaki pehla *asli* result jeete (pehle null result jeet jaata tha).
-  const must = (p) => p.then(r => { if (!r) throw new Error('empty'); return r; });
-
-  try {
-    const result = await Promise.any([
-      must(tryAPI1()),
-      must(tryAPI2()),
-      must(tryAPI3())
-    ]);
-
-    if (result) {
-      console.log(`✅ Search success (${result._src}): ${result.title}`);
-      delete result._src;
-      searchCache.set(cacheKey, { data: result, time: Date.now() });
-      if (searchCache.size > 200) {
-        const firstKey = searchCache.keys().next().value;
-        searchCache.delete(firstKey);
-      }
-      return result;
-    }
-  } catch (e) {}
-
   console.log('❌ ALL search APIs failed for:', query);
   return null;
 }
 
-// ✅ Similar songs search — 8s timeout, 2 retries, parallel
+// ✅ Artist ke gaanon ka pool 10 min cache hota hai, baar baar network call nahi
 async function searchSimilarSongs(query, exclude = []) {
-  const q = encodeURIComponent(query);
-  const seenIds = new Set();
-
-  const fetchWithRetry = async (fn, retries = 2) => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const result = await fn();
-        if (result && result.length > 0) return result;
-      } catch (e) {
-        console.log(`  retry ${i+1}/${retries}: ${e.message}`);
-      }
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 500));
-    }
-    // FIX: null return karo -> Promise.any is API ko fail maanega (khali list nahi)
-    throw new Error('no results');
-  };
-
-  const tryAPI1 = () => fetchWithRetry(async () => {
-    const r = await axios.get(
-      `https://saavn.dev/api/search/songs?query=${q}&limit=15`,
-      { timeout: 8000 }
-    );
-    const list = r.data?.data?.results || [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id, title: s.name,
-      artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-      duration: s.duration,
-      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-    })).filter(s => s.audioUrl);
-    return mapped;
-  });
-
-  const tryAPI2 = () => fetchWithRetry(async () => {
-    const r = await axios.get(
-      `https://saavnapi-nine.vercel.app/result?query=${q}`,
-      { timeout: 8000 }
-    );
-    const list = Array.isArray(r.data) ? r.data : [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id || Date.now().toString() + Math.random(),
-      title: s.song || s.title || query,
-      artist: s.primary_artists || s.singers || 'Unknown',
-      duration: parseInt(s.duration) || 0,
-      image: s.image,
-      audioUrl: s.media_url || s.download_url || s.url
-    })).filter(s => s.audioUrl);
-    return mapped;
-  });
-
-  const tryAPI3 = () => fetchWithRetry(async () => {
-    const r = await axios.get(
-      `https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-      { timeout: 8000 }
-    );
-    const list = r.data?.data?.results || r.data?.results || [];
-    const filtered = list.filter(s => !exclude.includes(s.id));
-    const mapped = filtered.map(s => ({
-      id: s.id || Date.now().toString() + Math.random(),
-      title: s.name || s.title || query,
-      artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
-      duration: s.duration || 0,
-      image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url || s.image,
-      audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
-    })).filter(s => s.audioUrl);
-    return mapped;
-  });
-
-  try {
-    const result = await Promise.any([tryAPI1(), tryAPI2(), tryAPI3()]);
-    if (result && result.length > 0) {
-      const unique = result.filter(s => {
-        if (seenIds.has(s.id)) return false;
-        seenIds.add(s.id);
-        return true;
-      });
-      return unique;
-    }
-  } catch (e) {
-    console.log(`searchSimilarSongs all failed: ${e.message}`);
+  const key = query.toLowerCase().trim();
+  let entry = similarCache.get(key);
+  if (!entry || Date.now() - entry.time > SIMILAR_TTL) {
+    const songs = await fetchSongList(query, 15);
+    // duplicate ids hatao
+    const seen = new Set();
+    const unique = songs.filter(s => (seen.has(s.id) ? false : (seen.add(s.id), true)));
+    entry = { data: unique, time: Date.now() };
+    if (unique.length) cacheSet(similarCache, key, unique, 100);
   }
-
-  return [];
+  return entry.data.filter(s => !exclude.includes(s.id));
 }
+
+// ===================== HISTORY / NEXT SONG =====================
+
+function pushHistory(room, track) {
+  if (!track || room.state.isAmbient) return;
+  if (!room.playedHistory) room.playedHistory = [];
+  const last = room.playedHistory[room.playedHistory.length - 1];
+  if (last && last.id === track.id) return;
+  room.playedHistory.push(track);
+  if (room.playedHistory.length > 30) room.playedHistory.shift();
+}
+
+const historyIds = room => (room.playedHistory || []).map(t => t.id);
 
 // ✅ SAME ARTIST FOCUS — 3-level fallback
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
@@ -767,7 +712,6 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
   const rawArtist = (currentTrack.artist || '').trim();
   const currentId = currentTrack.id;
 
-  // Artist name saaf karo
   const artistList = rawArtist
     .split(/[,&]|\bfeat\.?\b|\bft\.?\b/i)
     .map(a => a.trim())
@@ -775,50 +719,46 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
 
   console.log(`🎯 Auto-next: artist="${rawArtist}" → [${artistList.join(', ')}]`);
 
-  // Level 1: Exact artist ke gaane (played history exclude)
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
+  // Level 1: same artist, history exclude
   for (const artist of artistList) {
     const songs = await searchSimilarSongs(artist, fullExclude);
-    if (songs && songs.length > 0) {
-      const pick = songs[Math.floor(Math.random() * Math.min(5, songs.length))];
-      console.log(`🎵 Next (L1 - exact artist "${artist}"): ${pick.title}`);
-      return pick;
+    if (songs.length > 0) {
+      const p = pick(songs.slice(0, 5));
+      console.log(`🎵 Next (L1 - exact artist "${artist}"): ${p.title}`);
+      return p;
     }
   }
 
-  // Level 2: Same artist ke gaane (repeat allow)
-  console.log(`⚠️ L1 failed — trying L2 (same artist, allow repeats)`);
+  // Level 2: same artist, repeat allowed
+  console.log('⚠️ L1 failed — trying L2 (same artist, allow repeats)');
   for (const artist of artistList) {
     const songs = await searchSimilarSongs(artist, [currentId]);
-    if (songs && songs.length > 0) {
-      const filtered = songs.filter(s => s.id !== currentId);
-      if (filtered.length > 0) {
-        const pick = filtered[Math.floor(Math.random() * Math.min(5, filtered.length))];
-        console.log(`🎵 Next (L2 - same artist repeat): ${pick.title}`);
-        return pick;
-      }
+    if (songs.length > 0) {
+      const p = pick(songs.slice(0, 5));
+      console.log(`🎵 Next (L2 - same artist repeat): ${p.title}`);
+      return p;
     }
   }
 
-  // Level 3: Similar artists
-  console.log(`⚠️ L2 failed — trying L3 (similar artists)`);
+  // Level 3: similar artists
+  console.log('⚠️ L2 failed — trying L3 (similar artists)');
   const primaryArtist = artistList[0]?.toLowerCase();
   if (primaryArtist) {
     const similar = SIMILAR_ARTISTS[primaryArtist] || [];
     const shuffled = [...similar].sort(() => Math.random() - 0.5);
     for (const simArtist of shuffled.slice(0, 3)) {
       const songs = await searchSimilarSongs(simArtist, fullExclude);
-      if (songs && songs.length > 0) {
-        const pick = songs[Math.floor(Math.random() * Math.min(3, songs.length))];
-        console.log(`🎵 Next (L3 - similar "${simArtist}"): ${pick.title}`);
-        return pick;
+      if (songs.length > 0) {
+        const p = pick(songs.slice(0, 3));
+        console.log(`🎵 Next (L3 - similar "${simArtist}"): ${p.title}`);
+        return p;
       }
     }
   }
 
-  // Level 4: Auto DJ
-  console.log(`⚠️ All levels failed — Auto DJ random`);
+  console.log('⚠️ All levels failed — Auto DJ random');
   return null;
 }
 
@@ -831,209 +771,172 @@ async function getSkipSong(currentTrack, playedHistory = []) {
   if (artist && artist !== 'Unknown') {
     const artistSongs = await searchSimilarSongs(artist, fullExclude);
     if (artistSongs.length > 0) {
-      const pick = artistSongs[Math.floor(Math.random() * Math.min(5, artistSongs.length))];
-      console.log(`🎲 Skip: ${artist} → ${pick.title}`);
-      return pick;
+      const p = pick(artistSongs.slice(0, 5));
+      console.log(`🎲 Skip: ${artist} → ${p.title}`);
+      return p;
     }
   }
 
-  const artistLower = artist.toLowerCase();
-  const similarArtists = SIMILAR_ARTISTS[artistLower];
+  const similarArtists = SIMILAR_ARTISTS[artist.toLowerCase()];
   if (similarArtists && similarArtists.length > 0) {
     const shuffled = [...similarArtists].sort(() => Math.random() - 0.5);
     for (const simArtist of shuffled) {
       const songs = await searchSimilarSongs(simArtist, fullExclude);
       if (songs.length > 0) {
-        const pick = songs[Math.floor(Math.random() * Math.min(3, songs.length))];
-        console.log(`🎲 Skip: similar ${simArtist} → ${pick.title}`);
-        return pick;
+        const p = pick(songs.slice(0, 3));
+        console.log(`🎲 Skip: similar ${simArtist} → ${p.title}`);
+        return p;
       }
     }
   }
 
-  const randomIndex = Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length);
-  const songName = AUTO_DJ_PLAYLIST[randomIndex];
+  const songName = pick(AUTO_DJ_PLAYLIST);
   autoDjIndex++;
-  console.log(`🎲 Skip: random from Auto DJ`);
+  console.log('🎲 Skip: random from Auto DJ');
   return await searchSong(songName);
 }
 
-async function playNextSong(reason = 'auto', user = null) {
-  const room = rooms[GLOBAL_ROOM_ID];
-  if (!room) return;
-
-  const playedHistory = room.playedHistory || [];
-  let nextSong = null;
-
-  const currentIsAmbient = room.state.isAmbient || false;
-  const currentTrackId = room.state.track?.id;
-  const currentArtist = room.state.track?.artist || 'Unknown';
-
-  console.log(`\n🎵 ========== playNextSong (${reason}) ==========`);
-  console.log(`🎵 Current: "${room.state.track?.title}" by ${currentArtist}`);
-
-  if (!currentIsAmbient && currentTrackId) {
-    if (reason === 'skip') {
-      nextSong = await getSkipSong(room.state.track, playedHistory);
-    } else if (reason === 'next' || reason === 'auto') {
-      nextSong = await getNextSongFromContext(room.state.track, playedHistory);
+// ✅ Gaana chalte hi agla gaana background me pehle se dhoondh lo => next/skip instant
+async function prefetchNext(room) {
+  const cur = room.state.track;
+  if (!cur || room.state.isAmbient) return;
+  if (room._prefetch && room._prefetch.forId === cur.id) return;
+  const token = cur.id;
+  if (room._prefetchingFor === token) return;
+  room._prefetchingFor = token;
+  try {
+    const t = await getNextSongFromContext(cur, historyIds(room));
+    if (t && room.state.track && room.state.track.id === token) {
+      room._prefetch = { forId: token, track: t };
+      console.log(`⚡ Prefetched next: ${t.title}`);
     }
+  } catch (e) {
+    console.log('prefetch error:', e.message);
+  } finally {
+    if (room._prefetchingFor === token) room._prefetchingFor = null;
   }
+}
 
-  // Last resort — Auto DJ playlist
-  if (!nextSong) {
-    console.log(`⚠️ Context failed — Auto DJ playlist`);
-    // Room me koi gana nahi chal raha tha -> random gane se shuruaat
-    if (!currentTrackId) {
-      autoDjIndex = Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length);
-    }
-    for (let i = 0; i < 3; i++) {
-      const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
-      autoDjIndex++;
-      console.log(`  Auto DJ ${i+1}/3: ${songName}`);
-      nextSong = await searchSong(songName);
-      if (nextSong) {
-        console.log(`✅ Auto DJ got: ${nextSong.title}`);
-        break;
-      }
-    }
-  }
+// Ek hi jagah se track change => history, state, events, prefetch sab sahi rahe
+function setRoomTrack(room, track, opts = {}) {
+  const {
+    playedBy = null,
+    playedByName = 'Someone',
+    autoDj = false,
+    reason = 'next'
+  } = opts;
 
-  if (!nextSong) {
-    console.error('❌ playNextSong: ALL failed — keeping current track');
-    return;
-  }
-
-  if (!room.playedHistory) room.playedHistory = [];
-  if (room.state.track && !room.state.isAmbient && room.state.track.id !== nextSong.id) {
-    room.playedHistory.push(room.state.track.id);
-    if (room.playedHistory.length > 30) room.playedHistory.shift();
-  }
-
-  let playedByName = 'Someone';
-  let autoDjFlag = false;
-
-  if (reason === 'auto') {
-    playedByName = '🎵 Auto DJ';
-    autoDjFlag = true;
-  } else if (user) {
-    playedByName = user.name;
+  if (room.state.track && room.state.track.id !== track.id) {
+    pushHistory(room, room.state.track);
   }
 
   room.state = {
-    track: nextSong,
+    track,
     position: 0,
     isPlaying: true,
-    playedBy: user ? user.id : null,
-    playedByName: playedByName,
-    autoDj: autoDjFlag,
+    playedBy,
+    playedByName,
+    autoDj,
     isAmbient: false,
     lastUpdated: Date.now()
   };
+  room._lastKnownDuration = track.duration || 0;
+  room._lastChangeAt = Date.now();
+  room._prefetch = null;
+  analytics.songsPlayed++;
 
-  room._lastKnownDuration = nextSong.duration || 0;
+  console.log(`🎵 NOW PLAYING: "${track.title}" by ${track.artist} (${reason})`);
 
-  console.log(`🎵 NOW PLAYING: "${nextSong.title}" by ${nextSong.artist}`);
-  console.log(`🎵 ==========================================\n`);
+  io.to(room.roomId).emit('stateSync', room.state);
+  io.to(room.roomId).emit('songChanged', { track, reason, playedBy: playedByName });
 
-  io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-  io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-    track: nextSong,
-    reason: reason,
-    playedBy: playedByName
-  });
+  prefetchNext(room);
 }
 
-// Dedupe ke saath next gana chalao (end-of-song / join / start ke liye)
-async function playNextGuarded(reason, user = null) {
+// Returns: naya track (ya current track agar debounce/lock), null agar sab fail
+async function playNextSong(reason = 'auto', user = null) {
   const room = rooms[GLOBAL_ROOM_ID];
-  if (!room || room._loadingNext) return;
-  room._loadingNext = true;
+  if (!room) return null;
+
+  // double click / ek saath kai skip ko rokne ke liye
+  if (room._changing) return room.state.track;
+  if (reason !== 'auto' && Date.now() - (room._lastChangeAt || 0) < 1000) return room.state.track;
+
+  room._changing = true;
   try {
-    await playNextSong(reason, user);
-  } catch (e) {
-    console.error('playNextGuarded error:', e.message);
-  } finally {
-    setTimeout(() => { room._loadingNext = false; }, 3000);
-  }
-}
+    const cur = room.state.track;
+    const history = historyIds(room);
+    let nextSong = null;
 
-async function getPreviousSong(prevId) {
-  const apis = [
-    async () => {
-      const r = await axios.get(
-        'https://saavn.dev/api/songs/' + encodeURIComponent(prevId),
-        { timeout: 5000 }
-      );
-      const s = r.data?.data?.[0];
-      if (!s) return null;
-      return {
-        id: s.id, title: s.name,
-        artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-        duration: s.duration,
-        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-      };
-    },
-    async () => {
-      const r = await axios.get(
-        'https://jiosaavn-api-2-harsh-patel.vercel.app/song?id=' + encodeURIComponent(prevId),
-        { timeout: 5000 }
-      );
-      const s = r.data?.data?.[0] || r.data?.[0];
-      if (!s) return null;
-      return {
-        id: s.id, title: s.name || s.title,
-        artist: s.artists?.primary?.map(a => a.name).join(', ') || s.primaryArtists || 'Unknown',
-        duration: s.duration,
-        image: s.image?.[2]?.url || s.image?.[1]?.url || s.image,
-        audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url || s.url
-      };
+    console.log(`\n🎵 ===== playNextSong (${reason}) | current: "${cur?.title}" =====`);
+
+    // 1) Prefetched ho to turant
+    if (cur && room._prefetch && room._prefetch.forId === cur.id) {
+      nextSong = room._prefetch.track;
+      room._prefetch = null;
+      console.log('⚡ Using prefetched song');
     }
-  ];
 
-  for (const api of apis) {
-    try {
-      const track = await api();
-      if (track && track.audioUrl) {
-        console.log(`✅ Prev found: ${track.title}`);
-        return track;
+    // 2) Nahi to normal logic
+    if (!nextSong && cur && !room.state.isAmbient) {
+      nextSong = reason === 'skip'
+        ? await getSkipSong(cur, history)
+        : await getNextSongFromContext(cur, history);
+    }
+
+    // 3) Last resort — Auto DJ playlist
+    if (!nextSong) {
+      console.log('⚠️ Context failed — Auto DJ playlist');
+      for (let i = 0; i < 3; i++) {
+        const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
+        autoDjIndex++;
+        nextSong = await searchSong(songName);
+        if (nextSong) break;
       }
-    } catch (e) {
-      console.log('Prev API failed:', e.message);
     }
+
+    if (!nextSong) {
+      console.error('❌ playNextSong: ALL failed — keeping current track');
+      return null;
+    }
+
+    const isAuto = reason === 'auto';
+    setRoomTrack(room, nextSong, {
+      playedBy: user ? user.id : null,
+      playedByName: isAuto ? '🎵 Auto DJ' : (user ? user.name : 'Someone'),
+      autoDj: isAuto,
+      reason
+    });
+    return nextSong;
+  } finally {
+    room._changing = false;
   }
-  return null;
 }
 
-function hasOnlineUsers(room) {
-  const now = Date.now();
-  return room.users.some(u => u.status !== 'disconnected' && now - u.lastActive < IDLE_TIMEOUT);
-}
+// ===================== BACKGROUND LOOPS =====================
 
-// ✅ Song end check — 1s interval (backup; clients bhi 'trackEnded' bhejte hain)
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
     if (!room.state.track || !room.state.isPlaying) return;
     if (room._loadingNext) return;
-    // Khali room me gane chalte nahi rahenge
-    if (!hasOnlineUsers(room)) return;
 
     let duration = room.state.track.duration || 0;
-    if (!duration || duration <= 0) {
-      duration = room._lastKnownDuration || 0;
-    }
+    if (!duration || duration <= 0) duration = room._lastKnownDuration || 0;
 
-    const currentPos = getRawPosition(room);
-
-    const shouldTrigger = duration > 0 && currentPos >= duration + 1;
+    const currentPos = getCurrentPosition(room);
+    const shouldTrigger = duration > 0 && currentPos >= duration - 1.5;
     const fallbackTrigger = !duration && currentPos > 360;
 
     if (shouldTrigger || fallbackTrigger) {
+      room._loadingNext = true;
       console.log(`🎵 Song ended (pos=${currentPos.toFixed(1)}s, dur=${duration}s) — next`);
-      await playNextGuarded('auto');
+      try {
+        await playNextSong('auto');
+      } finally {
+        setTimeout(() => { room._loadingNext = false; }, 3000);
+      }
     }
   }, 1000);
 }
@@ -1045,15 +948,17 @@ function startPositionUpdater() {
     const lastUpdated = room.state.lastUpdated || Date.now();
     const elapsed = (Date.now() - lastUpdated) / 1000;
     if (elapsed > 5) {
-      room.state.position = (room.state.position || 0) + elapsed;
+      room.state.position = getCurrentPosition(room);
       room.state.lastUpdated = Date.now();
     }
   }, 5000);
 }
 
 function startAutoDj() {
-  console.log('🎵 Auto DJ: Naya user aate hi (agar gana nahi chal raha) random gana shuru hoga');
+  console.log('🎵 Auto DJ: Waiting for user to play a song...');
 }
+
+// ===================== SOCKET.IO =====================
 
 io.on('connection', (socket) => {
   const ip = getClientIP(socket);
@@ -1073,10 +978,11 @@ io.on('connection', (socket) => {
     return;
   }
 
-  socket.on('joinGlobal', ({ userName, fingerprint }) => {
+  socket.on('joinGlobal', ({ userName, fingerprint } = {}) => {
     ensureGlobalRoom();
     const room = rooms[GLOBAL_ROOM_ID];
     const userFp = fingerprint || fp;
+    userName = String(userName || 'Guest').trim().slice(0, 30) || 'Guest';
 
     if (BLOCKED_IPS.has(ip) || (userFp && BLOCKED_FINGERPRINTS.has(userFp))) {
       socket.emit('blocked', { message: 'You are blocked' });
@@ -1084,7 +990,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    let existingUser = room.users.find(u => u.fingerprint === userFp);
+    // 'unknown' fingerprint wale sab log ek user na ban jayein
+    let existingUser = (userFp && userFp !== 'unknown')
+      ? room.users.find(u => u.fingerprint === userFp)
+      : null;
 
     if (existingUser) {
       const oldSocket = io.sockets.sockets.get(existingUser.id);
@@ -1136,7 +1045,6 @@ io.on('connection', (socket) => {
     }
 
     if (room.state.track) {
-      // Pehle se koi gana chal raha hai -> naye user ko wahi gana usi position par
       const currentPosition = getCurrentPosition(room);
 
       socket.emit('stateSync', {
@@ -1148,19 +1056,13 @@ io.on('connection', (socket) => {
         lastUpdated: Date.now()
       });
 
-      if (room.state.isPlaying) {
-        socket.emit('songChanged', {
-          track: room.state.track,
-          reason: 'sync',
-          playedBy: room.state.playedByName
-        });
-      }
+      socket.emit('songChanged', {
+        track: room.state.track,
+        reason: 'sync',
+        playedBy: room.state.playedByName
+      });
 
       console.log(`🔄 Synced ${userName} → ${currentPosition.toFixed(1)}s`);
-    } else {
-      // Koi gana nahi chal raha -> random gana shuru karo (Auto DJ)
-      console.log(`🎲 Room khali — ${userName} ke liye random gana`);
-      playNextGuarded('auto');
     }
 
     socket.emit('chatHistory', room.messages);
@@ -1180,22 +1082,23 @@ io.on('connection', (socket) => {
       welcomeMessage: getRandomWelcome()
     });
 
+    // 🤖 Funny personal welcome
     setTimeout(() => {
-      const botMsg = {
-        id: 'bot-' + Date.now(),
+      socket.emit('chatMessage', {
+        id: 'bot-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         userId: 'bot', userName: '🤖 Music Bot',
-        text: getRandomWelcome(),
+        text: pick(FUNNY_WELCOMES)(userName),
         time: Date.now(), type: 'bot'
-      };
-      socket.emit('chatMessage', botMsg);
-    }, 3000);
+      });
+    }, 2000);
 
     console.log(`🌍 ${userName} joined (${room.users.length} total)`);
   });
 
-  socket.on('updateState', ({ roomId, newState }) => {
+  socket.on('updateState', ({ roomId, newState } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room || !newState) return;
+    if (!room) return;
+    if (!newState || typeof newState !== 'object') return;
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
@@ -1216,18 +1119,19 @@ io.on('connection', (socket) => {
       newState.playedByName = user.name;
       console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
 
-      if (!room.playedHistory) room.playedHistory = [];
       if (room.state.track && room.state.track.id !== newState.track.id) {
-        room.playedHistory.push(room.state.track.id);
-        if (room.playedHistory.length > 30) room.playedHistory.shift();
+        pushHistory(room, room.state.track);
       }
 
       analytics.songsPlayed++;
       room._lastKnownDuration = newState.track.duration || 0;
+      room._lastChangeAt = Date.now();
+      room._prefetch = null;
 
       room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
       socket.to(room.roomId).emit('stateSync', room.state);
       io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
+      prefetchNext(room);
       return;
     }
 
@@ -1235,10 +1139,11 @@ io.on('connection', (socket) => {
         room.state.track.id === newState.track.id &&
         newState.position !== undefined) {
 
-      const clientPos = newState.position;
+      const clientPos = Number(newState.position) || 0;
       const drift = Math.abs(clientPos - serverPos);
 
-      if (drift > 5) {
+      // ✅ Fix: user ne jaan bujh ke seek kiya ho (seeked: true) to reject mat karo
+      if (drift > 5 && !newState.seeked) {
         console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s`);
         socket.emit('stateSync', {
           track: room.state.track,
@@ -1251,10 +1156,11 @@ io.on('connection', (socket) => {
         return;
       }
 
+      if (newState.seeked) room._seekAt = Date.now();
       room.state.position = clientPos;
       room.state.isPlaying = newState.isPlaying !== undefined ? newState.isPlaying : room.state.isPlaying;
       room.state.lastUpdated = Date.now();
-      socket.to(room.roomId).emit('stateSync', room.state);
+      socket.to(room.roomId).emit('stateSync', { ...room.state, seeked: !!newState.seeked });
       return;
     }
 
@@ -1262,7 +1168,39 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('stateSync', room.state);
   });
 
-  socket.on('reportDuration', ({ roomId, trackId, duration }) => {
+  // ✅ NEW: seek (progress bar chhodne par ek baar bhejo)
+  socket.on('seek', ({ roomId, position } = {}) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room || !room.state.track) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    if (user.blocked && user.blocked.play) {
+      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
+      return;
+    }
+    user.lastActive = Date.now();
+
+    const dur = room.state.track.duration || room._lastKnownDuration || 0;
+    let pos = Number(position);
+    if (!isFinite(pos) || pos < 0) pos = 0;
+    if (dur > 0 && pos > dur - 2) pos = Math.max(0, dur - 2);
+
+    room.state.position = pos;
+    room.state.lastUpdated = Date.now();
+    room._seekAt = Date.now();
+
+    socket.to(room.roomId).emit('stateSync', {
+      track: room.state.track,
+      position: pos,
+      isPlaying: room.state.isPlaying,
+      playedByName: room.state.playedByName,
+      autoDj: room.state.autoDj,
+      seeked: true,
+      lastUpdated: Date.now()
+    });
+  });
+
+  socket.on('reportDuration', ({ roomId, trackId, duration } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room || !room.state.track) return;
     if (room.state.track.id === trackId && duration > 0) {
@@ -1272,48 +1210,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ✅ Gana khatam hone par — har client bhejta hai, server sirf EK baar next chalata hai
-  socket.on('trackEnded', async ({ trackId }) => {
-    const room = rooms[GLOBAL_ROOM_ID];
-    if (!room || !room.state.track) return;
-    if (room.state.track.id !== trackId) return;   // pehle hi next ho chuka
-    if (room._loadingNext) return;
-    console.log(`🏁 trackEnded from ${socket.userName || socket.id}: ${room.state.track.title}`);
-    await playNextGuarded('auto');
-  });
-
-  // ✅ Play button par jab client ke paas koi gana nahi hai
-  socket.on('requestStart', async () => {
-    const room = rooms[GLOBAL_ROOM_ID];
-    if (!room) return;
-    const user = room.users.find(u => u.id === socket.id);
-    if (!user) return;
-    user.lastActive = Date.now();
-
-    if (user.blocked && user.blocked.play) {
-      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
-      return;
-    }
-
-    if (room.state.track) {
-      // Gana room me already hai -> resume + sab ko sync
-      room.state.position = getCurrentPosition(room);
-      room.state.isPlaying = true;
-      room.state.lastUpdated = Date.now();
-      io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-      socket.emit('songChanged', {
-        track: room.state.track,
-        reason: 'sync',
-        playedBy: room.state.playedByName
-      });
-      return;
-    }
-
-    console.log(`▶️ ${user.name} pressed play on empty room — random song`);
-    await playNextGuarded('start', user);
-  });
-
-  socket.on('requestNext', async ({ roomId }) => {
+  socket.on('requestNext', async ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1330,35 +1227,20 @@ io.on('connection', (socket) => {
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 15000)
+        setTimeout(() => reject(new Error('Timeout')), 12000)
       );
-      await Promise.race([
-        playNextSong('next', user),
-        timeoutPromise
-      ]);
-      socket.emit('nextAck', { status: 'success', track: room.state.track?.title || 'Next' });
-      console.log(`✅ Next: ${room.state.track?.title}`);
+      const track = await Promise.race([playNextSong('next', user), timeoutPromise]);
+      if (track) {
+        socket.emit('nextAck', { status: 'success', track: track.title || 'Next' });
+      } else {
+        socket.emit('nextAck', { status: 'error' });
+      }
     } catch (e) {
       console.error('Next error:', e.message);
-      const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
-      const fallbackTrack = await searchSong(randomSong);
+      const fallbackTrack = await searchSong(pick(AUTO_DJ_PLAYLIST));
       if (fallbackTrack) {
-        room.state = {
-          track: fallbackTrack,
-          position: 0,
-          isPlaying: true,
-          playedBy: user.id,
-          playedByName: user.name,
-          autoDj: false,
-          isAmbient: false,
-          lastUpdated: Date.now()
-        };
-        room._lastKnownDuration = fallbackTrack.duration || 0;
-        io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-        io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-          track: fallbackTrack,
-          reason: 'next',
-          playedBy: user.name
+        setRoomTrack(room, fallbackTrack, {
+          playedBy: user.id, playedByName: user.name, autoDj: false, reason: 'next'
         });
         socket.emit('nextAck', { status: 'fallback', track: fallbackTrack.title });
       } else {
@@ -1367,7 +1249,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('requestPrev', async ({ roomId }) => {
+  // ✅ Previous: instant (history me poora track save hai, API call nahi)
+  socket.on('requestPrev', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1378,68 +1261,60 @@ io.on('connection', (socket) => {
       socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
       return;
     }
+    if (!room.state.track) return;
 
     console.log(`⏮️ ${user.name} requested PREV`);
-    socket.emit('prevAck', { status: 'loading' });
 
-    if (room.playedHistory && room.playedHistory.length > 0) {
-      const prevId = room.playedHistory[room.playedHistory.length - 1];
-      const prevTrack = await getPreviousSong(prevId);
+    const pos = getCurrentPosition(room);
+    const history = room.playedHistory || [];
 
-      if (prevTrack && prevTrack.audioUrl) {
-        room.playedHistory.pop();
-        if (room.state.track && !room.state.isAmbient) {
-          room.playedHistory.push(room.state.track.id);
-        }
-        room.state = {
-          track: prevTrack,
-          position: 0,
-          isPlaying: true,
-          playedBy: user.id,
-          playedByName: user.name,
-          autoDj: false,
-          isAmbient: false,
-          lastUpdated: Date.now()
-        };
-        room._lastKnownDuration = prevTrack.duration || 0;
-        io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-        io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-          track: prevTrack,
-          reason: 'prev',
-          playedBy: user.name
-        });
-        socket.emit('prevAck', { status: 'success', track: prevTrack.title });
-        return;
-      }
-    }
-
-    const randomSong = AUTO_DJ_PLAYLIST[Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length)];
-    const fallbackTrack = await searchSong(randomSong);
-    if (fallbackTrack) {
-      room.state = {
-        track: fallbackTrack,
+    // 5 sec se zyada chal chuka ya history khali => wahi gaana shuru se (Spotify jaisa)
+    if (pos > 5 || history.length === 0) {
+      room.state.position = 0;
+      room.state.isPlaying = true;
+      room.state.lastUpdated = Date.now();
+      room._seekAt = Date.now();
+      io.to(GLOBAL_ROOM_ID).emit('stateSync', {
+        track: room.state.track,
         position: 0,
         isPlaying: true,
-        playedBy: user.id,
-        playedByName: user.name,
-        autoDj: false,
-        isAmbient: false,
+        playedByName: room.state.playedByName,
+        autoDj: room.state.autoDj,
+        seeked: true,
         lastUpdated: Date.now()
-      };
-      room._lastKnownDuration = fallbackTrack.duration || 0;
-      io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
-      io.to(GLOBAL_ROOM_ID).emit('songChanged', {
-        track: fallbackTrack,
-        reason: 'prev',
-        playedBy: user.name
       });
-      socket.emit('prevAck', { status: 'fallback', track: fallbackTrack.title });
-    } else {
-      socket.emit('prevAck', { status: 'error' });
+      socket.emit('prevAck', { status: 'restart' });
+      return;
     }
+
+    const prevTrack = history.pop();
+    const leaving = room.state.track;
+
+    room.state = {
+      track: prevTrack,
+      position: 0,
+      isPlaying: true,
+      playedBy: user.id,
+      playedByName: user.name,
+      autoDj: false,
+      isAmbient: false,
+      lastUpdated: Date.now()
+    };
+    room._lastKnownDuration = prevTrack.duration || 0;
+    room._lastChangeAt = Date.now();
+    // Prev ke baad Next dabao to wahi gaana wapas aaye jo abhi chhoda
+    room._prefetch = { forId: prevTrack.id, track: leaving };
+
+    io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+    io.to(GLOBAL_ROOM_ID).emit('songChanged', {
+      track: prevTrack,
+      reason: 'prev',
+      playedBy: user.name
+    });
+    socket.emit('prevAck', { status: 'success', track: prevTrack.title });
   });
 
-  socket.on('requestSkip', async ({ roomId }) => {
+  socket.on('requestSkip', async ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1454,12 +1329,16 @@ io.on('connection', (socket) => {
     console.log(`🎲 ${user.name} SKIPPED`);
     io.to(room.roomId).emit('skipNotice', {
       userName: user.name,
-      message: `🎲 Skipped`
+      message: '🎲 Skipped'
     });
-    await playNextSong('skip', user);
+    try {
+      await playNextSong('skip', user);
+    } catch (e) {
+      console.error('Skip error:', e.message);
+    }
   });
 
-  socket.on('requestSyncState', ({ roomId }) => {
+  socket.on('requestSyncState', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const currentPosition = getCurrentPosition(room);
@@ -1472,7 +1351,7 @@ io.on('connection', (socket) => {
       autoDj: room.state.autoDj,
       lastUpdated: Date.now()
     });
-    if (room.state.track && room.state.isPlaying) {
+    if (room.state.track) {
       socket.emit('songChanged', {
         track: room.state.track,
         reason: 'sync',
@@ -1481,19 +1360,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('heartbeat', ({ roomId, position, isPlaying }) => {
+  // ✅ Heartbeat ab server ki state overwrite nahi karta (pehle ek buffering user sabka gaana rok deta tha)
+  socket.on('heartbeat', ({ roomId, position, isPlaying, buffering } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
-    if (user.blocked && user.blocked.play) return;
+
+    if (buffering || !room.state.isPlaying || !room.state.track) return;
+    if (Date.now() - (room._seekAt || 0) < 4000) return;  // seek ke baad 4s correction nahi
 
     const serverPos = getCurrentPosition(room);
-    const drift = Math.abs(position - serverPos);
+    const drift = Math.abs((Number(position) || 0) - serverPos);
 
-    if (drift > 5) {
-      console.log(`🚫 Heartbeat drift: ${drift.toFixed(1)}s`);
+    if (drift > 8) {
+      console.log(`🚫 Heartbeat drift ${drift.toFixed(1)}s → resync ${user.name}`);
       socket.emit('stateSync', {
         track: room.state.track,
         position: serverPos,
@@ -1502,23 +1384,17 @@ io.on('connection', (socket) => {
         autoDj: room.state.autoDj,
         lastUpdated: Date.now()
       });
-      return;
     }
-
-    room.state.position = position;
-    room.state.isPlaying = isPlaying;
-    room.state.lastUpdated = Date.now();
-    socket.to(room.roomId).emit('heartbeat', { position, isPlaying });
   });
 
-  socket.on('activity', ({ roomId }) => {
+  socket.on('activity', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
     if (user) user.lastActive = Date.now();
   });
 
-  socket.on('chatMessage', ({ roomId, text, mentions }) => {
+  socket.on('chatMessage', ({ roomId, text, mentions } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1537,11 +1413,17 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const clean = String(text || '').trim().slice(0, 500);
+    if (!clean) return;
+    if (Date.now() - (user._lastMsgAt || 0) < 500) return;  // spam rokne ke liye
+    user._lastMsgAt = Date.now();
+
+    room._lastChatAt = Date.now();
     analytics.messagesSent++;
     const msg = {
       id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
       userId: socket.id, userName: user.name,
-      text: String(text).slice(0, 500), mentions: mentions || [],
+      text: clean, mentions: Array.isArray(mentions) ? mentions : [],
       time: Date.now(), type: 'text'
     };
     room.messages.push(msg);
@@ -1549,7 +1431,7 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('chatMessage', msg);
   });
 
-  socket.on('voiceSignal', ({ roomId, signal }) => {
+  socket.on('voiceSignal', ({ roomId, signal } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1557,7 +1439,7 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('voiceSignal', { signal, from: socket.id, userName: user?.name });
   });
 
-  socket.on('pttState', ({ roomId, isTalking }) => {
+  socket.on('pttState', ({ roomId, isTalking } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1567,7 +1449,7 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('pttState', { userName: user.name, isTalking });
   });
 
-  socket.on('reaction', ({ roomId, emoji }) => {
+  socket.on('reaction', ({ roomId, emoji } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1576,7 +1458,7 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('reaction', { emoji, userName: user?.name });
   });
 
-  socket.on('chatPresence', ({ roomId, active }) => {
+  socket.on('chatPresence', ({ roomId, active } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1594,7 +1476,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('typing', ({ roomId, isTyping }) => {
+  socket.on('typing', ({ roomId, isTyping } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1604,7 +1486,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('moodUpdate', ({ roomId, mood, emoji, text, color }) => {
+  socket.on('moodUpdate', ({ roomId, mood, emoji, text, color } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1612,7 +1494,7 @@ io.on('connection', (socket) => {
     socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
   });
 
-  socket.on('shareLocation', ({ roomId, location, timezone, address, manualAddress }) => {
+  socket.on('shareLocation', ({ roomId, location, timezone, address, manualAddress } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
@@ -1644,7 +1526,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('requestGlobalListeners', ({ roomId }) => {
+  socket.on('requestGlobalListeners', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
 
@@ -1698,7 +1580,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('syncPing', ({ roomId, clientTime }) => {
+  socket.on('syncPing', ({ roomId, clientTime } = {}) => {
     socket.emit('syncPong', { clientTime, serverTime: Date.now() });
   });
 
@@ -1755,74 +1637,40 @@ function getUsersWithStatus(room) {
   }));
 }
 
-async function searchFromSaavnDev(query) {
-  const r = await axios.get(
-    'https://saavn.dev/api/search/songs?query=' + encodeURIComponent(query) + '&limit=15',
-    { timeout: 8000 }
-  );
-  const list = r.data?.data?.results || [];
-  return list.map(s => ({
-    id: s.id, title: s.name,
-    artist: s.artists?.primary?.map(a => a.name).join(', ') || 'Unknown',
-    duration: s.duration,
-    image: s.image?.[2]?.url || s.image?.[1]?.url || s.image?.[0]?.url,
-    audioUrl: s.downloadUrl?.[4]?.url || s.downloadUrl?.[3]?.url || s.downloadUrl?.[2]?.url
-  }));
-}
-
-async function searchFromSaavnNine(query) {
-  const r = await axios.get(
-    'https://saavnapi-nine.vercel.app/result',
-    { params: { query }, timeout: 8000 }
-  );
-  const list = Array.isArray(r.data) ? r.data : [];
-  return list.slice(0, 15).map(s => ({
-    id: s.id, title: s.song,
-    artist: s.primary_artists || s.singers || 'Unknown',
-    duration: parseInt(s.duration) || 0,
-    image: s.image,
-    audioUrl: s.media_url || s.download_url
-  }));
-}
+// ===================== SEARCH API =====================
 
 app.get('/api/search', async (req, res) => {
-  const query = req.query.q;
+  const query = String(req.query.q || '').trim();
   if (!query) return res.json({ results: [] });
 
-  const cacheKey = 'search:' + query.toLowerCase().trim();
+  const cacheKey = 'search:' + query.toLowerCase();
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
     return res.json({ results: cached.data, cached: true });
   }
 
-  try {
-    const songs = await searchFromSaavnDev(query);
-    if (songs.length > 0) {
-      searchCache.set(cacheKey, { data: songs, time: Date.now() });
-      return res.json({ results: songs });
-    }
-  } catch (e) { console.log('API 1 failed:', e.message); }
-  try {
-    const songs = await searchFromSaavnNine(query);
-    if (songs.length > 0) {
-      searchCache.set(cacheKey, { data: songs, time: Date.now() });
-      return res.json({ results: songs });
-    }
-  } catch (e) { console.log('API 2 failed:', e.message); }
+  const songs = await fetchSongList(query, 15);
+  if (songs.length > 0) {
+    cacheSet(searchCache, cacheKey, songs, 200);
+    return res.json({ results: songs });
+  }
   res.json({ results: [], error: 'Search failed' });
 });
+
+// ===================== START =====================
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port ' + PORT);
   console.log('🌍 Global room mode');
-  console.log('🎵 Auto DJ: Same artist focus (3-level fallback)');
+  console.log('🎵 Auto DJ: Same artist focus + prefetch next song');
   console.log('⏱️  Session grace: 30 seconds');
-  console.log('⚡ Optimized: search cache, drift 5s, 1s song-end check');
+  console.log('⚡ Optimized: parallel APIs, caches, seek event, instant prev/next');
   console.log('📍 Location: 5-15m accuracy + reverse geocode');
   ensureGlobalRoom();
   startAutoDj();
   startSongEndCheck();
   startPositionUpdater();
+  startFunnyBot();
   console.log('🔐 Admin panel: /admin');
 });
