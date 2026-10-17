@@ -72,8 +72,7 @@ body::before {
   position:relative; box-shadow:0 12px 32px var(--primary-glow);
   animation:logoFloat 3.5s ease-in-out infinite;
 }
-.join-logo::before { content:""; position:absolute; inset:-8px; border-radius:32px; background:linear-gradient(135deg, var(--primary), var(--accent)); opacity:0.35; filter:blur(20px); z-index:-1; }
-.join-logo img { width:40px; height:40px; stroke-width:2.2; color:white; }
+.join-logo img { width:100%; height:auto;}
 @keyframes logoFloat { 0%,100% { transform:translateY(0) rotate(0deg); } 50% { transform:translateY(-8px) rotate(-3deg); } }
 .join-box h1 {
   font-size:30px; font-weight:900; margin-bottom:8px; letter-spacing:-1px;
@@ -1040,7 +1039,7 @@ input:checked + .slider:before { transform:translateX(16px); }
         <img src="logo.png" alt="SangeetX" />
     </div>
     <h1>SangeetX</h1>
-    <p class="subtitle">🌍 Join the global room — everyone is welcome</p>
+    <p class="subtitle">🎶 Good music, good vibes — come be part of it!</p>
     <div class="input-wrap">
       <input type="text" id="userNameInput" name="display-nick" placeholder="Enter your name" maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
       <span class="input-icon"><i data-lucide="user"></i></span>
@@ -1052,11 +1051,11 @@ input:checked + .slider:before { transform:translateX(16px); }
     </div>
     <label style="display:flex;align-items:flex-start;gap:8px;margin:14px 0;font-size:11px;color:var(--text-dim);text-align:left;line-height:1.4;cursor:pointer;">
       <input type="checkbox" id="shareLocationConsent" checked style="margin-top:2px;flex-shrink:0;width:16px;height:16px;accent-color:#8B5CF6;" />
-      <span>Share my <b style="color:var(--primary-2);">approximate location</b> (±5-15m accuracy) so others can see where I'm listening from</span>
+      <span>Bring your music moments to life 💜 Let friends see where you're vibing from</span>
     </label>
     <button class="btn-primary" id="joinGlobalBtn">
       <i data-lucide="globe"></i>
-      <span>Join Global Room</span>
+      <span>Join & Listen Your Favorite</span>
     </button>
     <div id="globalStats" style="margin-top:20px;padding:14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:12px;">
       <div style="display:flex;justify-content:space-around;font-size:11px;">
