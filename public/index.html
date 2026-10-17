@@ -687,7 +687,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-msg.theirs .chat-msg-meta { color: rgba(180, 175, 210, 0.55); }
 .chat-msg-tick { display: inline-flex; align-items: center; color: #A78BFA; font-size: 12px; letter-spacing: -3px; margin-left: 1px; font-weight: 700; filter: none; }
 
-/* ✅ Mention tags */
+/* ============ MENTION TAGS ============ */
 .mention-tag {
   background: rgba(139,92,246,0.35);
   color: #E0D4FF;
@@ -703,24 +703,82 @@ input:checked + .slider:before { transform:translateX(16px); }
   color: #FFD1E8;
 }
 
-/* ✅ Mention autocomplete */
+/* ============ MENTION AUTOCOMPLETE ============ */
 .mention-suggest {
-  position:absolute; bottom:100%; left:12px; right:70px;
-  background:#16101F; border:1px solid rgba(139,92,246,0.3);
-  border-radius:12px; max-height:180px; overflow-y:auto;
-  display:none; z-index:30; box-shadow:0 -8px 24px rgba(0,0,0,0.6);
-  margin-bottom:6px;
+  position: fixed;
+  bottom: 76px;
+  left: 14px;
+  right: 14px;
+  background: #16101F;
+  border: 1px solid rgba(139,92,246,0.35);
+  border-radius: 14px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+  z-index: 300;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(139,92,246,0.1);
+  padding: 4px;
+  -webkit-overflow-scrolling: touch;
 }
-.mention-suggest.show { display:block; }
+@media (min-width: 768px) {
+  .mention-suggest {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 560px;
+    max-width: calc(100vw - 28px);
+  }
+}
+.mention-suggest.show { display: block; }
+.mention-suggest-header {
+  font-size: 10px;
+  font-weight: 800;
+  color: #A78BFA;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 12px 4px;
+  opacity: 0.85;
+}
 .mention-suggest-item {
-  padding:10px 14px; font-size:13px; font-weight:600; color:#FAFAFC;
-  cursor:pointer; display:flex; align-items:center; gap:8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FAFAFC;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  transition: background 0.12s ease;
 }
-.mention-suggest-item:hover, .mention-suggest-item.active {
-  background:rgba(139,92,246,0.25);
+.mention-suggest-item:hover,
+.mention-suggest-item.active {
+  background: rgba(139,92,246,0.25);
 }
-.mention-suggest-item::before {
-  content:"@"; color:#A78BFA; font-weight:800;
+.mention-suggest-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.mention-suggest-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mention-suggest-item .mention-at {
+  color: #A78BFA;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .typing-indicator {
@@ -1250,10 +1308,6 @@ input:checked + .slider:before { transform:translateX(16px); }
     <button class="chat-send" id="chatSend" type="button" aria-label="Send">
       <i data-lucide="send"></i>
     </button>
-
-    <!-- ✅ Mention autocomplete -->
-    <div class="mention-suggest" id="mentionSuggest"></div>
-
     <div class="emoji-picker" id="emojiPicker">
       <div class="emoji-picker-header">Quick Reactions</div>
       <div class="emoji-grid">
@@ -1272,6 +1326,9 @@ input:checked + .slider:before { transform:translateX(16px); }
       </div>
     </div>
   </div>
+
+  <!-- ✅ Mention autocomplete — fixed-position overlay -->
+  <div class="mention-suggest" id="mentionSuggest"></div>
 </div>
 
 <div id="searchModal">
@@ -1319,10 +1376,9 @@ let pttModeEnabled = false;
 let alwaysOnEnabled = false;
 let isTalking = false;
 
-// ✅ N-way voice: localStream + Map of peer connections
 let localStream = null;
-const peerConnections = new Map();   // remoteSocketId -> RTCPeerConnection
-const pendingCandidates = new Map(); // remoteSocketId -> [candidates]
+const peerConnections = new Map();
+const pendingCandidates = new Map();
 
 let heartbeatInterval = null;
 let activityInterval = null;
@@ -1380,6 +1436,13 @@ let isStarting = false;
 
 const SESSION_VALIDITY_MS = 30 * 1000;
 let sessionRefreshInterval = null;
+
+// ✅ Mention state
+const mentionSuggest = document.getElementById('mentionSuggest');
+let mentionAnchorNode = null;
+let mentionAnchorOffset = 0;
+let mentionActiveIndex = 0;
+let mentionItems = [];
 
 function initAudioContext() {
   if (audioContext) return;
@@ -2002,7 +2065,6 @@ document.getElementById('joinGlobalBtn').addEventListener('click', async () => {
   const name = document.getElementById('userNameInput').value.trim();
   if (!name) { showToast('Please enter your name first', 'error'); return; }
 
-  // ✅ Client-side name validation
   const nameCheck = clientValidateName(name);
   if (nameCheck) {
     document.getElementById('nameError').textContent = '⚠️ ' + nameCheck;
@@ -2055,7 +2117,6 @@ function initSocket(){
       </div>`;
   });
 
-  // ✅ Name rejected
   socket.on('nameRejected', ({ message }) => {
     document.getElementById('nameError').textContent = '⚠️ ' + message;
     showToast('❌ ' + message, 'error');
@@ -2107,7 +2168,6 @@ function initSocket(){
       const onlineCount = users.filter(u => u.status === 'online').length;
       sub.textContent = `${onlineCount} online`;
     }
-    // ✅ Voice mesh: if mic is on, ensure PC for each new peer
     if (localStream) {
       users.forEach(u => {
         if (u.id === socket.id) return;
@@ -2158,7 +2218,6 @@ function initSocket(){
   });
   socket.on('userLeft', ({ userName: leftName, message, userId }) => {
     showToast(message || `${leftName} left`);
-    // ✅ Cleanup peer
     const toRemove = [];
     remoteAudios.forEach((v, id) => {
       if (v.userName === leftName || (userId && id === userId)) toRemove.push(id);
@@ -2237,7 +2296,6 @@ function initSocket(){
     if(!chatOpen&&msg.userId!==socket.id){unreadMessages++;updateChatBadge();}
   });
 
-  // ✅ Moderation events
   socket.on('chatPending', ({ message }) => showToast(message, 'info'));
   socket.on('chatRejected', ({ messageId }) => {
     document.querySelector(`[data-msg-id="${messageId}"]`)?.remove();
@@ -2250,7 +2308,6 @@ function initSocket(){
     showToast(enabled ? '🛡️ Moderation ON — messages need approval' : '✅ Moderation OFF', 'info');
   });
 
-  // ✅ N-way voice
   socket.on('voiceSignal', async ({ signal, from, fromName }) => {
     await handleVoiceSignal({ signal, from, fromName });
   });
@@ -2491,13 +2548,189 @@ document.getElementById('closeChat').addEventListener('click',()=>{
   const emojiBtn = document.getElementById('chatEmojiBtn');
   if (picker) picker.classList.remove('show');
   if (emojiBtn) emojiBtn.classList.remove('active');
-  const mention = document.getElementById('mentionSuggest');
-  if (mention) mention.classList.remove('show');
+  hideMentionSuggest();
 });
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
 
 const chatInputEl = document.getElementById('chatInput');
+
+/* ============ MENTION AUTOCOMPLETE (WhatsApp-style) ============ */
+function getMentionContext() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return null;
+  if (!chatInputEl.contains(range.startContainer)) return null;
+
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE) return null;
+
+  const textBefore = node.textContent.slice(0, range.startOffset);
+  const m = textBefore.match(/(^|\s)@([^\s@]*)$/);
+  if (!m) return null;
+
+  const atOffset = range.startOffset - m[2].length - 1;
+  return {
+    node,
+    atOffset,
+    caretOffset: range.startOffset,
+    query: m[2]
+  };
+}
+
+function showMentionSuggest(query) {
+  const all = (window._currentUsers || []).filter(u => u.id !== socket?.id);
+  const q = (query || '').toLowerCase().trim();
+  const filtered = q
+    ? all.filter(u => u.name.toLowerCase().includes(q))
+    : all;
+
+  if (!filtered.length) { hideMentionSuggest(); return; }
+
+  filtered.sort((a, b) => {
+    const ap = a.name.toLowerCase().startsWith(q);
+    const bp = b.name.toLowerCase().startsWith(q);
+    if (ap && !bp) return -1;
+    if (bp && !ap) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  mentionItems = filtered.slice(0, 8);
+  mentionActiveIndex = 0;
+
+  mentionSuggest.innerHTML = `
+    <div class="mention-suggest-header">Mention someone</div>
+    ${mentionItems.map((u, i) => `
+      <div class="mention-suggest-item ${i === 0 ? 'active' : ''}"
+           data-name="${esc(u.name)}" data-index="${i}">
+        <div class="mention-suggest-avatar">${esc(u.name.charAt(0).toUpperCase())}</div>
+        <span class="mention-suggest-name">${esc(u.name)}</span>
+        <span class="mention-at">@</span>
+      </div>
+    `).join('')}
+  `;
+  mentionSuggest.classList.add('show');
+
+  mentionSuggest.querySelectorAll('.mention-suggest-item').forEach(el => {
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      insertMention(el.dataset.name);
+    });
+    el.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      insertMention(el.dataset.name);
+    }, { passive: false });
+  });
+}
+
+function hideMentionSuggest() {
+  mentionSuggest.classList.remove('show');
+  mentionSuggest.innerHTML = '';
+  mentionAnchorNode = null;
+  mentionAnchorOffset = 0;
+  mentionActiveIndex = 0;
+  mentionItems = [];
+}
+
+function getCurrentMentionQuery() {
+  const ctx = getMentionContext();
+  return ctx ? ctx.query : '';
+}
+
+function insertMention(name) {
+  if (!mentionAnchorNode) { hideMentionSuggest(); return; }
+
+  const node = mentionAnchorNode;
+  const atOffset = mentionAnchorOffset;
+  const q = getCurrentMentionQuery();
+  const before = node.textContent.slice(0, atOffset);
+  const after = node.textContent.slice(atOffset + 1 + q.length);
+
+  const newText = before + '@' + name + ' ' + after;
+  node.textContent = newText;
+
+  const newCaret = before.length + 1 + name.length + 1;
+  const range = document.createRange();
+  range.setStart(node, Math.min(newCaret, node.textContent.length));
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  hideMentionSuggest();
+  chatInputEl.focus();
+  chatInputEl.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+chatInputEl.addEventListener('input', () => {
+  if (!socket || !socket.connected) return;
+
+  if (!isTyping) { isTyping = true; socket.emit('typing', { roomId, isTyping: true, userName }); }
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => { isTyping = false; socket.emit('typing', { roomId, isTyping: false, userName }); }, 1500);
+
+  const ctx = getMentionContext();
+  if (!ctx) {
+    hideMentionSuggest();
+    return;
+  }
+
+  mentionAnchorNode = ctx.node;
+  mentionAnchorOffset = ctx.atOffset;
+  showMentionSuggest(ctx.query);
+});
+
+chatInputEl.addEventListener('keydown', (e) => {
+  if (!mentionSuggest.classList.contains('show')) return;
+  if (!mentionItems.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    mentionActiveIndex = (mentionActiveIndex + 1) % mentionItems.length;
+    updateMentionActive();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    mentionActiveIndex = (mentionActiveIndex - 1 + mentionItems.length) % mentionItems.length;
+    updateMentionActive();
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    insertMention(mentionItems[mentionActiveIndex].name);
+  } else if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (mentionItems[mentionActiveIndex]) {
+      insertMention(mentionItems[mentionActiveIndex].name);
+    }
+    return;
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    hideMentionSuggest();
+  }
+}, true);
+
+function updateMentionActive() {
+  mentionSuggest.querySelectorAll('.mention-suggest-item').forEach((el, i) => {
+    el.classList.toggle('active', i === mentionActiveIndex);
+    if (i === mentionActiveIndex) {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+chatInputEl.addEventListener('blur', () => {
+  setTimeout(() => {
+    if (!chatInputEl.matches(':focus')) hideMentionSuggest();
+  }, 200);
+});
+
+document.addEventListener('click', (e) => {
+  if (!mentionSuggest.contains(e.target) && e.target !== chatInputEl && !chatInputEl.contains(e.target)) {
+    hideMentionSuggest();
+  }
+});
 
 chatInputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -2517,60 +2750,6 @@ chatInputEl.addEventListener('paste', (e) => {
   const text = (e.clipboardData || window.clipboardData).getData('text/plain');
   document.execCommand('insertText', false, text);
 });
-
-/* ============ MENTION AUTOCOMPLETE ============ */
-const mentionSuggest = document.getElementById('mentionSuggest');
-let mentionQuery = null;
-
-chatInputEl.addEventListener('input', (e) => {
-  if(!socket||!socket.connected)return;
-  if(!isTyping){isTyping=true;socket.emit('typing',{roomId,isTyping:true,userName});}
-  clearTimeout(typingTimer);
-  typingTimer=setTimeout(()=>{ isTyping=false; socket.emit('typing',{roomId,isTyping:false,userName}); },1500);
-
-  // ✅ Mention autocomplete
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  const before = range.startContainer.textContent?.slice(0, range.startOffset) || '';
-  const m = before.match(/@([A-Za-z0-9_]*)$/);
-  if (!m) { mentionSuggest.classList.remove('show'); mentionQuery = null; return; }
-  mentionQuery = m[1].toLowerCase();
-  const users = (window._currentUsers || [])
-    .filter(u => u.id !== socket.id)
-    .filter(u => u.name.toLowerCase().includes(mentionQuery))
-    .slice(0, 6);
-  if (!users.length) { mentionSuggest.classList.remove('show'); return; }
-  mentionSuggest.innerHTML = users.map(u =>
-    `<div class="mention-suggest-item" data-name="${esc(u.name)}">${esc(u.name)}</div>`
-  ).join('');
-  mentionSuggest.classList.add('show');
-  mentionSuggest.querySelectorAll('.mention-suggest-item').forEach(el => {
-    el.addEventListener('mousedown', e2 => {
-      e2.preventDefault();
-      insertMention(el.dataset.name);
-    });
-  });
-});
-
-function insertMention(name) {
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  const before = range.startContainer.textContent.slice(0, range.startOffset);
-  const at = before.lastIndexOf('@');
-  if (at === -1) return;
-  range.setStart(range.startContainer, at);
-  range.deleteContents();
-  const node = document.createTextNode('@' + name + ' ');
-  range.insertNode(node);
-  range.setStartAfter(node);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-  mentionSuggest.classList.remove('show');
-  chatInputEl.dispatchEvent(new Event('input', { bubbles: true }));
-}
 
 /* ============ EMOJI PICKER ============ */
 const emojiPickerEl = document.getElementById('emojiPicker');
@@ -2611,23 +2790,18 @@ if (emojiBtn && emojiPickerEl) {
         emojiBtn.classList.remove('active');
       }
     }
-    if (mentionSuggest && mentionSuggest.classList.contains('show')) {
-      if (!mentionSuggest.contains(e.target) && e.target !== chatInputEl && !chatInputEl.contains(e.target)) {
-        mentionSuggest.classList.remove('show');
-      }
-    }
   });
 }
 
 function sendChat(){
   if(myPermissions.chat){showToast('You are blocked from chatting','error');return;}
+  hideMentionSuggest();
   const input=document.getElementById('chatInput');
   const text=(input.innerText || input.textContent || '').trim();
   if(!text)return;
   clearTimeout(typingTimer);isTyping=false;
   if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
 
-  // ✅ collect mentions
   const mentionNames = [...text.matchAll(/@([A-Za-z0-9_]{2,30})/g)].map(m => m[1]);
 
   if(!isOnline||!socket||!socket.connected){
@@ -2641,7 +2815,6 @@ function sendChat(){
   }
   socket.emit('chatMessage',{roomId,text,mentions:mentionNames});
   input.innerText='';
-  mentionSuggest.classList.remove('show');
 }
 
 /* ============ RENDER MESSAGE (with @mentions) ============ */
@@ -3333,8 +3506,6 @@ async function setupMic(){
     });
     localStream.getAudioTracks().forEach(t=>t.enabled=true);
     hideMicBanner();
-
-    // ✅ N-way: create PC for every existing user
     (window._currentUsers || []).forEach(u => {
       if (u.id === socket.id) return;
       callNewPeer(u.id, u.name);
@@ -3351,7 +3522,6 @@ async function setupMic(){
 
 function releaseMic(){
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
-  // ✅ Close all peer connections
   peerConnections.forEach((pc, id) => { try { pc.close(); } catch(e){} });
   peerConnections.clear();
   pendingCandidates.clear();
