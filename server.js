@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 const axios = require('axios');
 const path = require('path');
@@ -16,7 +17,13 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@8174902497';
+// 🔐 Password ab sirf environment variable se aata hai (code me hardcode nahi).
+// Agar set nahi hai to har start par random password banta hai aur console me dikhta hai.
+let ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) {
+  ADMIN_PASSWORD = crypto.randomBytes(9).toString('base64url');
+  console.log('⚠️  ADMIN_PASSWORD env set nahi hai. Temporary admin password:', ADMIN_PASSWORD);
+}
 
 const GLOBAL_ROOM_ID = 'global';
 const rooms = {};
@@ -158,12 +165,18 @@ function ensureGlobalRoom() {
 ensureGlobalRoom();
 setInterval(ensureGlobalRoom, 60000);
 
-function getCurrentPosition(room) {
+// Raw position (gana khatam hone ke baad bhi wrap nahi hota) — song-end check ke liye
+function getRawPosition(room) {
   if (!room || !room.state.track) return 0;
   if (!room.state.isPlaying) return room.state.position || 0;
   const lastUpdated = room.state.lastUpdated || Date.now();
   const elapsed = (Date.now() - lastUpdated) / 1000;
-  let pos = (room.state.position || 0) + elapsed;
+  return (room.state.position || 0) + elapsed;
+}
+
+function getCurrentPosition(room) {
+  if (!room || !room.state.track) return 0;
+  let pos = getRawPosition(room);
   if (room.state.track.duration > 0 && pos >= room.state.track.duration) {
     pos = 0;
   }
@@ -495,6 +508,7 @@ app.post('/api/admin/forceSkip', async (req, res) => {
     isAmbient: false,
     lastUpdated: Date.now()
   };
+  room._lastKnownDuration = track.duration || 0;
   io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
   io.to(GLOBAL_ROOM_ID).emit('songChanged', {
     track: track,
@@ -515,17 +529,18 @@ app.post('/api/admin/announce', (req, res) => {
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
   const announceMsg = String(message).slice(0, 300);
   const dur = Math.min(Math.max(parseInt(duration) || 10000, 2000), 60000);
-  currentAnnouncement = {
+  const announcement = {
     message: announceMsg,
     by: '👑 Admin',
     at: Date.now(),
     duration: dur
   };
+  currentAnnouncement = announcement;
   io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', currentAnnouncement);
   console.log(`📢 Admin announce: ${announceMsg} (${dur}ms)`);
   setTimeout(() => {
-    if (currentAnnouncement && currentAnnouncement.at === currentAnnouncement.at &&
-        Date.now() - currentAnnouncement.at >= dur - 200) {
+    // sirf tab clear karo jab beech me nayi announcement na aayi ho
+    if (currentAnnouncement === announcement) {
       currentAnnouncement = null;
       io.to(GLOBAL_ROOM_ID).emit('adminAnnounce', null);
       console.log('📢 Announcement cleared');
@@ -629,12 +644,16 @@ async function searchSong(query) {
     return null;
   };
 
+  // FIX: Promise.any ko "null" result nahi chahiye — null aane par reject karo
+  // taaki pehla *asli* result jeete (pehle null result jeet jaata tha).
+  const must = (p) => p.then(r => { if (!r) throw new Error('empty'); return r; });
+
   try {
     const result = await Promise.any([
-      tryAPI1(),
-      tryAPI2(),
-      tryAPI3()
-    ].filter(p => p !== null));
+      must(tryAPI1()),
+      must(tryAPI2()),
+      must(tryAPI3())
+    ]);
 
     if (result) {
       console.log(`✅ Search success (${result._src}): ${result.title}`);
@@ -667,7 +686,8 @@ async function searchSimilarSongs(query, exclude = []) {
       }
       if (i < retries - 1) await new Promise(r => setTimeout(r, 500));
     }
-    return null;
+    // FIX: null return karo -> Promise.any is API ko fail maanega (khali list nahi)
+    throw new Error('no results');
   };
 
   const tryAPI1 = () => fetchWithRetry(async () => {
@@ -863,6 +883,10 @@ async function playNextSong(reason = 'auto', user = null) {
   // Last resort — Auto DJ playlist
   if (!nextSong) {
     console.log(`⚠️ Context failed — Auto DJ playlist`);
+    // Room me koi gana nahi chal raha tha -> random gane se shuruaat
+    if (!currentTrackId) {
+      autoDjIndex = Math.floor(Math.random() * AUTO_DJ_PLAYLIST.length);
+    }
     for (let i = 0; i < 3; i++) {
       const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
       autoDjIndex++;
@@ -920,6 +944,20 @@ async function playNextSong(reason = 'auto', user = null) {
   });
 }
 
+// Dedupe ke saath next gana chalao (end-of-song / join / start ke liye)
+async function playNextGuarded(reason, user = null) {
+  const room = rooms[GLOBAL_ROOM_ID];
+  if (!room || room._loadingNext) return;
+  room._loadingNext = true;
+  try {
+    await playNextSong(reason, user);
+  } catch (e) {
+    console.error('playNextGuarded error:', e.message);
+  } finally {
+    setTimeout(() => { room._loadingNext = false; }, 3000);
+  }
+}
+
 async function getPreviousSong(prevId) {
   const apis = [
     async () => {
@@ -968,32 +1006,34 @@ async function getPreviousSong(prevId) {
   return null;
 }
 
-// ✅ Song end check — 1s interval + duration fallback
+function hasOnlineUsers(room) {
+  const now = Date.now();
+  return room.users.some(u => u.status !== 'disconnected' && now - u.lastActive < IDLE_TIMEOUT);
+}
+
+// ✅ Song end check — 1s interval (backup; clients bhi 'trackEnded' bhejte hain)
 function startSongEndCheck() {
   setInterval(async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
     if (!room.state.track || !room.state.isPlaying) return;
     if (room._loadingNext) return;
+    // Khali room me gane chalte nahi rahenge
+    if (!hasOnlineUsers(room)) return;
 
     let duration = room.state.track.duration || 0;
     if (!duration || duration <= 0) {
       duration = room._lastKnownDuration || 0;
     }
 
-    const currentPos = getCurrentPosition(room);
+    const currentPos = getRawPosition(room);
 
-    const shouldTrigger = duration > 0 && currentPos >= duration - 1.5;
+    const shouldTrigger = duration > 0 && currentPos >= duration + 1;
     const fallbackTrigger = !duration && currentPos > 360;
 
     if (shouldTrigger || fallbackTrigger) {
-      room._loadingNext = true;
       console.log(`🎵 Song ended (pos=${currentPos.toFixed(1)}s, dur=${duration}s) — next`);
-      try {
-        await playNextSong('auto');
-      } finally {
-        setTimeout(() => { room._loadingNext = false; }, 3000);
-      }
+      await playNextGuarded('auto');
     }
   }, 1000);
 }
@@ -1012,7 +1052,7 @@ function startPositionUpdater() {
 }
 
 function startAutoDj() {
-  console.log('🎵 Auto DJ: Waiting for user to play a song...');
+  console.log('🎵 Auto DJ: Naya user aate hi (agar gana nahi chal raha) random gana shuru hoga');
 }
 
 io.on('connection', (socket) => {
@@ -1021,7 +1061,7 @@ io.on('connection', (socket) => {
              socket.handshake.query?.fingerprint ||
              'unknown';
 
-  console.log('Connected:', socket.id, 'IP:', ip, 'FP:', fp.slice(-8));
+  console.log('Connected:', socket.id, 'IP:', ip, 'FP:', String(fp).slice(-8));
 
   const blockStatus = isBlocked(socket, fp);
   if (blockStatus.blocked) {
@@ -1095,25 +1135,32 @@ io.on('connection', (socket) => {
       socket.emit('adminAnnounce', currentAnnouncement);
     }
 
-    if (room.state.track && room.state.isPlaying) {
+    if (room.state.track) {
+      // Pehle se koi gana chal raha hai -> naye user ko wahi gana usi position par
       const currentPosition = getCurrentPosition(room);
 
       socket.emit('stateSync', {
         track: room.state.track,
         position: currentPosition,
-        isPlaying: true,
+        isPlaying: room.state.isPlaying,
         playedByName: room.state.playedByName,
         autoDj: room.state.autoDj,
         lastUpdated: Date.now()
       });
 
-      socket.emit('songChanged', {
-        track: room.state.track,
-        reason: 'sync',
-        playedBy: room.state.playedByName
-      });
+      if (room.state.isPlaying) {
+        socket.emit('songChanged', {
+          track: room.state.track,
+          reason: 'sync',
+          playedBy: room.state.playedByName
+        });
+      }
 
       console.log(`🔄 Synced ${userName} → ${currentPosition.toFixed(1)}s`);
+    } else {
+      // Koi gana nahi chal raha -> random gana shuru karo (Auto DJ)
+      console.log(`🎲 Room khali — ${userName} ke liye random gana`);
+      playNextGuarded('auto');
     }
 
     socket.emit('chatHistory', room.messages);
@@ -1148,7 +1195,7 @@ io.on('connection', (socket) => {
 
   socket.on('updateState', ({ roomId, newState }) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room) return;
+    if (!room || !newState) return;
     const user = room.users.find(u => u.id === socket.id);
     if (!user) return;
     user.lastActive = Date.now();
@@ -1223,6 +1270,47 @@ io.on('connection', (socket) => {
       room._lastKnownDuration = duration;
       console.log(`📏 Duration updated: ${room.state.track.title} → ${duration}s`);
     }
+  });
+
+  // ✅ Gana khatam hone par — har client bhejta hai, server sirf EK baar next chalata hai
+  socket.on('trackEnded', async ({ trackId }) => {
+    const room = rooms[GLOBAL_ROOM_ID];
+    if (!room || !room.state.track) return;
+    if (room.state.track.id !== trackId) return;   // pehle hi next ho chuka
+    if (room._loadingNext) return;
+    console.log(`🏁 trackEnded from ${socket.userName || socket.id}: ${room.state.track.title}`);
+    await playNextGuarded('auto');
+  });
+
+  // ✅ Play button par jab client ke paas koi gana nahi hai
+  socket.on('requestStart', async () => {
+    const room = rooms[GLOBAL_ROOM_ID];
+    if (!room) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    user.lastActive = Date.now();
+
+    if (user.blocked && user.blocked.play) {
+      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
+      return;
+    }
+
+    if (room.state.track) {
+      // Gana room me already hai -> resume + sab ko sync
+      room.state.position = getCurrentPosition(room);
+      room.state.isPlaying = true;
+      room.state.lastUpdated = Date.now();
+      io.to(GLOBAL_ROOM_ID).emit('stateSync', room.state);
+      socket.emit('songChanged', {
+        track: room.state.track,
+        reason: 'sync',
+        playedBy: room.state.playedByName
+      });
+      return;
+    }
+
+    console.log(`▶️ ${user.name} pressed play on empty room — random song`);
+    await playNextGuarded('start', user);
   });
 
   socket.on('requestNext', async ({ roomId }) => {
@@ -1384,7 +1472,7 @@ io.on('connection', (socket) => {
       autoDj: room.state.autoDj,
       lastUpdated: Date.now()
     });
-    if (room.state.track) {
+    if (room.state.track && room.state.isPlaying) {
       socket.emit('songChanged', {
         track: room.state.track,
         reason: 'sync',
