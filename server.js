@@ -329,15 +329,35 @@ async function aiSay(room, instruction, { timeout = 7000 } = {}) {
   }
 }
 
+// ✅ UPDATED: bot message 10 second baad apne aap delete ho jayega
+const BOT_MSG_TTL = 10000; // 10 seconds
+
 function botSay(room, text) {
   const msg = {
     id: 'bot-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     userId: 'bot', userName: '🤖 Music Bot',
-    text, time: Date.now(), type: 'bot'
+    text, time: Date.now(), type: 'bot',
+    expiresAt: Date.now() + BOT_MSG_TTL
   };
   room.messages.push(msg);
   if (room.messages.length > 100) room.messages.shift();
   io.to(room.roomId).emit('chatMessage', msg);
+
+  // ✅ 10s baad server-side se auto-delete + sab clients ko notify
+  setTimeout(() => {
+    const idx = room.messages.findIndex(m => m.id === msg.id);
+    if (idx !== -1) room.messages.splice(idx, 1);
+    io.to(room.roomId).emit('messageDeleted', { messageId: msg.id });
+  }, BOT_MSG_TTL);
+}
+
+// ✅ NEW: chat history se expired bot messages filter karo
+function getCleanChatHistory(room) {
+  const now = Date.now();
+  return room.messages.filter(m => {
+    if (m.type === 'bot' && m.expiresAt && now > m.expiresAt) return false;
+    return true;
+  });
 }
 
 const botTyping = (room, on) =>
@@ -1142,7 +1162,8 @@ io.on('connection', (socket) => {
       console.log(`🔄 Synced ${userName} → ${currentPosition.toFixed(1)}s`);
     }
 
-    socket.emit('chatHistory', room.messages);
+    // ✅ UPDATED: expired bot messages filter karke history bhejo
+    socket.emit('chatHistory', getCleanChatHistory(room));
 
     io.to(GLOBAL_ROOM_ID).emit('usersUpdate', getUsersWithStatus(room));
     io.to(GLOBAL_ROOM_ID).emit('globalStats', {
@@ -1771,4 +1792,11 @@ app.get('/api/search', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 Server running on port '
+  console.log('🚀 Server running on port ' + PORT);
+});
+
+// Missing function calls at startup (jo original file mein truncate ho gaye the)
+startSongEndCheck();
+startPositionUpdater();
+startAutoDj();
+startFunnyBot();
