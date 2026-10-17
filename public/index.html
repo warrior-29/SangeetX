@@ -607,12 +607,12 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-presence-empty::before { content: "•"; font-style: normal; color: #10B981; font-size: 16px; line-height: 0; }
 .chat-presence-user {
   display: flex; align-items: center; gap: 5px;
-  background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.25);
+  background: rgba(139,92,246,0.15);
   padding: 3px 10px 3px 8px; border-radius: 100px;
   font-size: 11px; font-weight: 600; color: #C4B5FD; white-space: nowrap; flex-shrink: 0;
 }
 .chat-presence-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; flex-shrink: 0; box-shadow: 0 0 6px #10B981; }
-.chat-presence-user.is-me { background: rgba(139,92,246,0.22); border-color: rgba(139,92,246,0.35); color: #FAFAFC; }
+.chat-presence-user.is-me { color: #FAFAFC; }
 
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 16px 14px 20px;
