@@ -2327,8 +2327,8 @@ function initSocket(){
       el.style.transition='opacity 0.3s ease, transform 0.3s ease';
       el.style.opacity='0';
       el.style.transform='scale(0.85)';
-      // ✅ Yeh line 'Music Bot' ke naam wale box ko bhi delete kar degi
-      setTimeout(()=>el.closest('.chat-msg-row')?.remove(),300); 
+      // ✅ Yeh line message ke saath uske Sender Name (Music Bot) ko bhi poori tarah delete karegi
+      setTimeout(()=>el.closest('.chat-msg-row')?.remove(),300);
     }
   });
 
