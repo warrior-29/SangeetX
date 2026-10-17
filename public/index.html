@@ -452,6 +452,9 @@ body::before {
   color:var(--text-dim); font:700 10px 'Inter',sans-serif; cursor:pointer; white-space:nowrap;
   transition:all .2s var(--ease);
 }
+.mode-switch button { display:flex; align-items:center; justify-content:center; gap:5px; }
+.mode-switch [data-lucide] { width:13px; height:13px; stroke-width:2.4; flex-shrink:0; }
+.album-art.buffering { animation:pulse 1s infinite; }
 .mode-switch button.active { background:linear-gradient(135deg,var(--primary),var(--accent)); color:#fff; box-shadow:0 4px 12px var(--primary-glow); }
 
 .ptt-toggles { display:flex; gap:12px; flex-wrap:wrap; }
@@ -1124,11 +1127,11 @@ input:checked + .slider:before { transform:translateX(16px); }
       <div class="ptt-status" id="pttStatus">🔇 OFF</div>
     </div>
 
-    <!-- ✅ NEW: kya sunna hai — Dono / Sirf Gana / Sirf Baatein -->
+    <!-- Audio mode: Music + Voice / Music Only / Voice Only -->
     <div class="mode-switch" id="audioModeSwitch">
-      <button data-mode="both" class="active">🎵+🎤 Dono</button>
-      <button data-mode="music">🎵 Sirf Gana</button>
-      <button data-mode="voice">🎤 Sirf Baatein</button>
+      <button data-mode="both" class="active"><i data-lucide="headphones"></i><span>Music + Voice</span></button>
+      <button data-mode="music"><i data-lucide="music"></i><span>Music Only</span></button>
+      <button data-mode="voice"><i data-lucide="mic"></i><span>Voice Only</span></button>
     </div>
 
     <div class="ptt-toggles">
@@ -1293,7 +1296,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 
 <!-- ============ HIDDEN ============ -->
 <div id="reactionLayer" class="reaction-layer"></div>
-<audio id="audioPlayer" preload="metadata" crossorigin="anonymous" playsinline></audio>
+<audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -1407,8 +1410,8 @@ document.querySelectorAll('#audioModeSwitch button').forEach(b => {
     try { localStorage.setItem('audioMode', audioMode); } catch (e) {}
     applyAudioMode();
     duckMusic(false);
-    showToast(audioMode === 'both' ? '🎵+🎤 Gana aur baatein' :
-              audioMode === 'music' ? '🎵 Sirf gana' : '🎤 Sirf baatein', 'success');
+    showToast(audioMode === 'both' ? 'Music + Voice' :
+              audioMode === 'music' ? 'Music only' : 'Voice only', 'success');
   });
 });
 
@@ -2364,6 +2367,7 @@ function initSocket(){
     if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
     if (status === 'loading') return;
     if (status === 'success' || status === 'fallback') showToast(`⏮️ ${track || 'Previous'}`, 'success');
+    else if (status === 'restart') { /* song restarted */ }
     else showToast('⏮️ No previous song', 'warning');
   });
 
@@ -2526,7 +2530,7 @@ document.getElementById('globalMapBtn').addEventListener('click', openGlobalMap)
 document.getElementById('closeGlobalMapBtn').addEventListener('click', closeGlobalMap);
 
 document.getElementById('audioOutputBtn')?.addEventListener('click', () => {
-  showToast('🔊 Aawaj phone ke connected speaker/earbuds par hi aayegi', 'info');
+  showToast('🔊 Audio plays through your device’s connected output', 'info');
 });
 
 /* ============ CHAT PANEL ============ */
@@ -2833,6 +2837,7 @@ async function applyRemoteState(state) {
       if (state.isPlaying && audio.paused) await audio.play().catch(() => {});
       if (!state.isPlaying && !audio.paused) audio.pause();
 
+      if (audio.seeking) return;
       if (state.isPlaying && !audio.paused && state.position !== undefined) {
         const drift = audio.currentTime - state.position;
         const abs = Math.abs(drift);
@@ -2880,6 +2885,18 @@ audio.addEventListener('pause', () => {
   const art = document.getElementById('albumArt');
   if (art) art.classList.remove('playing');
   updatePlayIcon();
+});
+
+/* ============ BUFFERING + ERROR ============ */
+audio.addEventListener('waiting', () => document.getElementById('albumArt')?.classList.add('buffering'));
+['playing', 'canplay'].forEach(ev =>
+  audio.addEventListener(ev, () => document.getElementById('albumArt')?.classList.remove('buffering')));
+audio.addEventListener('error', () => {
+  if (!currentTrack || !socket || !socket.connected || isLoadingNext) return;
+  showToast('This song could not be played. Loading next…', 'warning');
+  isLoadingNext = true;
+  socket.emit('requestNext', { roomId });
+  setTimeout(() => { isLoadingNext = false; }, 5000);
 });
 
 /* ============ LOAD TRACK ============ */
@@ -2932,7 +2949,6 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   }, 15000);
   audio.addEventListener('canplay', () => clearTimeout(loadTimeout), { once: true });
 
-  cacheSongForOffline(track);
 
   if (autoPlay) {
     try {
@@ -2962,7 +2978,7 @@ async function loadTrack(track, position = 0, autoPlay = false) {
       };
       document.addEventListener('click', resume, { once: true });
       document.addEventListener('touchstart', resume, { once: true });
-      showToast('👆 Gana sunne ke liye screen par tap karo', 'info');
+      showToast('👆 Tap anywhere to start playback', 'info');
     }
   }
 
@@ -2994,12 +3010,12 @@ document.getElementById('playBtn').addEventListener('click',()=>{
   // ✅ Koi gana nahi hai -> server se random gana (ya room ka chalta gana) mango
   if(!currentTrack){
     if(!socket||!socket.connected){showToast('Not connected','error');return;}
-    if(isStarting){showToast('⏳ Gana aa raha hai...');return;}
+    if(isStarting){showToast('⏳ Loading…');return;}
     isStarting = true;
     setTimeout(()=>{ isStarting = false; }, 8000);
     initAudioContext();
     if(audioContext?.state==='suspended')audioContext.resume();
-    showToast('🎲 Random gana laa rahe hain...');
+    showToast('🎲 Finding a song for you…');
     socket.emit('requestStart');
     return;
   }
@@ -3027,9 +3043,7 @@ document.getElementById('playBtn').addEventListener('click',()=>{
 document.getElementById('rewindBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
-  const newTime = Math.max(0, audio.currentTime - 10);
-  audio.currentTime = newTime;
-  broadcastState({ isPlaying: !audio.paused, position: newTime });
+  seekTo(audio.currentTime - 10);
   if (navigator.vibrate) navigator.vibrate(15);
   showToast('⏪ -10s');
 });
@@ -3037,9 +3051,7 @@ document.getElementById('rewindBtn').addEventListener('click', () => {
 document.getElementById('forwardBtn').addEventListener('click', () => {
   if (!currentTrack || !audio.duration) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
-  const newTime = Math.min(audio.duration - 1, audio.currentTime + 10);
-  audio.currentTime = newTime;
-  broadcastState({ isPlaying: !audio.paused, position: newTime });
+  seekTo(audio.currentTime + 10);
   if (navigator.vibrate) navigator.vibrate(15);
   showToast('⏩ +10s');
 });
@@ -3048,8 +3060,7 @@ document.getElementById('prevBtn').addEventListener('click', () => {
   if (!currentTrack) { showToast('No song playing', 'error'); return; }
   if (myPermissions.play) { showToast('You are blocked', 'error'); return; }
   if (audio.currentTime > 3) {
-    audio.currentTime = 0;
-    broadcastState({ isPlaying: true, position: 0 });
+    seekTo(0);
     showToast('⏮️ Restarted');
     return;
   }
@@ -3118,8 +3129,7 @@ function endDrag(e) {
   isDragging = false;
   progressBarEl.classList.remove('dragging');
   const pct = getSeekPercent(e.clientX);
-  try { audio.currentTime = pct * audio.duration; } catch (err) {}
-  broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+  seekTo(pct * audio.duration);
   if (wasPlayingBeforeDrag && audio.paused) audio.play().catch(() => {});
   if (navigator.vibrate) navigator.vibrate(15);
   e.preventDefault();
@@ -3132,12 +3142,10 @@ progressBarEl.addEventListener('keydown', (e) => {
   if (!currentTrack || !audio.duration) return;
   if (e.key === 'ArrowRight') {
     e.preventDefault();
-    audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
-    broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+    seekTo(audio.currentTime + 5);
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
-    audio.currentTime = Math.max(0, audio.currentTime - 5);
-    broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+    seekTo(audio.currentTime - 5);
   }
 });
 
@@ -3181,6 +3189,16 @@ audio.addEventListener('ended',()=>{
 
 function fmt(s){if(!s||isNaN(s))return'0:00';const m=Math.floor(s/60);const x=Math.floor(s%60).toString().padStart(2,'0');return m+':'+x;}
 
+/* ============ SEEK (server ko 'seek' event bhejo, updateState nahi) ============ */
+function seekTo(pos) {
+  if (!currentTrack) return;
+  const dur = audio.duration || 0;
+  pos = Math.max(0, dur ? Math.min(pos, dur - 1) : pos);
+  audio.currentTime = pos;
+  lastBroadcastPosition = pos;
+  if (socket && socket.connected) socket.emit('seek', { roomId, position: pos });
+}
+
 /* ============ BROADCAST ============ */
 let lastBroadcastTime = 0;
 let lastBroadcastPosition = 0;
@@ -3213,7 +3231,7 @@ function startHeartbeat(){
   if(heartbeatInterval)clearInterval(heartbeatInterval);
   heartbeatInterval=setInterval(()=>{
     if(currentTrack && !audio.paused && socket && socket.connected){
-      socket.emit('heartbeat',{roomId,position:audio.currentTime,isPlaying:true});
+      socket.emit('heartbeat',{roomId,position:audio.currentTime,isPlaying:true,buffering:audio.readyState<3||audio.seeking});
     }
   }, 8000);
 }
@@ -3231,16 +3249,19 @@ document.getElementById('searchInput').addEventListener('input',(e)=>{
   clearTimeout(searchTimeout);
   const q=e.target.value.trim();
   if(q.length<2){document.getElementById('searchResults').innerHTML='<p class="search-hint">Start typing...</p>';return;}
-  searchTimeout=setTimeout(()=>searchSongs(q),400);
+  searchTimeout=setTimeout(()=>searchSongs(q),250);
 });
 
 let searchResultsData = [];
+let searchAbort = null;
 async function searchSongs(query){
   const results=document.getElementById('searchResults');
   if(!isOnline){results.innerHTML='<p class="search-hint">📴 Search needs internet</p>';return;}
   results.innerHTML='<p class="search-hint">Searching...</p>';
+  if (searchAbort) searchAbort.abort();
+  searchAbort = new AbortController();
   try{
-    const res=await fetch('/api/search?q='+encodeURIComponent(query));
+    const res=await fetch('/api/search?q='+encodeURIComponent(query),{signal:searchAbort.signal});
     const data=await res.json();
     if(!data.results||data.results.length===0){results.innerHTML='<p class="search-hint">No results found</p>';return;}
     searchResultsData = data.results;
@@ -3257,7 +3278,7 @@ async function searchSongs(query){
     results.querySelectorAll('.song-item').forEach(el=>{
       el.addEventListener('click',()=>selectSong(searchResultsData[parseInt(el.dataset.idx)]));
     });
-  }catch(e){results.innerHTML='<p class="search-hint">Search failed</p>';}
+  }catch(e){if(e.name==='AbortError')return;results.innerHTML='<p class="search-hint">Search failed</p>';}
 }
 
 function selectSong(song){
@@ -3612,8 +3633,7 @@ function setupMediaSession() {
   });
   navigator.mediaSession.setActionHandler('seekto', (d) => {
     if (d.seekTime !== undefined && currentTrack) {
-      audio.currentTime = d.seekTime;
-      broadcastState({ isPlaying: !audio.paused, position: audio.currentTime });
+      seekTo(d.seekTime);
     }
   });
   navigator.mediaSession.setActionHandler('nexttrack', () => {
@@ -3627,8 +3647,7 @@ function setupMediaSession() {
   });
   navigator.mediaSession.setActionHandler('previoustrack', () => {
     if (audio.currentTime > 3) {
-      audio.currentTime = 0;
-      broadcastState({ isPlaying: true, position: 0 });
+      seekTo(0);
       return;
     }
     if (!socket || !socket.connected) return;
