@@ -2848,14 +2848,18 @@ function renderChat(messages,replace){
   }
   const empty=box.querySelector('.chat-empty');
   if(empty)empty.remove();
+  
   messages.forEach(m=>{
-     if (m.type === 'bot' && m.expiresAt && Date.now() > m.expiresAt) return;
+    // 1️⃣ Agar message expire ho chuka hai, toh render hi mat karo
+    if (m.type === 'bot' && m.expiresAt && Date.now() > m.expiresAt) return;
+    
     const mine = m.userId === socket?.id || m.pending;
     const isBot = m.type === 'bot';
     const row = document.createElement('div');
     row.className = 'chat-msg-row ' + (mine ? 'mine' : 'theirs');
     const time = new Date(m.time).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
+    
     row.innerHTML = `
       <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
       <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${esc(String(m.id))}">
@@ -2864,7 +2868,22 @@ function renderChat(messages,replace){
       </div>
     `;
     box.appendChild(row);
+
+    // 2️⃣ Bot message 10 second baad apne aap delete ho jayega (naam + message dono)
+    if (isBot) {
+      setTimeout(() => {
+        const el = document.querySelector(`[data-msg-id="${m.id}"]`);
+        if (el) {
+          el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          el.style.opacity = '0';
+          el.style.transform = 'scale(0.85)';
+          // `closest('.chat-msg-row')` se poora row (Sender ka naam + message) delete ho jayega
+          setTimeout(() => el.closest('.chat-msg-row')?.remove(), 300);
+        }
+      }, 10000); 
+    }
   });
+  
   box.scrollTop=box.scrollHeight;
 }
 
