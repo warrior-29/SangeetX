@@ -51,12 +51,9 @@ body::before {
 
 .reaction-btn, .icon-btn, .ctrl-btn, .btn-primary, .btn-secondary,
 .chat-msg, .user-item, .room-card, .stat-card {
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  will-change: transform; transform: translateZ(0); backface-visibility: hidden;
 }
 
-/* ============ JOIN SCREEN ============ */
 #joinScreen { align-items:center; justify-content:center; padding:20px; overflow-y:auto; }
 .join-box {
   width:100%; max-width:380px; padding:32px 24px;
@@ -118,8 +115,8 @@ body::before {
 .btn-secondary:active { transform:scale(0.97); }
 
 .hint { color:var(--muted); font-size:11px; margin-top:18px; line-height:1.6; }
+#nameError { font-size:11px; color:var(--danger); text-align:left; padding:4px 4px 0; min-height:16px; line-height:1.3; }
 
-/* ============ WAITING SCREEN ============ */
 #waitingScreen { align-items:center; justify-content:center; padding:24px; }
 .waiting-box { text-align:center; max-width:320px; }
 .spinner-rings { width:72px; height:72px; margin:0 auto 28px; position:relative; }
@@ -130,7 +127,6 @@ body::before {
 .waiting-box h2 { font-size:20px; font-weight:800; margin-bottom:8px; }
 .waiting-box p { color:var(--text-dim); font-size:13px; margin-bottom:24px; line-height:1.6; }
 
-/* ============ MAIN SCREEN ============ */
 #mainScreen {
   display:none; height:100vh; height:100dvh;
   flex-direction:column; padding:10px;
@@ -140,7 +136,6 @@ body::before {
 }
 #mainScreen.active { display:flex; }
 
-/* ============ TOP BAR ============ */
 .topbar {
   display:flex; justify-content:space-between; align-items:center;
   gap:6px; flex-shrink:0; overflow:visible;
@@ -198,7 +193,6 @@ body::before {
 }
 @keyframes badgePulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
 
-/* ============ AUDIO OUTPUT BADGE ============ */
 .audio-output-badge {
   display:none; align-items:center; gap:5px;
   font-size:10px; font-weight:700; padding:5px 10px;
@@ -211,7 +205,6 @@ body::before {
 .audio-output-badge [data-lucide] { width:12px; height:12px; stroke-width:2.5; flex-shrink:0; }
 .audio-output-badge span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* ============ DISTANCE METER ============ */
 .distance-meter {
   display:none; align-items:center; justify-content:center; gap:6px;
   font-size:10px; font-weight:700; padding:6px 14px;
@@ -225,7 +218,6 @@ body::before {
 .distance-heart { animation:heartBeat 1.5s ease-in-out infinite; flex-shrink:0; }
 @keyframes heartBeat { 0%,100% { transform:scale(1); } 50% { transform:scale(1.25); } }
 
-/* ============ PLAYER SECTION ============ */
 .player-section { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-height:0; overflow:hidden; }
 
 .album-art {
@@ -288,7 +280,6 @@ body::before {
   box-shadow: 0 0 3px rgba(0,0,0,0.6);
 }
 
-/* ============ PROGRESS BAR ============ */
 .progress-section { width:100%; padding:0 6px; flex-shrink:0; }
 .progress-bar {
   width:100%; height:20px; position:relative; cursor:pointer;
@@ -324,7 +315,6 @@ body::before {
 .progress-bar.dragging .progress-track { height:6px; }
 .time-row { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:5px; font-weight:600; padding:0 2px; }
 
-/* ============ CONTROLS ============ */
 .controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .ctrl-btn {
   width: 42px; height: 42px; border-radius: 50%;
@@ -392,7 +382,6 @@ body::before {
   .ctrl-btn.play [data-lucide] { width: 22px; height: 22px; }
 }
 
-/* ============ SEARCH BUTTON ============ */
 .search-btn {
   width:100%; padding:13px 16px;
   background:rgba(0,0,0,0.5); border:1.5px solid var(--border);
@@ -420,7 +409,6 @@ body::before {
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
 }
 
-/* ============ PTT CARD ============ */
 .ptt-card {
   background:rgba(255,255,255,0.03); border:1px solid var(--border);
   border-radius:14px; padding:10px;
@@ -445,7 +433,6 @@ body::before {
 }
 .ptt-status.live { color:white; background:var(--danger); border-color:var(--danger); animation:pulse 1s infinite; }
 
-/* ===== Audio mode switch (Dono / Sirf Gana / Sirf Baatein) ===== */
 .mode-switch { display:flex; gap:4px; background:rgba(0,0,0,.35); padding:3px; border-radius:12px; border:1px solid var(--border); }
 .mode-switch button {
   flex:1; padding:8px 4px; border:none; border-radius:9px; background:transparent;
@@ -491,7 +478,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   box-shadow:0 0 40px rgba(239,68,68,0.6);
 }
 
-/* ============ REACTIONS ============ */
 .reactions {
   display: grid; grid-template-columns: repeat(5, 1fr);
   gap: 5px; flex-shrink: 0; position: relative; z-index: 5;
@@ -505,7 +491,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 }
 .reaction-btn:active { transform:scale(0.88); background:rgba(139,92,246,0.2); border-color:var(--primary); }
 
-/* ============ USERS PANEL ============ */
 #usersPanel {
   display:none; position:fixed; inset:0;
   background:rgba(0,0,0,0.8); backdrop-filter:blur(6px);
@@ -542,7 +527,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .mute-btn [data-lucide] { width:11px; height:11px; stroke-width:2.5; }
 .mute-btn.muted { background:rgba(239,68,68,0.15); color:var(--danger); }
 
-/* ============ GLOBAL MAP MODAL ============ */
 #globalMapModal {
   display:none; position:fixed; inset:0;
   background:rgba(0,0,0,0.85); backdrop-filter:blur(6px);
@@ -570,7 +554,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .leaflet-popup-content-wrapper { background: rgba(22,22,32,0.98) !important; color: var(--text) !important; border-radius: 10px !important; border: 1px solid var(--border) !important; }
 .leaflet-popup-tip { background: rgba(22,22,32,0.98) !important; }
 
-/* ============ CHAT PANEL — WATER BUBBLE STYLE ============ */
 #chatPanel {
   display: none; position: fixed; inset: 0;
   background: #0a0614;
@@ -694,6 +677,7 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-msg.bot .chat-msg-sender::before { background: linear-gradient(180deg, #A78BFA, #8B5CF6); }
 .chat-msg.pending { opacity: 0.6; }
 .chat-msg-text { font-size: 15px; line-height: 1.42; word-break: break-word; padding: 0; font-weight: 400; display: inline; text-shadow: none; color: inherit; position: relative; z-index: 1; }
+.chat-msg-text a { color: #A78BFA; text-decoration: underline; }
 .chat-msg-meta {
   display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500;
   color: rgba(190, 185, 215, 0.55); letter-spacing: 0.2px; text-shadow: none;
@@ -702,6 +686,42 @@ input:checked + .slider:before { transform:translateX(16px); }
 .chat-msg.mine .chat-msg-meta { color: rgba(200, 195, 230, 0.65); }
 .chat-msg.theirs .chat-msg-meta { color: rgba(180, 175, 210, 0.55); }
 .chat-msg-tick { display: inline-flex; align-items: center; color: #A78BFA; font-size: 12px; letter-spacing: -3px; margin-left: 1px; font-weight: 700; filter: none; }
+
+/* ✅ Mention tags */
+.mention-tag {
+  background: rgba(139,92,246,0.35);
+  color: #E0D4FF;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+  border: 1px solid rgba(167,139,250,0.5);
+  display: inline;
+}
+.mention-unknown {
+  background: rgba(236,72,153,0.25);
+  border-color: rgba(236,72,153,0.4);
+  color: #FFD1E8;
+}
+
+/* ✅ Mention autocomplete */
+.mention-suggest {
+  position:absolute; bottom:100%; left:12px; right:70px;
+  background:#16101F; border:1px solid rgba(139,92,246,0.3);
+  border-radius:12px; max-height:180px; overflow-y:auto;
+  display:none; z-index:30; box-shadow:0 -8px 24px rgba(0,0,0,0.6);
+  margin-bottom:6px;
+}
+.mention-suggest.show { display:block; }
+.mention-suggest-item {
+  padding:10px 14px; font-size:13px; font-weight:600; color:#FAFAFC;
+  cursor:pointer; display:flex; align-items:center; gap:8px;
+}
+.mention-suggest-item:hover, .mention-suggest-item.active {
+  background:rgba(139,92,246,0.25);
+}
+.mention-suggest-item::before {
+  content:"@"; color:#A78BFA; font-weight:800;
+}
 
 .typing-indicator {
   padding: 6px 16px 8px; display: none; align-items: center; gap: 8px;
@@ -781,7 +801,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   .emoji-grid { grid-template-columns: repeat(6, 1fr); }
 }
 
-/* ============ SEARCH MODAL ============ */
 #searchModal { display:none; position:fixed; inset:0; background:var(--bg); z-index:100; flex-direction:column; }
 #searchModal.active { display:flex; }
 .search-header {
@@ -810,12 +829,10 @@ input:checked + .slider:before { transform:translateX(16px); }
 .song-item-artist { font-size:11px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
 .song-item-duration { font-size:11px; color:var(--muted); font-weight:600; flex-shrink:0; }
 
-/* ============ FLOATING EMOJI ============ */
 .reaction-layer { position:fixed; inset:0; pointer-events:none; z-index:250; overflow:hidden; }
 .floating-emoji { position:absolute; font-size:42px; animation:floatUp 2.2s cubic-bezier(0.4,0,0.2,1) forwards; filter:drop-shadow(0 6px 16px rgba(0,0,0,0.5)); }
 @keyframes floatUp { 0% { transform:translateY(0) scale(1) rotate(0deg); opacity:1; } 100% { transform:translateY(-240px) scale(1.7) rotate(20deg); opacity:0; } }
 
-/* ============ WELCOME TOAST ============ */
 .welcome-toast {
   position: fixed; top: max(70px, calc(env(safe-area-inset-top) + 70px)); left: 50%;
   transform: translateX(-50%) translateY(-40px) scale(0.85);
@@ -836,7 +853,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .welcome-name { font-size: 12px; font-weight: 800; color: var(--text); margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .welcome-msg { font-size: 10px; color: var(--text-dim); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ============ TOAST ============ */
 .toast {
   position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px);
   background:rgba(22,22,32,0.95); backdrop-filter:blur(10px);
@@ -855,7 +871,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .toast.info { border-color:rgba(59,130,246,0.4); }
 .toast.info [data-lucide] { color:#60A5FA; }
 
-/* ============ MIC BANNER ============ */
 .mic-banner {
   position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-120px);
   background:rgba(239,68,68,0.95); backdrop-filter:blur(10px); color:white; padding:12px 18px; border-radius:14px;
@@ -871,7 +886,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 
-/* ============ OFFLINE BANNER ============ */
 .offline-banner {
   position:fixed; top:max(60px, calc(env(safe-area-inset-top) + 60px)); left:50%; transform:translateX(-50%) translateY(-120px);
   background:rgba(245,158,11,0.95); backdrop-filter:blur(10px); color:white; padding:8px 16px; border-radius:100px;
@@ -882,7 +896,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .offline-banner [data-lucide] { width:14px; height:14px; stroke-width:2.5; flex-shrink:0; }
 .offline-count { background:white; color:#F59E0B; font-size:10px; font-weight:800; padding:2px 7px; border-radius:100px; min-width:18px; text-align:center; flex-shrink:0; }
 
-/* ============ INSTALL BANNER ============ */
 .install-banner {
   position:fixed; bottom:max(20px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%) translateY(200px);
   background:linear-gradient(135deg, var(--primary), var(--accent)); backdrop-filter:blur(10px); color:white;
@@ -899,7 +912,6 @@ input:checked + .slider:before { transform:translateX(16px); }
 .install-btn { background:white; color:var(--primary); font-weight:800; padding:0 14px; height:34px; border-radius:10px; border:none; cursor:pointer; font-size:11px; font-family:inherit; flex-shrink:0; box-shadow:0 4px 12px rgba(0,0,0,0.2); }
 .install-close { background:rgba(255,255,255,0.25); border:none; color:white; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 
-/* ============ ADMIN ANNOUNCE BANNER ============ */
 .admin-announce-banner {
   position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
   background: linear-gradient(135deg, rgba(139,92,246,0.98), rgba(236,72,153,0.98)); backdrop-filter: blur(10px);
@@ -938,7 +950,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   #chatPanel.active { height: 100%; }
 }
 
-/* ============ RESPONSIVE ============ */
 @media (max-height:700px) {
   .album-art { width:min(42vw, 155px); }
   .player-section { gap:7px; }
@@ -967,16 +978,16 @@ input:checked + .slider:before { transform:translateX(16px); }
 </head>
 <body>
 
-<!-- ============ JOIN SCREEN ============ -->
 <div id="joinScreen" class="screen active">
   <div class="join-box">
     <div class="join-logo"><i data-lucide="music-2"></i></div>
-    <h1>Music To</h1>
+    <h1>SangeetX</h1>
     <p class="subtitle">🌍 Join the global room — everyone is welcome</p>
     <div class="input-wrap">
       <input type="text" id="userNameInput" name="display-nick" placeholder="Enter your name" maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
       <span class="input-icon"><i data-lucide="user"></i></span>
     </div>
+    <div id="nameError"></div>
     <div class="input-wrap">
       <input type="text" id="userAddressInput" name="listening-area" placeholder="Your area (e.g. Sector 15, Noida)" maxlength="60" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
       <span class="input-icon"><i data-lucide="map-pin"></i></span>
@@ -1008,7 +1019,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ WAITING SCREEN ============ -->
 <div id="waitingScreen" class="screen">
   <div class="waiting-box">
     <div class="spinner-rings"></div>
@@ -1021,7 +1031,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ MAIN SCREEN ============ -->
 <div id="mainScreen" class="screen">
   <div class="topbar">
     <div class="status">
@@ -1122,12 +1131,11 @@ input:checked + .slider:before { transform:translateX(16px); }
     <div class="ptt-header">
       <div class="ptt-title">
         <div class="mic-icon"><i data-lucide="mic"></i></div>
-        <span>Voice</span>
+        <span>Voice (All Members)</span>
       </div>
       <div class="ptt-status" id="pttStatus">🔇 OFF</div>
     </div>
 
-    <!-- Audio mode: Music + Voice / Music Only / Voice Only -->
     <div class="mode-switch" id="audioModeSwitch">
       <button data-mode="both" class="active"><i data-lucide="headphones"></i><span>Music + Voice</span></button>
       <button data-mode="music"><i data-lucide="music"></i><span>Music Only</span></button>
@@ -1159,7 +1167,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ GLOBAL MAP MODAL ============ -->
 <div id="globalMapModal">
   <div class="global-map-box">
     <h3><i data-lucide="globe-2"></i> 🌍 Global Listeners</h3>
@@ -1182,7 +1189,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ USERS PANEL ============ -->
 <div id="usersPanel">
   <div class="users-box">
     <h3><i data-lucide="users"></i> Room Members</h3>
@@ -1194,7 +1200,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ CHAT PANEL ============ -->
 <div id="chatPanel">
   <div class="chat-header">
     <div class="chat-header-left">
@@ -1245,6 +1250,10 @@ input:checked + .slider:before { transform:translateX(16px); }
     <button class="chat-send" id="chatSend" type="button" aria-label="Send">
       <i data-lucide="send"></i>
     </button>
+
+    <!-- ✅ Mention autocomplete -->
+    <div class="mention-suggest" id="mentionSuggest"></div>
+
     <div class="emoji-picker" id="emojiPicker">
       <div class="emoji-picker-header">Quick Reactions</div>
       <div class="emoji-grid">
@@ -1265,7 +1274,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ SEARCH MODAL ============ -->
 <div id="searchModal">
   <div class="search-header">
     <button class="back-btn" id="closeSearch"><i data-lucide="arrow-left"></i></button>
@@ -1276,7 +1284,6 @@ input:checked + .slider:before { transform:translateX(16px); }
   </div>
 </div>
 
-<!-- ============ MIC BANNER ============ -->
 <div class="mic-banner" id="micBanner">
   <i data-lucide="mic-off"></i>
   <div class="mic-banner-text">
@@ -1287,14 +1294,12 @@ input:checked + .slider:before { transform:translateX(16px); }
   <button onclick="hideMicBanner()" class="mic-banner-close">✕</button>
 </div>
 
-<!-- ============ OFFLINE BANNER ============ -->
 <div class="offline-banner" id="offlineBanner">
   <i data-lucide="wifi-off"></i>
   <span>Offline — messages will queue</span>
   <span class="offline-count" id="offlineCount" style="display:none;">0</span>
 </div>
 
-<!-- ============ HIDDEN ============ -->
 <div id="reactionLayer" class="reaction-layer"></div>
 <audio id="audioPlayer" preload="auto" crossorigin="anonymous" playsinline></audio>
 
@@ -1313,8 +1318,12 @@ let isRemoteUpdate = false;
 let pttModeEnabled = false;
 let alwaysOnEnabled = false;
 let isTalking = false;
+
+// ✅ N-way voice: localStream + Map of peer connections
 let localStream = null;
-let peerConnection = null;
+const peerConnections = new Map();   // remoteSocketId -> RTCPeerConnection
+const pendingCandidates = new Map(); // remoteSocketId -> [candidates]
+
 let heartbeatInterval = null;
 let activityInterval = null;
 let syncInterval = null;
@@ -1330,7 +1339,6 @@ let muteAll = false;
 
 let globalMutedByAdmin = false;
 
-/* ✅ AUDIO MODE: 'both' (gana+baatein) | 'music' (sirf gana) | 'voice' (sirf baatein) */
 let audioMode = 'both';
 try { audioMode = localStorage.getItem('audioMode') || 'both'; } catch (e) {}
 if (!['both', 'music', 'voice'].includes(audioMode)) audioMode = 'both';
@@ -1349,9 +1357,6 @@ let lastKnownPosition = 0;
 const typingUsers = new Map();
 let isTyping = false;
 let typingTimer = null;
-
-let makingOffer = false;
-let ignoreOffer = false;
 
 let currentVoiceSinkId = 'default';
 let currentMusicSinkId = 'default';
@@ -1391,15 +1396,12 @@ function initAudioContext() {
 
 /* ============ AUDIO MODE ============ */
 function applyAudioMode() {
-  // Gana: 'voice' mode me band (playback sync chalta rahta hai)
   audio.muted = (audioMode === 'voice');
-  // Baatein: 'music' mode me band
   applyMuteState();
   document.querySelectorAll('#audioModeSwitch button').forEach(b =>
     b.classList.toggle('active', b.dataset.mode === audioMode));
 }
 
-// Jab koi baat kare to gana thoda dheema (sirf jab gana sun rahe ho)
 function duckMusic(on) {
   audio.volume = (on && audioMode === 'both') ? 0.4 : 1;
 }
@@ -1472,24 +1474,34 @@ async function generateFingerprint() {
   return 'fp_' + Math.abs(hash).toString(36);
 }
 
-/* ============ AUDIO OUTPUT ============
-   ✅ FIX: App ab audio routing me haath NAHI lagata.
-   - Pehle har 5 sec getUserMedia() chalta tha -> BT earbuds "call mode (HFP)" me
-     chale jate the (volume bahut kam) aur BT speaker/Echo ki jagah phone speaker chun liya jata tha.
-   - Ab OS khud connected speaker/earbuds/Echo par aawaj bhejta hai.
-*/
+/* ============ NAME VALIDATION (client) ============ */
+function clientValidateName(name) {
+  const n = String(name || '').trim();
+  if (n.length < 2) return 'Name must be at least 2 characters';
+  if (n.length > 20) return 'Name must be 20 characters or less';
+  if (!/^[A-Za-z]/.test(n)) return 'Name must start with a letter';
+  if (!/^[A-Za-z0-9 _.\-]+$/.test(n)) return 'Only letters, numbers, spaces, _ . - allowed';
+  if ((n.match(/[A-Za-z]/g) || []).length < 2) return 'Name must contain at least 2 letters';
+  if (/\d{2,}$/.test(n)) return 'Name cannot end with multiple numbers (e.g. ankit123)';
+  if ((n.match(/\d/g) || []).length / n.length > 0.3) return 'Too many numbers in name';
+  if (!/[A-Za-z]{3,}/.test(n)) return 'Name needs at least 3 continuous letters';
+  const letters = n.toLowerCase().replace(/[^a-z]/g, '');
+  if (letters.length >= 4 && !/[aeiouy]/.test(letters)) return 'That looks like random typing';
+  if (/(.)\1{2,}/.test(letters)) return 'Too many repeated letters';
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(letters)) return 'That looks like random typing';
+  return null;
+}
+
+/* ============ AUDIO OUTPUT ============ */
 async function detectAudioOutputDevices() {
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices(); // getUserMedia NAHI
+    const devices = await navigator.mediaDevices.enumerateDevices();
     audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
     return audioOutputDevices;
   } catch (e) { return []; }
 }
 function applyVoiceSinkToAudio() {}
-async function autoDetectAndRouteAudio() {
-  // OS ko routing karne do. App kuch force nahi karega.
-  return null;
-}
+async function autoDetectAndRouteAudio() { return null; }
 function updateAudioOutputBadge() {}
 
 /* ============ PLAYED BY ============ */
@@ -1499,7 +1511,6 @@ function updatePlayedBy(playedByName, reason) {
   if (!badge || !text) return;
   if (!playedByName) { badge.classList.remove('active'); return; }
   badge.classList.add('active');
-
   if (reason === 'auto' || playedByName === '🎵 Auto DJ') {
     text.textContent = '🎵 Auto DJ';
     badge.classList.add('auto');
@@ -1704,7 +1715,6 @@ function applyMuteState(){
   remoteAudios.forEach(e=>{
     if(e.audio&&e.userName){
       const m=mutedUsers.has(e.userName.toLowerCase());
-      // 'Sirf gana' mode me baatein band
       e.audio.muted = muteAll || m || audioMode === 'music';
     }
   });
@@ -1723,31 +1733,20 @@ function loadMuteState(){
   }catch(e){}
 }
 
-/* ============ EXACT LOCATION (5-15m) ============ */
+/* ============ EXACT LOCATION ============ */
 async function getExactLocation() {
   return new Promise(async (resolve) => {
-    if (!navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-
+    if (!navigator.geolocation) { resolve(null); return; }
     let permState = 'prompt';
     try {
       const p = await navigator.permissions.query({ name: 'geolocation' });
       permState = p.state;
     } catch (e) {}
-
-    if (permState === 'denied') {
-      console.warn('❌ Location permission denied');
-      resolve(null);
-      return;
-    }
-
+    if (permState === 'denied') { resolve(null); return; }
     const readings = [];
     let bestReading = null;
     let resolved = false;
     let watchId = null;
-
     const finish = () => {
       if (resolved) return;
       resolved = true;
@@ -1756,49 +1755,24 @@ async function getExactLocation() {
       else if (readings.length > 0) resolve(computeBestReading(readings));
       else resolve(null);
     };
-
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const r = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy
-        };
+        const r = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
         readings.push(r);
-
-        if (!bestReading || r.accuracy < bestReading.accuracy) {
-          bestReading = r;
-        }
-
-        if (pos.coords.accuracy <= 5 && readings.length >= 2) {
-          finish();
-          return;
-        }
-
-        if (readings.length >= 8) {
-          finish();
-        }
+        if (!bestReading || r.accuracy < bestReading.accuracy) bestReading = r;
+        if (pos.coords.accuracy <= 5 && readings.length >= 2) { finish(); return; }
+        if (readings.length >= 8) finish();
       },
-      (err) => {
-        console.warn('GPS error:', err.message);
-        finish();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 0
-      }
+      (err) => { finish(); },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
-
     setTimeout(finish, 22000);
   });
 }
-
 function computeBestReading(readings) {
   if (readings.length === 0) return null;
   readings.sort((a, b) => a.accuracy - b.accuracy);
   const best = readings[0];
-
   let totalWeight = 0, sumLat = 0, sumLng = 0;
   readings.forEach(r => {
     const w = 1 / Math.max(r.accuracy, 1);
@@ -1806,28 +1780,20 @@ function computeBestReading(readings) {
     sumLat += r.lat * w;
     sumLng += r.lng * w;
   });
-
-  return {
-    lat: sumLat / totalWeight,
-    lng: sumLng / totalWeight,
-    accuracy: best.accuracy
-  };
+  return { lat: sumLat / totalWeight, lng: sumLng / totalWeight, accuracy: best.accuracy };
 }
 
 /* ============ REVERSE GEOCODING ============ */
 const geocodeCache = new Map();
-
 async function reverseGeocode(lat, lng) {
   const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
   if (geocodeCache.has(key)) return geocodeCache.get(key);
-
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
     if (!res.ok) return null;
     const data = await res.json();
     const addr = data.address || {};
-
     const parts = {
       house: addr.house_number || '',
       building: addr.building || addr.amenity || '',
@@ -1839,21 +1805,16 @@ async function reverseGeocode(lat, lng) {
       country: addr.country || '',
       display: data.display_name || ''
     };
-
     let shortLabel = '';
     if (parts.building) shortLabel += parts.building + ', ';
     if (parts.neighbourhood) shortLabel += parts.neighbourhood + ', ';
     if (parts.city) shortLabel += parts.city;
     if (!shortLabel && parts.state) shortLabel = parts.state;
     if (!shortLabel) shortLabel = parts.country;
-
     const result = { ...parts, shortLabel, fullAddress: parts.display };
     geocodeCache.set(key, result);
     return result;
-  } catch (e) {
-    console.warn('Reverse geocode failed:', e);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 /* ============ LOCATION ============ */
@@ -1864,135 +1825,82 @@ function calculateDistance(a,b,c,d){
   const x=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLng/2)**2;
   return Math.round(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
 }
-
 function updateDistanceDisplay(){
   if(!myLocation||!partnerLocation)return;
   distanceKm=calculateDistance(myLocation.lat,myLocation.lng,partnerLocation.lat,partnerLocation.lng);
   const meter=document.getElementById('distanceMeter');
   const text=document.getElementById('distanceText');
   let msg;
-  if(distanceKm<1){
-    msg = `Same area! · same song 🎵`;
-  } else if(distanceKm>=1000){
-    msg = `${distanceKm.toLocaleString()} km apart · same song 🎵`;
-  } else {
-    msg = `${distanceKm} km apart · same song 🎵`;
-  }
+  if(distanceKm<1) msg = `Same area! · same song 🎵`;
+  else if(distanceKm>=1000) msg = `${distanceKm.toLocaleString()} km apart · same song 🎵`;
+  else msg = `${distanceKm} km apart · same song 🎵`;
   text.textContent = msg;
   meter.classList.add('active');
   refreshIcons();
 }
-
 async function shareLocation(){
   if (locationShared) return;
-
   const consent = document.getElementById('shareLocationConsent');
-  if (consent && !consent.checked) {
-    console.log('📍 Location sharing skipped (no consent)');
-    return;
-  }
-
-  console.log('📍 Getting exact location...');
+  if (consent && !consent.checked) return;
   showToast('📍 Getting your exact location...', 'info');
-
   const loc = await getExactLocation();
-  if (!loc) {
-    showToast('❌ Location permission denied', 'error');
-    return;
-  }
-
+  if (!loc) { showToast('❌ Location permission denied', 'error'); return; }
   myLocation = loc;
   locationShared = true;
   myTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  console.log(`📍 GPS: ${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)} (±${loc.accuracy}m)`);
   showToast(`📍 Accuracy: ±${Math.round(loc.accuracy)}m`, 'success');
-
   const manualInput = document.getElementById('userAddressInput');
   const manualAddress = manualInput ? manualInput.value.trim() : '';
-
   const addr = await reverseGeocode(loc.lat, loc.lng);
-  if (addr) {
-    exactAddress = addr;
-    console.log('📍 Address:', addr.shortLabel);
-  }
-
+  if (addr) exactAddress = addr;
   if (socket && socket.connected) {
     socket.emit('shareLocation', {
       roomId,
       location: { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy },
       timezone: myTimezone,
       address: addr ? {
-        house: addr.house,
-        building: addr.building,
-        road: addr.road,
-        neighbourhood: addr.neighbourhood,
-        city: addr.city,
-        state: addr.state,
-        postcode: addr.postcode,
-        country: addr.country,
-        shortLabel: addr.shortLabel,
-        fullAddress: addr.fullAddress
+        house: addr.house, building: addr.building, road: addr.road,
+        neighbourhood: addr.neighbourhood, city: addr.city,
+        state: addr.state, postcode: addr.postcode, country: addr.country,
+        shortLabel: addr.shortLabel, fullAddress: addr.fullAddress
       } : null,
       manualAddress: manualAddress || null
     });
   }
-
   if (partnerLocation) updateDistanceDisplay();
-}
-
-function showDistanceHeart(){
-  if(distanceKm<100||!currentTrack)return;
-  const layer=document.getElementById('reactionLayer');
-  const el=document.createElement('div');
-  el.className='floating-emoji';el.textContent='❤️';
-  el.style.left='50%';el.style.bottom='30%';el.style.fontSize='60px';el.style.transform='translateX(-50%)';
-  layer.appendChild(el);
-  setTimeout(()=>el.remove(),2500);
 }
 
 /* ============ GLOBAL MAP ============ */
 function openGlobalMap() {
   document.getElementById('globalMapModal').classList.add('active');
   refreshIcons();
-
   if (!globalMap) {
     setTimeout(() => {
       try {
         globalMap = L.map('globalMap', {
-          zoomControl: true,
-          attributionControl: false,
-          worldCopyJump: true
+          zoomControl: true, attributionControl: false, worldCopyJump: true
         }).setView([20, 0], 2);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          minZoom: 2
+          maxZoom: 19, minZoom: 2
         }).addTo(globalMap);
       } catch (e) {}
     }, 100);
   } else {
     setTimeout(() => { if (globalMap) globalMap.invalidateSize(); }, 100);
   }
-
   if (socket && socket.connected) socket.emit('requestGlobalListeners', { roomId });
 }
 function closeGlobalMap() {
   document.getElementById('globalMapModal').classList.remove('active');
 }
-
 function renderGlobalMap({ listeners, users, currentTrack, myId }) {
   if (!globalMap) return;
-
   mapMarkers.forEach(m => globalMap.removeLayer(m));
   mapMarkers = [];
-
   (users || []).forEach(u => {
     if (!u.lat || !u.lng) return;
-
     const isMe = u.id === myId;
     const color = isMe ? '#10B981' : '#EC4899';
-
     if (u.accuracy && u.accuracy > 0) {
       const accuracyCircle = L.circle([u.lat, u.lng], {
         radius: Math.min(u.accuracy, 500),
@@ -2000,52 +1908,29 @@ function renderGlobalMap({ listeners, users, currentTrack, myId }) {
       }).addTo(globalMap);
       mapMarkers.push(accuracyCircle);
     }
-
     const marker = L.circleMarker([u.lat, u.lng], {
       radius: isMe ? 9 : 7, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
     }).addTo(globalMap);
-
     const addr = u.manualAddress || u.address?.shortLabel || u.city;
-    const road = u.address?.road ? `🛣️ ${esc(u.address.road)}` : '';
-    const area = u.address?.neighbourhood ? `🏘️ ${esc(u.address.neighbourhood)}` : '';
-    const building = u.address?.building ? `🏢 ${esc(u.address.building)}` : '';
-    const acc = u.accuracy ? `±${Math.round(u.accuracy)}m` : '';
-
     marker.bindPopup(`
       <div style="font-family: Inter, sans-serif; min-width: 200px; max-width: 280px;">
         <div style="font-weight: 800; font-size: 14px; margin-bottom: 6px; color: ${color};">
           ${isMe ? '🟢 ' : '🎵 '}${esc(u.name)}${isMe ? ' (You)' : ''}
         </div>
-        <div style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">
-          📍 ${esc(addr)}
-        </div>
-        ${building ? `<div style="font-size: 11px; margin-bottom: 2px;">${building}</div>` : ''}
-        ${road ? `<div style="font-size: 11px; margin-bottom: 2px;">${road}</div>` : ''}
-        ${area ? `<div style="font-size: 11px; margin-bottom: 2px;">${area}</div>` : ''}
-        ${acc ? `<div style="font-size: 10px; color: #10B981; margin-top: 4px;">🎯 GPS: ${acc}</div>` : ''}
-        <div style="font-size: 10px; color: ${u.status === 'online' ? '#10B981' : '#F59E0B'}; margin-top: 4px;">
-          ● ${u.status === 'online' ? 'Listening now' : 'Idle'}
-        </div>
+        <div style="font-size: 12px; margin-bottom: 4px; font-weight: 600;">📍 ${esc(addr)}</div>
+        ${u.accuracy ? `<div style="font-size: 10px; color: #10B981; margin-top: 4px;">🎯 GPS: ±${Math.round(u.accuracy)}m</div>` : ''}
       </div>
     `);
-
     mapMarkers.push(marker);
   });
-
   const nowPlayingEl = document.getElementById('mapNowPlaying');
-  if (nowPlayingEl) {
-    nowPlayingEl.textContent = currentTrack
-      ? `${currentTrack.title} — ${currentTrack.artist}`
-      : 'No song playing';
-  }
-
+  if (nowPlayingEl) nowPlayingEl.textContent = currentTrack ? `${currentTrack.title} — ${currentTrack.artist}` : 'No song playing';
   const cityListEl = document.getElementById('mapCityList');
   const sortedUsers = [...(users || [])].sort((a, b) => {
     if (a.status === 'online' && b.status !== 'online') return -1;
     if (b.status === 'online' && a.status !== 'online') return 1;
     return a.name.localeCompare(b.name);
   });
-
   if (sortedUsers.length === 0) {
     cityListEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">No listeners with location yet</div>';
   } else {
@@ -2053,30 +1938,21 @@ function renderGlobalMap({ listeners, users, currentTrack, myId }) {
       const isMe = u.id === myId;
       const dotColor = u.status === 'online' ? '#10B981' : '#F59E0B';
       const addr = u.manualAddress || u.address?.shortLabel || u.city;
-      const road = u.address?.road ? ` · ${u.address.road}` : '';
       const acc = u.accuracy ? ` (±${Math.round(u.accuracy)}m)` : '';
-
       return `
         <div class="city-row" style="${isMe ? 'background: rgba(16,185,129,0.08); border-radius: 8px; padding: 8px;' : 'padding: 8px;'}">
           <div style="flex: 1; min-width: 0;">
             <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px;">
               <span style="width: 7px; height: 7px; border-radius: 50%; background: ${dotColor}; box-shadow: 0 0 6px ${dotColor}; flex-shrink: 0;"></span>
-              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${esc(u.name)}${isMe ? ' (You)' : ''}
-              </span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(u.name)}${isMe ? ' (You)' : ''}</span>
             </div>
-            <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              📍 ${esc(addr)}${esc(road)}${acc}
-            </div>
+            <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${esc(addr)}${acc}</div>
           </div>
           <span style="font-size: 16px; flex-shrink: 0;">${u.status === 'online' ? '🎵' : '💤'}</span>
-        </div>
-      `;
+        </div>`;
     }).join('');
   }
-
   refreshIcons();
-
   if (mapMarkers.length > 0 && globalMap) {
     try {
       const group = L.featureGroup(mapMarkers);
@@ -2120,20 +1996,21 @@ function flushMessageQueue(){
   toSend.forEach(m=>{ socket.emit('chatMessage',{roomId:m.roomId||roomId,text:m.text,mentions:[],queuedAt:m.time}); });
   showToast(`✅ ${toSend.length} messages sent`,'success');
 }
-async function cacheSongForOffline(track){
-  if(!track||!track.audioUrl)return;
-  if(!('caches'in window))return;
-  try{
-    const c=await caches.open('sangeetx-songs-v1');
-    if(await c.match(track.audioUrl))return;
-    fetch(track.audioUrl).then(r=>{if(r.ok)c.put(track.audioUrl,r.clone());}).catch(()=>{});
-  }catch(e){}
-}
 
 /* ============ JOIN GLOBAL ============ */
 document.getElementById('joinGlobalBtn').addEventListener('click', async () => {
   const name = document.getElementById('userNameInput').value.trim();
   if (!name) { showToast('Please enter your name first', 'error'); return; }
+
+  // ✅ Client-side name validation
+  const nameCheck = clientValidateName(name);
+  if (nameCheck) {
+    document.getElementById('nameError').textContent = '⚠️ ' + nameCheck;
+    document.getElementById('userNameInput').focus();
+    return;
+  }
+  document.getElementById('nameError').textContent = '';
+
   userName = name;
   roomId = 'global';
   isOwner = false;
@@ -2142,10 +2019,13 @@ document.getElementById('joinGlobalBtn').addEventListener('click', async () => {
   localStorage.setItem('sangeetxUserName', userName);
   saveSession();
   startSessionRefresh();
-  // Join click = user gesture -> audio unlock (autoplay ke liye)
   initAudioContext();
   initSocket();
   socket.on('connect', () => socket.emit('joinGlobal', { userName, fingerprint: myFingerprint }));
+});
+
+document.getElementById('userNameInput').addEventListener('input', () => {
+  document.getElementById('nameError').textContent = '';
 });
 
 /* ============ SOCKET INIT ============ */
@@ -2173,6 +2053,19 @@ function initSocket(){
         <h1 style="font-size:26px;font-weight:900;margin-bottom:12px;color:#EF4444;">You Are Blocked</h1>
         <p style="color:#A8A8B3;font-size:14px;">${esc(message || 'You have been blocked.')}</p>
       </div>`;
+  });
+
+  // ✅ Name rejected
+  socket.on('nameRejected', ({ message }) => {
+    document.getElementById('nameError').textContent = '⚠️ ' + message;
+    showToast('❌ ' + message, 'error');
+    clearSession();
+    stopSessionRefresh();
+    waitingScreen.classList.remove('active');
+    mainScreen.classList.remove('active');
+    joinScreen.classList.add('active');
+    if (userName) document.getElementById('userNameInput').value = userName;
+    setTimeout(() => document.getElementById('userNameInput').focus(), 200);
   });
 
   socket.on('joinResult',(r)=>{
@@ -2214,6 +2107,16 @@ function initSocket(){
       const onlineCount = users.filter(u => u.status === 'online').length;
       sub.textContent = `${onlineCount} online`;
     }
+    // ✅ Voice mesh: if mic is on, ensure PC for each new peer
+    if (localStream) {
+      users.forEach(u => {
+        if (u.id === socket.id) return;
+        if (!peerConnections.has(u.id)) {
+          if (socket.id < u.id) callNewPeer(u.id, u.name);
+          else createPeerConnection(u.id, u.name);
+        }
+      });
+    }
   });
 
   socket.on('stateSync',(state)=>{
@@ -2223,22 +2126,14 @@ function initSocket(){
 
   socket.on('songChanged', ({ track, reason, playedBy }) => {
     if (!track || !track.audioUrl) return;
-    console.log(`🎵 songChanged: ${track.title} (${reason})`);
-
-    // Naya gana aaya -> "loading" flags reset
     isStarting = false;
-
     if (currentTrack && currentTrack.id === track.id) {
       if (reason === 'sync' && lastKnownPosition !== undefined) {
         const drift = Math.abs(audio.currentTime - lastKnownPosition);
-        if (drift > 2) {
-          audio.currentTime = lastKnownPosition;
-          console.log(`🎯 Position synced: ${lastKnownPosition.toFixed(1)}s`);
-        }
+        if (drift > 2) audio.currentTime = lastKnownPosition;
       }
       return;
     }
-
     if (reason === 'sync') {
       const syncPos = lastKnownPosition || 0;
       loadTrack(track, syncPos, true);
@@ -2261,7 +2156,22 @@ function initSocket(){
     showWelcomeToast(joinedName, welcomeMessage);
     showToast(message, 'success');
   });
-  socket.on('userLeft', ({ userName, message }) => { showToast(message); });
+  socket.on('userLeft', ({ userName: leftName, message, userId }) => {
+    showToast(message || `${leftName} left`);
+    // ✅ Cleanup peer
+    const toRemove = [];
+    remoteAudios.forEach((v, id) => {
+      if (v.userName === leftName || (userId && id === userId)) toRemove.push(id);
+    });
+    toRemove.forEach(id => {
+      const v = remoteAudios.get(id);
+      if (v) { try { v.audio.srcObject = null; } catch(e){} }
+      remoteAudios.delete(id);
+      const pc = peerConnections.get(id);
+      if (pc) { try { pc.close(); } catch(e){} peerConnections.delete(id); }
+      pendingCandidates.delete(id);
+    });
+  });
 
   socket.on('globalStats', (stats) => {
     const onlineEl = document.getElementById('onlineCount');
@@ -2327,9 +2237,22 @@ function initSocket(){
     if(!chatOpen&&msg.userId!==socket.id){unreadMessages++;updateChatBadge();}
   });
 
-  socket.on('voiceSignal',async({signal,from,userName:fromName})=>{
-    window._lastVoiceFromId=from;window._lastVoiceFromName=fromName;
-    await handleVoiceSignal(signal);
+  // ✅ Moderation events
+  socket.on('chatPending', ({ message }) => showToast(message, 'info'));
+  socket.on('chatRejected', ({ messageId }) => {
+    document.querySelector(`[data-msg-id="${messageId}"]`)?.remove();
+    showToast('❌ Message rejected by admin', 'error');
+  });
+  socket.on('moderationFlag', ({ userName, text }) => {
+    console.warn(`[MOD] ${userName}: ${text}`);
+  });
+  socket.on('moderationModeUpdate', ({ enabled }) => {
+    showToast(enabled ? '🛡️ Moderation ON — messages need approval' : '✅ Moderation OFF', 'info');
+  });
+
+  // ✅ N-way voice
+  socket.on('voiceSignal', async ({ signal, from, fromName }) => {
+    await handleVoiceSignal({ signal, from, fromName });
   });
 
   socket.on('pttState',({userName:fromName,isTalking:talk})=>{
@@ -2367,7 +2290,7 @@ function initSocket(){
     if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
     if (status === 'loading') return;
     if (status === 'success' || status === 'fallback') showToast(`⏮️ ${track || 'Previous'}`, 'success');
-    else if (status === 'restart') { /* song restarted */ }
+    else if (status === 'restart') {}
     else showToast('⏮️ No previous song', 'warning');
   });
 
@@ -2408,9 +2331,7 @@ function initSocket(){
     showToast(muted ? `🔇 You have been muted by ${by}` : `🔊 You have been unmuted`, muted ? 'error' : 'success');
   });
 
-  socket.on('adminForceSkip', ({ track, message }) => {
-    showToast(`👑 ${message}`, 'warning');
-  });
+  socket.on('adminForceSkip', ({ track, message }) => showToast(`👑 ${message}`, 'warning'));
 
   socket.on('adminAnnounce', (data) => {
     if (!data) {
@@ -2570,6 +2491,8 @@ document.getElementById('closeChat').addEventListener('click',()=>{
   const emojiBtn = document.getElementById('chatEmojiBtn');
   if (picker) picker.classList.remove('show');
   if (emojiBtn) emojiBtn.classList.remove('active');
+  const mention = document.getElementById('mentionSuggest');
+  if (mention) mention.classList.remove('show');
 });
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
@@ -2589,18 +2512,65 @@ chatInputEl.addEventListener('keydown', (e) => {
   }
 });
 
-chatInputEl.addEventListener('input', (e) => {
-  if(!socket||!socket.connected)return;
-  if(!isTyping){isTyping=true;socket.emit('typing',{roomId,isTyping:true,userName});}
-  clearTimeout(typingTimer);
-  typingTimer=setTimeout(()=>{ isTyping=false; socket.emit('typing',{roomId,isTyping:false,userName}); },1500);
-});
-
 chatInputEl.addEventListener('paste', (e) => {
   e.preventDefault();
   const text = (e.clipboardData || window.clipboardData).getData('text/plain');
   document.execCommand('insertText', false, text);
 });
+
+/* ============ MENTION AUTOCOMPLETE ============ */
+const mentionSuggest = document.getElementById('mentionSuggest');
+let mentionQuery = null;
+
+chatInputEl.addEventListener('input', (e) => {
+  if(!socket||!socket.connected)return;
+  if(!isTyping){isTyping=true;socket.emit('typing',{roomId,isTyping:true,userName});}
+  clearTimeout(typingTimer);
+  typingTimer=setTimeout(()=>{ isTyping=false; socket.emit('typing',{roomId,isTyping:false,userName}); },1500);
+
+  // ✅ Mention autocomplete
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const before = range.startContainer.textContent?.slice(0, range.startOffset) || '';
+  const m = before.match(/@([A-Za-z0-9_]*)$/);
+  if (!m) { mentionSuggest.classList.remove('show'); mentionQuery = null; return; }
+  mentionQuery = m[1].toLowerCase();
+  const users = (window._currentUsers || [])
+    .filter(u => u.id !== socket.id)
+    .filter(u => u.name.toLowerCase().includes(mentionQuery))
+    .slice(0, 6);
+  if (!users.length) { mentionSuggest.classList.remove('show'); return; }
+  mentionSuggest.innerHTML = users.map(u =>
+    `<div class="mention-suggest-item" data-name="${esc(u.name)}">${esc(u.name)}</div>`
+  ).join('');
+  mentionSuggest.classList.add('show');
+  mentionSuggest.querySelectorAll('.mention-suggest-item').forEach(el => {
+    el.addEventListener('mousedown', e2 => {
+      e2.preventDefault();
+      insertMention(el.dataset.name);
+    });
+  });
+});
+
+function insertMention(name) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const before = range.startContainer.textContent.slice(0, range.startOffset);
+  const at = before.lastIndexOf('@');
+  if (at === -1) return;
+  range.setStart(range.startContainer, at);
+  range.deleteContents();
+  const node = document.createTextNode('@' + name + ' ');
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  mentionSuggest.classList.remove('show');
+  chatInputEl.dispatchEvent(new Event('input', { bubbles: true }));
+}
 
 /* ============ EMOJI PICKER ============ */
 const emojiPickerEl = document.getElementById('emojiPicker');
@@ -2641,6 +2611,11 @@ if (emojiBtn && emojiPickerEl) {
         emojiBtn.classList.remove('active');
       }
     }
+    if (mentionSuggest && mentionSuggest.classList.contains('show')) {
+      if (!mentionSuggest.contains(e.target) && e.target !== chatInputEl && !chatInputEl.contains(e.target)) {
+        mentionSuggest.classList.remove('show');
+      }
+    }
   });
 }
 
@@ -2652,6 +2627,9 @@ function sendChat(){
   clearTimeout(typingTimer);isTyping=false;
   if(socket&&socket.connected)socket.emit('typing',{roomId,isTyping:false,userName});
 
+  // ✅ collect mentions
+  const mentionNames = [...text.matchAll(/@([A-Za-z0-9_]{2,30})/g)].map(m => m[1]);
+
   if(!isOnline||!socket||!socket.connected){
     messageQueue.push({text,time:Date.now(),roomId});
     updateOfflineCount();showOfflineBanner();
@@ -2661,8 +2639,26 @@ function sendChat(){
     input.innerText='';
     return;
   }
-  socket.emit('chatMessage',{roomId,text,mentions:[]});
+  socket.emit('chatMessage',{roomId,text,mentions:mentionNames});
   input.innerText='';
+  mentionSuggest.classList.remove('show');
+}
+
+/* ============ RENDER MESSAGE (with @mentions) ============ */
+function renderMessageHTML(text) {
+  const safe = esc(text);
+  const users = (window._currentUsers || []).map(u => u.name);
+  let out = safe;
+  users.sort((a,b) => b.length - a.length).forEach(name => {
+    const re = new RegExp('@' + name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+    out = out.replace(re, m => `<span class="mention-tag">${m}</span>`);
+  });
+  out = out.replace(/@([A-Za-z0-9_]{2,30})/g, (m, name) => {
+    const isReal = users.some(u => u.toLowerCase() === name.toLowerCase());
+    return isReal ? m : `<span class="mention-tag mention-unknown">${m}</span>`;
+  });
+  out = out.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  return out;
 }
 
 function renderChat(messages,replace){
@@ -2684,7 +2680,7 @@ function renderChat(messages,replace){
     row.innerHTML = `
       <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
       <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${esc(String(m.id))}">
-        <span class="chat-msg-text">${esc(m.text)}</span>
+        <span class="chat-msg-text">${renderMessageHTML(m.text)}</span>
         <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
       </div>
     `;
@@ -2758,8 +2754,8 @@ function showWelcomeToast(userName, message) {
 /* ============ SHARE ============ */
 document.getElementById('shareBtn').addEventListener('click',async()=>{
   const url=window.location.origin;
-  const text=`Listen to music with me on Music Sync!\n\nLink: ${url}`;
-  if(navigator.share){try{await navigator.share({title:'Music Sync',text,url});}catch(e){}}
+  const text=`Listen to music with me on SangeetX!\n\nLink: ${url}`;
+  if(navigator.share){try{await navigator.share({title:'SangeetX',text,url});}catch(e){}}
   else{
     try{await navigator.clipboard.writeText(text);showToast('Link copied! 📋','success');}
     catch(e){prompt('Copy this link:',url);}
@@ -2795,8 +2791,6 @@ window.addEventListener('load', async () => {
     }
   } catch (e) {}
 
-  // ✅ FIX: audio output polling / auto-routing hata diya (BT earbuds/speaker problem ki jad yahi thi)
-
   const sessionRaw = localStorage.getItem('musicSyncSession');
   if (sessionRaw) {
     try {
@@ -2825,23 +2819,18 @@ async function applyRemoteState(state) {
   isRemoteUpdate = true;
   try {
     if (!state.track) return;
-
     if (!currentTrack || currentTrack.id !== state.track.id) {
-      console.log(`🎵 Loading from server: ${state.track.title} at ${(state.position||0).toFixed(1)}s`);
       await loadTrack(state.track, state.position || 0, state.isPlaying);
       if (state.playedByName) updatePlayedBy(state.playedByName, state.autoDj ? 'auto' : 'user');
       return;
     }
-
     if (currentTrack.id === state.track.id) {
       if (state.isPlaying && audio.paused) await audio.play().catch(() => {});
       if (!state.isPlaying && !audio.paused) audio.pause();
-
       if (audio.seeking) return;
       if (state.isPlaying && !audio.paused && state.position !== undefined) {
         const drift = audio.currentTime - state.position;
         const abs = Math.abs(drift);
-
         if (abs < 0.3) {
           audio.playbackRate = 1.0;
         } else if (abs < 2.0) {
@@ -2851,7 +2840,6 @@ async function applyRemoteState(state) {
         } else {
           audio.currentTime = state.position;
           audio.playbackRate = 1.0;
-          console.log(`🎯 Jump to server position: ${state.position.toFixed(1)}s (drift ${drift.toFixed(1)}s)`);
         }
       }
     }
@@ -2861,7 +2849,7 @@ async function applyRemoteState(state) {
   }
 }
 
-/* ============ UPDATE PLAY ICON ============ */
+/* ============ PLAY ICON ============ */
 const PLAY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><polygon points="6 3 20 12 6 21 6 3" fill="white" stroke="white"/></svg>`;
 const PAUSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;display:block;flex-shrink:0;"><rect x="6" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white" stroke="white"/></svg>`;
 
@@ -2874,7 +2862,6 @@ function updatePlayIcon() {
   btn.innerHTML = audio.paused ? PLAY_SVG : PAUSE_SVG;
 }
 
-// Ek hi baar register (pehle loadTrack me har baar register hote the)
 audio.addEventListener('play', () => {
   const art = document.getElementById('albumArt');
   if (art) art.classList.add('playing');
@@ -2887,7 +2874,6 @@ audio.addEventListener('pause', () => {
   updatePlayIcon();
 });
 
-/* ============ BUFFERING + ERROR ============ */
 audio.addEventListener('waiting', () => document.getElementById('albumArt')?.classList.add('buffering'));
 ['playing', 'canplay'].forEach(ev =>
   audio.addEventListener(ev, () => document.getElementById('albumArt')?.classList.remove('buffering')));
@@ -2901,11 +2887,7 @@ audio.addEventListener('error', () => {
 
 /* ============ LOAD TRACK ============ */
 async function loadTrack(track, position = 0, autoPlay = false) {
-  if (!track || !track.audioUrl) {
-    console.error('❌ loadTrack: invalid track');
-    return;
-  }
-
+  if (!track || !track.audioUrl) return;
   currentTrack = track;
   document.getElementById('songTitle').textContent = track.title;
   document.getElementById('songArtist').textContent = track.artist;
@@ -2928,27 +2910,11 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   const applyPosition = () => {
     if (posSet) return;
     if (position > 0) {
-      try {
-        audio.currentTime = position;
-        posSet = true;
-        console.log(`🎯 Position applied: ${position.toFixed(1)}s`);
-      } catch (e) {}
-    } else {
-      posSet = true;
-    }
+      try { audio.currentTime = position; posSet = true; } catch (e) {}
+    } else posSet = true;
   };
-
   audio.addEventListener('loadedmetadata', applyPosition, { once: true });
   audio.addEventListener('canplay', applyPosition, { once: true });
-
-  const loadTimeout = setTimeout(() => {
-    if (!audio.duration || isNaN(audio.duration)) {
-      console.warn('⚠️ Audio load timeout — retry');
-      audio.load();
-    }
-  }, 15000);
-  audio.addEventListener('canplay', () => clearTimeout(loadTimeout), { once: true });
-
 
   if (autoPlay) {
     try {
@@ -2959,18 +2925,13 @@ async function loadTrack(track, position = 0, autoPlay = false) {
       document.getElementById('waveformLive').classList.add('active');
       startWaveform();
       startBeatDetection();
-
       if (position > 0) {
         setTimeout(() => {
           const drift = Math.abs(audio.currentTime - position);
-          if (drift > 1.5) {
-            audio.currentTime = position;
-            console.log(`🔧 Drift corrected: ${drift.toFixed(1)}s`);
-          }
+          if (drift > 1.5) audio.currentTime = position;
         }, 3000);
       }
     } catch (e) {
-      // Browser autoplay block -> agle tap par chala do
       const resume = () => {
         initAudioContext();
         if (audioContext?.state === 'suspended') audioContext.resume();
@@ -2985,14 +2946,13 @@ async function loadTrack(track, position = 0, autoPlay = false) {
   setTimeout(() => { updatePlayIcon(); }, 150);
   updatePlayIcon();
   startHeartbeat();
-  if (distanceKm > 100) setTimeout(showDistanceHeart, 800);
 
   if ('mediaSession' in navigator && track) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title || 'Unknown',
         artist: track.artist || 'Unknown',
-        album: 'Music Sync',
+        album: 'SangeetX',
         artwork: track.image ? [
           { src: track.image, sizes: '96x96', type: 'image/jpeg' },
           { src: track.image, sizes: '192x192', type: 'image/jpeg' },
@@ -3006,8 +2966,6 @@ async function loadTrack(track, position = 0, autoPlay = false) {
 /* ============ PLAYER ============ */
 document.getElementById('playBtn').addEventListener('click',()=>{
   if(myPermissions.play){showToast('You are blocked','error');return;}
-
-  // ✅ Koi gana nahi hai -> server se random gana (ya room ka chalta gana) mango
   if(!currentTrack){
     if(!socket||!socket.connected){showToast('Not connected','error');return;}
     if(isStarting){showToast('⏳ Loading…');return;}
@@ -3019,7 +2977,6 @@ document.getElementById('playBtn').addEventListener('click',()=>{
     socket.emit('requestStart');
     return;
   }
-
   const art=document.getElementById('albumArt');
   const wf=document.getElementById('waveformLive');
   if(audio.paused){
@@ -3084,7 +3041,6 @@ document.getElementById('nextBtn').addEventListener('click', () => {
   const btn = document.getElementById('nextBtn');
   btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
   showToast('⏭️ Loading next...');
-  // Koi gana nahi chal raha ho to server random Auto DJ gana laayega
   socket.emit('requestNext', { roomId });
   setTimeout(() => { isLoadingNext = false; btn.style.opacity = ''; btn.style.pointerEvents = ''; }, 20000);
 });
@@ -3140,13 +3096,8 @@ progressBarEl.addEventListener('pointerup', endDrag);
 progressBarEl.addEventListener('pointercancel', endDrag);
 progressBarEl.addEventListener('keydown', (e) => {
   if (!currentTrack || !audio.duration) return;
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    seekTo(audio.currentTime + 5);
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    seekTo(audio.currentTime - 5);
-  }
+  if (e.key === 'ArrowRight') { e.preventDefault(); seekTo(audio.currentTime + 5); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); seekTo(audio.currentTime - 5); }
 });
 
 audio.addEventListener('timeupdate',()=>{
@@ -3160,15 +3111,11 @@ audio.addEventListener('timeupdate',()=>{
 
 audio.addEventListener('loadedmetadata',()=>{
   document.getElementById('totalTime').textContent=fmt(audio.duration);
-
-  // Server ko actual duration bhejo
   if (socket && socket.connected && currentTrack && audio.duration > 0) {
     if (!currentTrack.duration || currentTrack.duration <= 0) {
       currentTrack.duration = Math.floor(audio.duration);
       socket.emit('reportDuration', {
-        roomId,
-        trackId: currentTrack.id,
-        duration: Math.floor(audio.duration)
+        roomId, trackId: currentTrack.id, duration: Math.floor(audio.duration)
       });
     }
   }
@@ -3178,18 +3125,13 @@ audio.addEventListener('ended',()=>{
   document.getElementById('albumArt').classList.remove('playing');
   document.getElementById('waveformLive').classList.remove('active');
   stopWaveform();stopBeatDetection();updatePlayIcon();
-
-  // ✅ Server ko batao gana khatam. Server dedupe karke sirf EK baar next gana chalata hai
-  // (same singer / similar artist / Auto DJ).
   if (socket && socket.connected && currentTrack) {
-    console.log('🎵 Audio ended — trackEnded');
     socket.emit('trackEnded', { roomId, trackId: currentTrack.id });
   }
 });
 
 function fmt(s){if(!s||isNaN(s))return'0:00';const m=Math.floor(s/60);const x=Math.floor(s%60).toString().padStart(2,'0');return m+':'+x;}
 
-/* ============ SEEK (server ko 'seek' event bhejo, updateState nahi) ============ */
 function seekTo(pos) {
   if (!currentTrack) return;
   const dur = audio.duration || 0;
@@ -3206,16 +3148,12 @@ let lastBroadcastPosition = 0;
 function broadcastState(partial) {
   if (isRemoteUpdate) return;
   if (!socket || !socket.connected) return;
-
   const now = Date.now();
   const position = partial.position !== undefined ? partial.position : audio.currentTime;
-
   if (now - lastBroadcastTime < 2000 && partial.isPlaying === undefined) return;
   if (Math.abs(position - lastBroadcastPosition) < 3 && partial.isPlaying === undefined) return;
-
   lastBroadcastTime = now;
   lastBroadcastPosition = position;
-
   socket.emit('updateState', {
     roomId,
     newState: {
@@ -3395,31 +3333,12 @@ async function setupMic(){
     });
     localStream.getAudioTracks().forEach(t=>t.enabled=true);
     hideMicBanner();
-    // ✅ autoDetectAndRouteAudio() yahan se hata diya
-    if(socket&&socket.connected){
-      if(!peerConnection){createPeerConnection();}
-      else{
-        const hasAudioTrack = peerConnection.getSenders().some(s => s.track && s.track.kind === 'audio');
-        if(!hasAudioTrack && localStream){
-          localStream.getTracks().forEach(track=>{track.contentHint='speech';peerConnection.addTrack(track,localStream);});
-        }
-      }
-      setTimeout(async () => {
-        if(!peerConnection) return;
-        if(peerConnection.remoteDescription && peerConnection.remoteDescription.type) return;
-        if(peerConnection.signalingState !== 'stable') return;
-        const myName = (userName || '').toLowerCase();
-        const partnerName = (window._lastVoiceFromName || '').toLowerCase();
-        const isPolite = myName && partnerName ? (myName > partnerName) : false;
-        if(isPolite) return;
-        try{
-          makingOffer = true;
-          const offer=await peerConnection.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:false});
-          await peerConnection.setLocalDescription(offer);
-          socket.emit('voiceSignal',{roomId,signal:{type:'offer',sdp:offer.sdp}});
-        }catch(e){}finally{makingOffer = false;}
-      }, 1000);
-    }
+
+    // ✅ N-way: create PC for every existing user
+    (window._currentUsers || []).forEach(u => {
+      if (u.id === socket.id) return;
+      callNewPeer(u.id, u.name);
+    });
   }catch(e){
     if(e.name==='NotAllowedError'||e.message?.includes('denied')){showMicBanner();showToast('Mic permission blocked','error');}
     else if(e.name==='NotFoundError'){showToast('No microphone found','error');}
@@ -3432,80 +3351,120 @@ async function setupMic(){
 
 function releaseMic(){
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
-  if(peerConnection){peerConnection.close();peerConnection=null;}
+  // ✅ Close all peer connections
+  peerConnections.forEach((pc, id) => { try { pc.close(); } catch(e){} });
+  peerConnections.clear();
+  pendingCandidates.clear();
+  remoteAudios.forEach(v => { try { v.audio.srcObject = null; } catch(e){} });
+  remoteAudios.clear();
 }
 
-function createPeerConnection(){
-  if(peerConnection)return;
-  peerConnection=new RTCPeerConnection({
-    iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'stun:stun1.l.google.com:19302'},
-      {urls:'stun:stun2.l.google.com:19302'}
+/* ============ N-WAY VOICE MESH ============ */
+function createPeerConnection(remoteId, remoteName) {
+  if (peerConnections.has(remoteId)) return peerConnections.get(remoteId);
+
+  const pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
     ],
-    iceCandidatePoolSize:10,bundlePolicy:'max-bundle',rtcpMuxPolicy:'require'
+    iceCandidatePoolSize: 10,
   });
-  if(localStream){
-    localStream.getTracks().forEach(track=>{track.contentHint='speech';peerConnection.addTrack(track,localStream);});
+
+  if (localStream) {
+    localStream.getTracks().forEach(t => {
+      t.contentHint = 'speech';
+      pc.addTrack(t, localStream);
+    });
   }
-  peerConnection.ontrack=(e)=>{
+
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      socket.emit('voiceSignal', {
+        roomId, to: remoteId,
+        signal: { type: 'ice', candidate: e.candidate }
+      });
+    }
+  };
+
+  pc.ontrack = e => {
     const remote = new Audio();
     remote.srcObject = e.streams[0];
-    remote.autoplay = true;remote.playsInline = true;remote.volume = 1.0;
-    const tryPlay=()=>{
-      remote.play().catch((err)=>{
-        const unlock=()=>{remote.play().catch(()=>{});document.removeEventListener('click',unlock);document.removeEventListener('touchstart',unlock);};
-        document.addEventListener('click',unlock,{once:true});
-        document.addEventListener('touchstart',unlock,{once:true});
-      });
-    };
-    tryPlay();
-    const remoteName=window._lastVoiceFromName||'Unknown';
-    const remoteId=window._lastVoiceFromId||('remote-'+Date.now());
-    remoteAudios.set(remoteId,{audio:remote,userName:remoteName,remoteId});
-    const isUserMuted=mutedUsers.has(remoteName.toLowerCase());
-    // 'Sirf gana' mode me baatein band
-    remote.muted=muteAll||isUserMuted||audioMode==='music';
+    remote.autoplay = true;
+    remote.playsInline = true;
+    remote.volume = 1.0;
+    remote.play().catch(() => {
+      const unlock = () => { remote.play().catch(()=>{}); document.removeEventListener('click', unlock); };
+      document.addEventListener('click', unlock, { once: true });
+    });
+    const isUserMuted = mutedUsers.has((remoteName||'').toLowerCase());
+    remote.muted = muteAll || isUserMuted || audioMode === 'music';
+    remoteAudios.set(remoteId, { audio: remote, userName: remoteName, remoteId });
   };
-  peerConnection.onicecandidate=(e)=>{if(e.candidate)socket.emit('voiceSignal',{roomId,signal:{type:'ice',candidate:e.candidate}});};
-  peerConnection.onconnectionstatechange=()=>{if(peerConnection.connectionState==='failed')peerConnection.restartIce();};
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'failed') pc.restartIce();
+  };
+
+  peerConnections.set(remoteId, pc);
+  pendingCandidates.set(remoteId, []);
+  return pc;
 }
 
-async function handleVoiceSignal(signal){
-  if(myPermissions.voice)return;
-  if(!peerConnection)createPeerConnection();
-  try{
-    if(signal.type==='offer'){
-      const offerCollision = makingOffer || peerConnection.signalingState !== 'stable';
-      const myName = (userName || '').toLowerCase();
-      const partnerName = (window._lastVoiceFromName || '').toLowerCase();
-      const isPolite = myName && partnerName ? (myName > partnerName) : false;
-      ignoreOffer = !isPolite && offerCollision;
-      if(ignoreOffer) return;
-      if(offerCollision){await peerConnection.setLocalDescription({type:'rollback'});}
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({type:'offer',sdp:signal.sdp}));
-      if(localStream && peerConnection.getSenders().length === 0){
-        localStream.getTracks().forEach(track=>{track.contentHint='speech';peerConnection.addTrack(track,localStream);});
+async function handleVoiceSignal({ signal, from, fromName }) {
+  if (myPermissions.voice) return;
+  if (!socket) return;
+  const pc = createPeerConnection(from, fromName);
+
+  try {
+    if (signal.type === 'offer') {
+      const polite = (socket.id > from);
+      const collision = pc.signalingState !== 'stable';
+      if (collision && !polite) return;
+      if (collision) await pc.setLocalDescription({ type: 'rollback' });
+
+      await pc.setRemoteDescription(new RTCSessionDescription(signal));
+      if (localStream && pc.getSenders().length === 0) {
+        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
       }
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      socket.emit('voiceSignal',{roomId,signal:{type:'answer',sdp:answer.sdp}});
-    } else if(signal.type==='answer'){
-      if(peerConnection.signalingState !== 'have-local-offer') return;
-      await peerConnection.setRemoteDescription(new RTCSessionDescription({type:'answer',sdp:signal.sdp}));
-    } else if(signal.type==='ice'){
-      if(peerConnection.remoteDescription && peerConnection.remoteDescription.type){
-        try{await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));}catch(e){}
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('voiceSignal', {
+        roomId, to: from,
+        signal: { type: 'answer', sdp: answer.sdp }
+      });
+    } else if (signal.type === 'answer') {
+      if (pc.signalingState !== 'have-local-offer') return;
+      await pc.setRemoteDescription(new RTCSessionDescription(signal));
+    } else if (signal.type === 'ice') {
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch(e){}
       } else {
-        if(!window._iceQueue) window._iceQueue = [];
-        window._iceQueue.push(signal.candidate);
+        pendingCandidates.get(from)?.push(signal.candidate);
       }
     }
-    if(peerConnection.remoteDescription && peerConnection.remoteDescription.type && window._iceQueue){
-      for(const c of window._iceQueue){try{await peerConnection.addIceCandidate(new RTCIceCandidate(c));}catch(e){}}
-      window._iceQueue=[];
+
+    if (pc.remoteDescription && pc.remoteDescription.type) {
+      const q = pendingCandidates.get(from) || [];
+      for (const c of q) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} }
+      pendingCandidates.set(from, []);
     }
-  }catch(e){}
+  } catch (e) { console.warn('voice signal err', e); }
+}
+
+function callNewPeer(remoteId, remoteName) {
+  if (!socket) return;
+  const pc = createPeerConnection(remoteId, remoteName);
+  if (!localStream || pc.signalingState !== 'stable') return;
+  pc.createOffer({ offerToReceiveAudio: true })
+    .then(offer => pc.setLocalDescription(offer))
+    .then(() => {
+      socket.emit('voiceSignal', {
+        roomId, to: remoteId,
+        signal: { type: 'offer', sdp: pc.localDescription.sdp }
+      });
+    })
+    .catch(() => {});
 }
 
 /* ============ REACTIONS ============ */
@@ -3585,7 +3544,7 @@ function showInstallBanner() {
   b.innerHTML = `
     <i data-lucide="download"></i>
     <div class="install-banner-text">
-      <strong>Install Music Sync</strong>
+      <strong>Install SangeetX</strong>
       <span>Background playback + better experience</span>
     </div>
     <button class="install-btn" onclick="installPWA()">Install</button>
@@ -3611,7 +3570,7 @@ async function installPWA() {
 }
 
 window.addEventListener('appinstalled', () => {
-  showToast('🎉 Music Sync installed!', 'success');
+  showToast('🎉 SangeetX installed!', 'success');
   dismissInstallBanner();
 });
 
@@ -3632,9 +3591,7 @@ function setupMediaSession() {
     if (!audio.paused) { audio.pause(); updatePlayIcon(); broadcastState({ isPlaying: false, position: audio.currentTime }); }
   });
   navigator.mediaSession.setActionHandler('seekto', (d) => {
-    if (d.seekTime !== undefined && currentTrack) {
-      seekTo(d.seekTime);
-    }
+    if (d.seekTime !== undefined && currentTrack) seekTo(d.seekTime);
   });
   navigator.mediaSession.setActionHandler('nexttrack', () => {
     if (!socket || !socket.connected) return;
@@ -3646,10 +3603,7 @@ function setupMediaSession() {
     setTimeout(() => { isLoadingNext = false; if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; } }, 20000);
   });
   navigator.mediaSession.setActionHandler('previoustrack', () => {
-    if (audio.currentTime > 3) {
-      seekTo(0);
-      return;
-    }
+    if (audio.currentTime > 3) { seekTo(0); return; }
     if (!socket || !socket.connected) return;
     if (isLoadingPrev) return;
     isLoadingPrev = true;
@@ -3740,7 +3694,7 @@ window.addEventListener('popstate',(e)=>{
       stopSessionRefresh();
       if(socket)socket.disconnect();
       if(audio){audio.pause();audio.src='';}
-      if(peerConnection){peerConnection.close();peerConnection=null;}
+      peerConnections.forEach(pc => { try { pc.close(); } catch(e){} });
       if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
       window.location.href = window.location.origin;
     }
