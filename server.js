@@ -833,19 +833,9 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     }
   }
 
-  // Level 2: same artist, repeat allowed
-  console.log('⚠️ L1 failed — trying L2 (same artist, allow repeats)');
-  for (const artist of artistList) {
-    const songs = await searchSimilarSongs(artist, [currentId]);
-    if (songs.length > 0) {
-      const p = pick(songs.slice(0, 5));
-      console.log(`🎵 Next (L2 - same artist repeat): ${p.title}`);
-      return p;
-    }
-  }
-
-  // Level 3: similar artists
-  console.log('⚠️ L2 failed — trying L3 (similar artists)');
+  // Never deliberately reselect a recently played track just because the
+  // same-artist search ran out of results. Move to similar artists / Auto DJ.
+  console.log('⚠️ No unseen same-artist tracks — trying similar artists');
   const primaryArtist = artistList[0]?.toLowerCase();
   if (primaryArtist) {
     const similar = SIMILAR_ARTISTS[primaryArtist] || [];
@@ -945,6 +935,7 @@ function setRoomTrack(room, track, opts = {}) {
   room._lastKnownDuration = track.duration || 0;
   room._lastChangeAt = Date.now();
   room._prefetch = null;
+  room._endHandledFor = null;
   analytics.songsPlayed++;
 
   console.log(`🎵 NOW PLAYING: "${track.title}" by ${track.artist} (${reason})`);
@@ -982,13 +973,35 @@ async function playNextSong(reason = 'auto', user = null) {
         : await getNextSongFromContext(cur, history);
     }
 
+    // A cached/prefetched recommendation can become stale while the room changes.
+    const excludedIds = new Set([cur?.id, ...history].filter(Boolean));
+    if (nextSong && excludedIds.has(nextSong.id)) {
+      console.warn(`⚠️ Rejected duplicate/recent track: ${nextSong.title}`);
+      nextSong = null;
+    }
+
     if (!nextSong) {
-      console.log('⚠️ Context failed — Auto DJ playlist');
-      for (let i = 0; i < 3; i++) {
+      console.log('⚠️ Context failed — Auto DJ playlist (skip recent IDs)');
+      // Search the whole configured playlist before permitting any old repeat.
+      for (let i = 0; i < AUTO_DJ_PLAYLIST.length; i++) {
         const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
         autoDjIndex++;
-        nextSong = await searchSong(songName);
-        if (nextSong) break;
+        const candidate = await searchSong(songName);
+        if (candidate && !excludedIds.has(candidate.id)) {
+          nextSong = candidate;
+          break;
+        }
+      }
+    }
+
+    // If every provider result is already in history, allow an older track as a
+    // last resort, but never select the track that is currently playing.
+    if (!nextSong && cur) {
+      for (let i = 0; i < AUTO_DJ_PLAYLIST.length; i++) {
+        const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
+        autoDjIndex++;
+        const candidate = await searchSong(songName);
+        if (candidate && candidate.id !== cur.id) { nextSong = candidate; break; }
       }
     }
 
@@ -1312,8 +1325,15 @@ io.on('connection', (socket) => {
   socket.on('trackEnded', ({ trackId } = {}) => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room || !room.state.track || room.state.track.id !== trackId) return;
-    if (room._changing || Date.now() - (room._lastChangeAt || 0) < 5000) return;
-    playNextSong('auto');
+    // Many listeners may report the same ended event; the server timer may also
+    // notice it. Accept only one completion signal for the current track.
+    if (room._changing || room._loadingNext || room._endHandledFor === trackId) return;
+    if (Date.now() - (room._lastChangeAt || 0) < 5000) return;
+    room._endHandledFor = trackId;
+    room._loadingNext = true;
+    playNextSong('auto').finally(() => {
+      setTimeout(() => { room._loadingNext = false; }, 1200);
+    });
   });
 
   // ✅ NEW: koi gana nahi chal raha ho aur user Play dabaye
@@ -1356,10 +1376,9 @@ io.on('connection', (socket) => {
     socket.emit('nextAck', { status: 'loading' });
 
     try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 12000)
-      );
-      const track = await Promise.race([playNextSong('next', user), timeoutPromise]);
+      // Do not race an uncancelled song lookup against a second fallback change:
+      // that used to allow two different tracks to be committed for one click.
+      const track = await playNextSong('next', user);
       if (track) {
         socket.emit('nextAck', { status: 'success', track: track.title || 'Next' });
       } else {
@@ -1367,15 +1386,7 @@ io.on('connection', (socket) => {
       }
     } catch (e) {
       console.error('Next error:', e.message);
-      const fallbackTrack = await searchSong(pick(AUTO_DJ_PLAYLIST));
-      if (fallbackTrack) {
-        setRoomTrack(room, fallbackTrack, {
-          playedBy: user.id, playedByName: user.name, autoDj: false, reason: 'next'
-        });
-        socket.emit('nextAck', { status: 'fallback', track: fallbackTrack.title });
-      } else {
-        socket.emit('nextAck', { status: 'error' });
-      }
+      socket.emit('nextAck', { status: 'error' });
     }
   });
 
@@ -1562,12 +1573,21 @@ io.on('connection', (socket) => {
     maybeBotReply(room, user, clean);
   });
 
-  socket.on('voiceSignal', ({ roomId, signal } = {}) => {
+  socket.on('voiceSignal', ({ roomId, to, signal } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room) return;
+    if (!room || !to || !signal || !['offer', 'answer', 'ice'].includes(signal.type)) return;
     const user = room.users.find(u => u.id === socket.id);
-    if (user && user.blocked && user.blocked.voice) return;
-    socket.to(room.roomId).emit('voiceSignal', { signal, from: socket.id, userName: user?.name });
+    const target = room.users.find(u => u.id === to);
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!user || !target || !targetSocket || !targetSocket.rooms.has(room.roomId)) return;
+    if ((user.blocked && user.blocked.voice) || (target.blocked && target.blocked.voice)) return;
+    // WebRTC signaling must go only to the intended peer. Broadcasting SDP/ICE
+    // to the whole room causes peer negotiation collisions and failed calls.
+    io.to(to).emit('voiceSignal', {
+      signal,
+      from: socket.id,
+      fromName: user.name
+    });
   });
 
   socket.on('pttState', ({ roomId, isTalking } = {}) => {
