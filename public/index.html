@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script async src="https://www.instagram.com/embed.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 :root {
@@ -1608,6 +1609,118 @@ button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible 
 }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important; } }
 
+/* ===================== REELS PANEL ===================== */
+#reelsPanel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(4,4,10,.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 130;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+#reelsPanel.active { display: flex; }
+.reels-box {
+  width: min(100%, 540px);
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(199,184,255,.16);
+  background: linear-gradient(145deg, rgba(24,22,40,.98), rgba(11,11,19,.98));
+  padding: 16px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.6);
+}
+.reels-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.reels-head h3 {
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text);
+}
+.reels-head h3 [data-lucide] { color: var(--primary-2); }
+.reels-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#reelUrlInput {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(199,184,255,.18);
+  background: #0a111b;
+  color: #f4f7fb;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+#reelUrlInput:focus { border-color: rgba(174,148,255,.85); box-shadow: 0 0 0 3px rgba(148,112,255,.13); }
+#reelGoBtn {
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(135deg, #8561FF, #E85FAE);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+#reelGoBtn:active { transform: scale(.96); }
+.reels-stage {
+  min-height: 340px;
+  border-radius: 18px;
+  background: #0a0a14;
+  border: 1px solid rgba(199,184,255,.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.reels-empty {
+  color: #77738D;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.reels-stage .instagram-media {
+  margin: 0 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  border-radius: 16px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.reels-status {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #A78BFA;
+  text-align: center;
+  min-height: 16px;
+  font-weight: 600;
+}
+@media (max-width: 420px) {
+  .reels-box { padding: 13px; border-radius: 20px; }
+  .reels-stage { min-height: 300px; }
+  #reelUrlInput { font-size: 13px; padding: 11px 12px; }
+  #reelGoBtn { padding: 0 14px; font-size: 12px; }
+}
 </style>
 </head>
 <body>
@@ -1681,9 +1794,10 @@ button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible 
       <button class="icon-btn" id="audioOutputBtn" title="Audio Output" style="display:none;">
         <i data-lucide="volume-2"></i>
       </button>
-      <button class="icon-btn" id="globalMapBtn" title="Global Listeners">
+            <button class="icon-btn" id="globalMapBtn" title="Global Listeners">
         <i data-lucide="globe-2"></i>
       </button>
+      <button class="icon-btn" id="reelsBtn" title="Room Reels"><i data-lucide="film"></i></button>
       <button class="icon-btn" id="muteAllBtn" title="Mute All Voices"><i data-lucide="volume-2"></i></button>
       <button class="icon-btn" id="chatBtn" title="Chat">
         <i data-lucide="message-circle"></i>
@@ -1962,6 +2076,28 @@ button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible 
 
   <!-- ✅ Mention autocomplete — fixed-position overlay -->
   <div class="mention-suggest" id="mentionSuggest"></div>
+</div>
+
+<!-- ===================== REELS PANEL ===================== -->
+<div id="reelsPanel">
+  <div class="reels-box">
+    <div class="reels-head">
+      <h3><i data-lucide="film"></i> Room Reels</h3>
+      <button class="icon-btn" id="closeReels" aria-label="Close Reels"><i data-lucide="x"></i></button>
+    </div>
+    <div class="reels-input-row">
+      <input id="reelUrlInput" type="url" placeholder="Paste Instagram Reel link…" autocomplete="off" spellcheck="false" />
+      <button id="reelGoBtn" type="button">Load</button>
+    </div>
+    <div id="reelsStage" class="reels-stage">
+      <div class="reels-empty">
+        <i data-lucide="film" style="width:42px;height:42px;opacity:.4;"></i>
+        <div style="margin-top:10px;">No Reel loaded yet</div>
+        <div style="font-size:11px;opacity:.6;margin-top:4px;">Paste an Instagram Reel link above</div>
+      </div>
+    </div>
+    <div id="reelsStatus" class="reels-status"></div>
+  </div>
 </div>
 
 <div id="searchModal">
@@ -4841,6 +4977,98 @@ document.getElementById('cancelWaitBtn')?.addEventListener('click', () => {
   stopSessionRefresh();
   location.reload();
 });
+
+/* ===================== REELS PANEL LOGIC ===================== */
+(function initReelsPanel() {
+  const reelsPanel = document.getElementById('reelsPanel');
+  const reelsStage = document.getElementById('reelsStage');
+  const reelsStatus = document.getElementById('reelsStatus');
+  const reelUrlInput = document.getElementById('reelUrlInput');
+  const reelsBtn = document.getElementById('reelsBtn');
+  const closeReelsBtn = document.getElementById('closeReels');
+  const reelGoBtn = document.getElementById('reelGoBtn');
+
+  if (!reelsPanel || !reelsBtn) return;
+
+  const VALID_REEL = /^https:\/\/(www\.)?instagram\.com\/(reel|p)\//i;
+
+  function showReelsPanel() {
+    reelsPanel.classList.add('active');
+    refreshIcons();
+  }
+  function hideReelsPanel() {
+    reelsPanel.classList.remove('active');
+  }
+
+  reelsBtn.addEventListener('click', showReelsPanel);
+  closeReelsBtn?.addEventListener('click', hideReelsPanel);
+  reelsPanel.addEventListener('click', (e) => {
+    if (e.target === reelsPanel) hideReelsPanel();
+  });
+
+  async function loadReel(url, fromRemote = false) {
+    reelsStage.innerHTML = '<div class="reels-empty">Loading Reel…</div>';
+    reelsStatus.textContent = '';
+    try {
+      const r = await fetch('/api/instagram-oembed?url=' + encodeURIComponent(url));
+      const data = await r.json();
+      if (!r.ok || !data.html) throw new Error(data.error || 'Embed failed');
+      reelsStage.innerHTML = data.html;
+      if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
+      reelsStatus.textContent = fromRemote ? '🎬 Synced to room' : 'Loaded — syncing to room…';
+      if (!fromRemote && socket && socket.connected) {
+        socket.emit('reelSync', { roomId, reelUrl: url });
+      }
+      setTimeout(() => {
+        if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
+      }, 800);
+    } catch (e) {
+      reelsStage.innerHTML = '<div class="reels-empty">Reel preview unavailable on this network<br><span style="font-size:10px;opacity:.6;margin-top:6px;">Instagram embed blocked or invalid link</span></div>';
+      reelsStatus.textContent = 'Could not load this Reel';
+    }
+  }
+
+  function tryLoadFromInput() {
+    const url = (reelUrlInput.value || '').trim();
+    if (!url) return;
+    if (!VALID_REEL.test(url)) {
+      reelsStatus.textContent = 'Paste a valid Instagram Reel link';
+      reelUrlInput.focus();
+      return;
+    }
+    loadReel(url, false);
+  }
+
+  reelGoBtn?.addEventListener('click', tryLoadFromInput);
+  reelUrlInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); tryLoadFromInput(); }
+  });
+
+  function attachReelSync() {
+    if (typeof socket === 'undefined' || !socket) return;
+    socket.on('reelSync', ({ reelUrl, by }) => {
+      if (!reelUrl) return;
+      showToast(`🎬 ${by} loaded a Reel`);
+      showReelsPanel();
+      if (reelUrlInput) reelUrlInput.value = reelUrl;
+      loadReel(reelUrl, true);
+    });
+    socket.on('connect', () => {
+      if (roomId) socket.emit('requestReelState', { roomId });
+    });
+  }
+  attachReelSync();
+
+  // Re-attach after socket is recreated by join flow
+  const origInitSocket = window.initSocket;
+  if (typeof origInitSocket === 'function') {
+    window.initSocket = function() {
+      const result = origInitSocket.apply(this, arguments);
+      attachReelSync();
+      return result;
+    };
+  }
+})();
 </script>
 </body>
 </html>
