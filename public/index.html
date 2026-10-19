@@ -1227,6 +1227,57 @@ button, [role="button"], .song-item, .search-btn { -webkit-tap-highlight-color:t
 }
 /* ================= END SANGEETX VISUAL REFRESH ================= */
 
+
+
+/* SangeetX expressive chat upgrade: premium surfaces, animated tabs and oversized sticker messages */
+#chatPanel { background: radial-gradient(ellipse at 12% 0%, rgba(124,58,237,.18), transparent 38%), radial-gradient(ellipse at 100% 100%, rgba(236,72,153,.11), transparent 34%), #080611; }
+.chat-header { background: rgba(13,8,25,.88); backdrop-filter: blur(22px); border-bottom-color: rgba(167,139,250,.18); box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+.chat-header-avatar { background: linear-gradient(135deg,#7c3aed 0%,#a855f7 48%,#ec4899 100%); box-shadow: 0 0 0 5px rgba(139,92,246,.08), 0 8px 26px rgba(139,92,246,.32); }
+.chat-header-info h3 { font-size: 15px; font-weight: 800; letter-spacing: -.35px; }
+.chat-header-info .chat-sub { color: #b7a6d9; font-size: 11px; }
+.chat-presence { background: rgba(8,6,17,.72); border-bottom: 1px solid rgba(167,139,250,.08); }
+.chat-presence-user { background: linear-gradient(120deg,rgba(139,92,246,.18),rgba(236,72,153,.09)); border: 1px solid rgba(167,139,250,.16); padding: 5px 10px; }
+.chat-messages { background-image: radial-gradient(ellipse at 20% 0%,rgba(139,92,246,.13),transparent 45%), radial-gradient(ellipse at 100% 70%,rgba(236,72,153,.08),transparent 38%); }
+.chat-msg-row { max-width: min(84%, 560px); }
+.chat-msg { border-radius: 18px; padding: 11px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.chat-msg.mine { background: linear-gradient(135deg,rgba(109,40,217,.62),rgba(126,34,206,.48)); border: 1px solid rgba(196,181,253,.26); border-bottom-right-radius: 6px; box-shadow: 0 8px 26px rgba(109,40,217,.13), inset 0 1px rgba(255,255,255,.1); }
+.chat-msg.theirs, .chat-msg.bot { background: linear-gradient(135deg,rgba(35,27,52,.9),rgba(23,18,36,.92)); border: 1px solid rgba(196,181,253,.13); border-bottom-left-radius: 6px; box-shadow: 0 8px 26px rgba(0,0,0,.16), inset 0 1px rgba(255,255,255,.04); }
+.chat-msg-text { font-size: 14px; line-height: 1.5; }
+.chat-msg.sticker { min-width: 0; min-height: 0; padding: 5px 8px 7px; background: linear-gradient(145deg,rgba(139,92,246,.16),rgba(236,72,153,.1)); border: 1px solid rgba(196,181,253,.16); border-radius: 22px; box-shadow: 0 10px 32px rgba(139,92,246,.12); backdrop-filter: blur(12px); }
+.chat-msg.sticker .chat-msg-text { display: block; font-size: 58px; line-height: 1.18; filter: drop-shadow(0 5px 9px rgba(0,0,0,.2)); }
+.chat-msg.sticker .chat-msg-meta { display: flex; float: none; justify-content: flex-end; font-size: 9px; top: 0; margin: 0 3px; opacity: .75; }
+.chat-msg.sticker::before, .chat-msg.sticker::after { display: none; }
+.chat-input-row { gap: 9px; background: rgba(13,8,25,.9); border-top: 1px solid rgba(167,139,250,.16); backdrop-filter: blur(22px); padding-top: 12px; }
+.chat-input-editable { background: rgba(30,22,48,.72); border-color: rgba(167,139,250,.19); border-radius: 18px; padding: 12px 16px; box-shadow: inset 0 1px rgba(255,255,255,.035); }
+.chat-input-editable:focus { border-color: rgba(192,132,252,.65); box-shadow: 0 0 0 3px rgba(139,92,246,.13); }
+.chat-emoji-btn { background: rgba(139,92,246,.1); border: 1px solid rgba(167,139,250,.15); color: #d8c7ff; }
+.chat-send { background: linear-gradient(135deg,#7c3aed,#a855f7 55%,#ec4899); box-shadow: 0 5px 18px rgba(139,92,246,.32); }
+.emoji-picker { background: rgba(13,8,25,.97); border: 1px solid rgba(167,139,250,.22); border-bottom: 0; border-radius: 22px 22px 0 0; padding: 15px 14px 18px; max-height: min(390px, 58dvh); box-shadow: 0 -18px 48px rgba(0,0,0,.42); backdrop-filter: blur(26px) saturate(140%); }
+.emoji-picker-topline { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 12px; }
+.emoji-picker-header { margin:0; padding:0; font-size:12px; letter-spacing:.2px; text-transform:none; color:#f4edff; display:flex; align-items:center; gap:7px; }
+.picker-sparkle { display:inline-flex; align-items:center; justify-content:center; width:25px; height:25px; border-radius:9px; background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(236,72,153,.2)); color:#e9d5ff; font-size:15px; }
+.picker-note { font-size:10px; color:#9385ac; }
+.picker-tabs { display:flex; gap:5px; padding:4px; margin-bottom:13px; background:rgba(255,255,255,.035); border:1px solid rgba(167,139,250,.09); border-radius:13px; }
+.picker-tab { flex:1; border:1px solid transparent; border-radius:10px; padding:9px 5px; background:transparent; color:#a99bbf; font:600 11px/1.2 Inter, sans-serif; cursor:pointer; white-space:nowrap; transition:all .18s ease; }
+.picker-tab.active { color:#fff; background:linear-gradient(120deg,rgba(124,58,237,.35),rgba(168,85,247,.2)); border-color:rgba(196,181,253,.2); box-shadow:0 3px 12px rgba(0,0,0,.15); }
+.picker-pane[hidden] { display:none !important; }
+.picker-pane.active { animation: pickerPaneIn .18s ease-out; }
+@keyframes pickerPaneIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.emoji-grid { grid-template-columns:repeat(8,minmax(0,1fr)); gap:5px; }
+.emoji-grid button { border-radius:12px; font-size:24px; transition:transform .15s ease, background .15s ease; }
+.emoji-grid button:hover { background:rgba(139,92,246,.16); transform:translateY(-2px) scale(1.06); }
+.sticker-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.sticker-choice { min-width:0; min-height:91px; padding:9px 4px 8px; border:1px solid rgba(196,181,253,.13); border-radius:15px; background:linear-gradient(145deg,rgba(139,92,246,.13),rgba(236,72,153,.06)); color:#dcd1ef; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font:600 10px Inter,sans-serif; cursor:pointer; transition:transform .16s ease,border-color .16s ease,background .16s ease; }
+.sticker-choice:hover, .sticker-choice:focus-visible { transform:translateY(-2px); border-color:rgba(196,181,253,.4); background:linear-gradient(145deg,rgba(139,92,246,.24),rgba(236,72,153,.13)); outline:none; }
+.sticker-art { font-size:34px; line-height:1.1; filter:drop-shadow(0 5px 7px rgba(0,0,0,.18)); }
+.picker-footnote { margin-top:10px; text-align:center; font-size:10px; color:#887a9e; }
+.mood-sticker-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.mood-sticker { display:flex; align-items:center; gap:10px; padding:12px; border-radius:14px; border:1px solid rgba(196,181,253,.12); color:#eee6ff; background:linear-gradient(110deg,rgba(139,92,246,.13),rgba(255,255,255,.025)); cursor:pointer; text-align:left; font:600 11px Inter,sans-serif; }
+.mood-sticker span { font-size:27px; }
+.mood-sticker b { font-size:11px; font-weight:650; }
+.mood-sticker:hover { border-color:rgba(196,181,253,.4); }
+@media (max-width:420px) { .picker-tab { font-size:10px; padding:9px 3px; } .sticker-grid { gap:7px; } .sticker-choice { min-height:82px; } .sticker-art { font-size:30px; } .chat-msg.sticker .chat-msg-text { font-size:52px; } }
+@media (prefers-reduced-motion: reduce) { .picker-pane.active { animation:none; } .sticker-choice, .picker-tab, .emoji-grid button { transition:none; } }
 </style>
 </head>
 <body>
@@ -1505,21 +1556,58 @@ button, [role="button"], .song-item, .search-btn { -webkit-tap-highlight-color:t
     <button class="chat-send" id="chatSend" type="button" aria-label="Send">
       <i data-lucide="send"></i>
     </button>
-    <div class="emoji-picker" id="emojiPicker">
-      <div class="emoji-picker-header">Quick Reactions</div>
-      <div class="emoji-grid">
-        <button data-emoji="😀">😀</button><button data-emoji="😂">😂</button>
-        <button data-emoji="🥰">🥰</button><button data-emoji="😍">😍</button>
-        <button data-emoji="🤩">🤩</button><button data-emoji="😎">😎</button>
-        <button data-emoji="🤔">🤔</button><button data-emoji="😴">😴</button>
-        <button data-emoji="😢">😢</button><button data-emoji="😭">😭</button>
-        <button data-emoji="😡">😡</button><button data-emoji="🥺">🥺</button>
-        <button data-emoji="👍">👍</button><button data-emoji="👎">👎</button>
-        <button data-emoji="🙏">🙏</button><button data-emoji="👏">👏</button>
-        <button data-emoji="💪">💪</button><button data-emoji="🔥">🔥</button>
-        <button data-emoji="❤️">❤️</button><button data-emoji="💔">💔</button>
-        <button data-emoji="🎵">🎵</button><button data-emoji="🎉">🎉</button>
-        <button data-emoji="✨">✨</button><button data-emoji="💯">💯</button>
+    <div class="emoji-picker" id="emojiPicker" aria-label="Emoji and sticker picker">
+      <div class="emoji-picker-topline"><div class="emoji-picker-header"><span class="picker-sparkle">✦</span> Make it expressive</div><span class="picker-note">Tap to add</span></div>
+      <div class="picker-tabs" role="tablist" aria-label="Message reactions">
+        <button class="picker-tab active" type="button" data-picker-tab="emoji" role="tab" aria-selected="true">😊 Emoji</button>
+        <button class="picker-tab" type="button" data-picker-tab="stickers" role="tab" aria-selected="false">✨ Stickers</button>
+        <button class="picker-tab" type="button" data-picker-tab="music" role="tab" aria-selected="false">🎧 Music mood</button>
+      </div>
+      <div class="picker-pane active" data-picker-pane="emoji" role="tabpanel">
+        <div class="emoji-grid">
+          <button data-emoji="😀" aria-label="Grinning">😀</button><button data-emoji="😂" aria-label="Laughing">😂</button>
+          <button data-emoji="🥰" aria-label="Love">🥰</button><button data-emoji="😍" aria-label="Heart eyes">😍</button>
+          <button data-emoji="🤩" aria-label="Star struck">🤩</button><button data-emoji="😎" aria-label="Cool">😎</button>
+          <button data-emoji="🤔" aria-label="Thinking">🤔</button><button data-emoji="😴" aria-label="Sleepy">😴</button>
+          <button data-emoji="😢" aria-label="Sad">😢</button><button data-emoji="😭" aria-label="Crying">😭</button>
+          <button data-emoji="😡" aria-label="Angry">😡</button><button data-emoji="🥺" aria-label="Pleading">🥺</button>
+          <button data-emoji="👍" aria-label="Like">👍</button><button data-emoji="👎" aria-label="Dislike">👎</button>
+          <button data-emoji="🙏" aria-label="Thanks">🙏</button><button data-emoji="👏" aria-label="Clap">👏</button>
+          <button data-emoji="💪" aria-label="Strong">💪</button><button data-emoji="🔥" aria-label="Fire">🔥</button>
+          <button data-emoji="❤️" aria-label="Heart">❤️</button><button data-emoji="💔" aria-label="Broken heart">💔</button>
+          <button data-emoji="🎵" aria-label="Music">🎵</button><button data-emoji="🎉" aria-label="Party">🎉</button>
+          <button data-emoji="✨" aria-label="Sparkles">✨</button><button data-emoji="💯" aria-label="Hundred">💯</button>
+          <button data-emoji="🫶" aria-label="Heart hands">🫶</button><button data-emoji="🤝" aria-label="Handshake">🤝</button>
+          <button data-emoji="🥳" aria-label="Celebrating">🥳</button><button data-emoji="🙌" aria-label="Hands up">🙌</button>
+          <button data-emoji="💖" aria-label="Sparkling heart">💖</button><button data-emoji="🪩" aria-label="Disco">🪩</button>
+        </div>
+      </div>
+      <div class="picker-pane" data-picker-pane="stickers" role="tabpanel" hidden>
+        <div class="sticker-grid">
+          <button class="sticker-choice" data-emoji="🫶" aria-label="Sending love"><span class="sticker-art">🫶</span><span>Sending love</span></button>
+          <button class="sticker-choice" data-emoji="🔥" aria-label="It's fire"><span class="sticker-art">🔥</span><span>It's fire</span></button>
+          <button class="sticker-choice" data-emoji="🥹" aria-label="So cute"><span class="sticker-art">🥹</span><span>So cute</span></button>
+          <button class="sticker-choice" data-emoji="👑" aria-label="Iconic"><span class="sticker-art">👑</span><span>Iconic</span></button>
+          <button class="sticker-choice" data-emoji="💖" aria-label="Big love"><span class="sticker-art">💖</span><span>Big love</span></button>
+          <button class="sticker-choice" data-emoji="😎" aria-label="Too cool"><span class="sticker-art">😎</span><span>Too cool</span></button>
+          <button class="sticker-choice" data-emoji="🚀" aria-label="Let's go"><span class="sticker-art">🚀</span><span>Let's go</span></button>
+          <button class="sticker-choice" data-emoji="🎉" aria-label="Celebrate"><span class="sticker-art">🎉</span><span>Celebrate</span></button>
+          <button class="sticker-choice" data-emoji="😂" aria-label="I'm dead"><span class="sticker-art">😂</span><span>I'm dead</span></button>
+          <button class="sticker-choice" data-emoji="🥰" aria-label="Adore"><span class="sticker-art">🥰</span><span>Adore</span></button>
+          <button class="sticker-choice" data-emoji="💃" aria-label="Dance mode"><span class="sticker-art">💃</span><span>Dance mode</span></button>
+          <button class="sticker-choice" data-emoji="🎧" aria-label="Tune in"><span class="sticker-art">🎧</span><span>Tune in</span></button>
+        </div>
+        <p class="picker-footnote">Stickers send as expressive oversized reactions in chat.</p>
+      </div>
+      <div class="picker-pane" data-picker-pane="music" role="tabpanel" hidden>
+        <div class="mood-sticker-grid">
+          <button class="mood-sticker" data-emoji="🎧"><span>🎧</span><b>In the zone</b></button>
+          <button class="mood-sticker" data-emoji="🪩"><span>🪩</span><b>Party mode</b></button>
+          <button class="mood-sticker" data-emoji="🎤"><span>🎤</span><b>Main character</b></button>
+          <button class="mood-sticker" data-emoji="🌙"><span>🌙</span><b>Late night</b></button>
+          <button class="mood-sticker" data-emoji="💿"><span>💿</span><b>On repeat</b></button>
+          <button class="mood-sticker" data-emoji="🎶"><span>🎶</span><b>Good vibes</b></button>
+        </div>
       </div>
     </div>
   </div>
@@ -3000,6 +3088,27 @@ if (emojiBtn && emojiPickerEl) {
   });
 }
 
+// Advanced emoji / sticker picker tabs. All choices still use the existing safe chat send path.
+(function initExpressivePicker(){
+  const picker = document.getElementById('emojiPicker');
+  if (!picker) return;
+  const tabs = [...picker.querySelectorAll('[data-picker-tab]')];
+  const panes = [...picker.querySelectorAll('[data-picker-pane]')];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    const key = tab.dataset.pickerTab;
+    tabs.forEach(item => {
+      const active = item === tab;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+    });
+    panes.forEach(pane => {
+      const active = pane.dataset.pickerPane === key;
+      pane.classList.toggle('active', active);
+      pane.hidden = !active;
+    });
+  }));
+})();
+
 function sendChat(){
   if(myPermissions.chat){showToast('You are blocked from chatting','error');return;}
   hideMentionSuggest();
@@ -3061,10 +3170,12 @@ function renderChat(messages,replace){
     row.className = 'chat-msg-row ' + (mine ? 'mine' : 'theirs');
     const time = new Date(m.time).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',hour12:true}).toUpperCase();
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
+    const stickerValues = new Set(['🫶','🔥','🥹','👑','💖','😎','🚀','🎉','😂','🥰','💃','🎧','🪩','🎤','🌙','💿','🎶']);
+    const isSticker = stickerValues.has(String(m.text || '').trim());
     
     row.innerHTML = `
       <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
-      <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}" data-msg-id="${esc(String(m.id))}">
+      <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}${isSticker?' sticker':''}" data-msg-id="${esc(String(m.id))}">
         <span class="chat-msg-text">${renderMessageHTML(m.text)}</span>
         <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
       </div>
