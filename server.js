@@ -889,6 +889,27 @@ async function fetchSongList(query, limit = 15) {
     return pickFn(r.data).filter(s => s && s.audioUrl && s.id);
   };
 
+  // ===================== INSTAGRAM REELS OEMBED =====================
+// Tokenless oEmbed (June 2026+). Returns embed HTML for public Reels/Posts.
+app.get('/api/instagram-oembed', async (req, res) => {
+  const reelUrl = String(req.query.url || '').trim();
+  if (!reelUrl || !/^https:\/\/(www\.)?instagram\.com\/(reel|p)\//i.test(reelUrl)) {
+    return res.status(400).json({ error: 'Valid Instagram Reel/Post URL required' });
+  }
+  try {
+    const r = await axios.get('https://graph.facebook.com/v25.0/instagram_oembed', {
+      params: { url: reelUrl, omitscript: 'false' },
+      timeout: 6000
+    });
+    if (!r.data || !r.data.html) return res.status(502).json({ error: 'No embed returned' });
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ html: r.data.html, url: reelUrl });
+  } catch (err) {
+    console.error('Instagram oEmbed error:', err.message);
+    res.status(502).json({ error: 'Instagram embed unavailable' });
+  }
+});
+  
   // Merge successful providers instead of taking whichever API responds first.
   // The fastest API often returned a duplicate/poor result, changing only the poster.
   const results = await Promise.allSettled([
@@ -1825,6 +1846,28 @@ io.on('connection', (socket) => {
 
     // 🤖 Bot reply (bot ko bulao to hamesha, warna kabhi kabhi)
     maybeBotReply(room, user, clean);
+  });
+
+  // ===================== REELS SYNC =====================
+  socket.on('reelSync', ({ roomId, reelUrl } = {}) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    if (typeof reelUrl !== 'string' || !/^https:\/\/(www\.)?instagram\.com\/(reel|p)\//i.test(reelUrl)) return;
+    user.lastActive = Date.now();
+    room.currentReel = reelUrl;
+    room.reelSetBy = user.name;
+    socket.to(room.roomId).emit('reelSync', { reelUrl, by: user.name });
+    console.log(`🎬 Reel synced by ${user.name}: ${reelUrl}`);
+  });
+
+  socket.on('requestReelState', ({ roomId } = {}) => {
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room || !room.users.some(u => u.id === socket.id)) return;
+    if (room.currentReel) {
+      socket.emit('reelSync', { reelUrl: room.currentReel, by: room.reelSetBy || 'Someone' });
+    }
   });
 
   socket.on('chatAttachment', ({ roomId, name, mime, data } = {}) => {
