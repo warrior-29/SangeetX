@@ -2179,8 +2179,11 @@ function initSocket(){
   });
 
   socket.on('stateSync',(state)=>{
-    if (state.position !== undefined) lastKnownPosition = state.position;
-    applyRemoteState(state);
+    if (state.position !== undefined) {
+      const elapsed = state.isPlaying && state.lastUpdated ? Math.max(0, (Date.now() - state.lastUpdated) / 1000) : 0;
+      lastKnownPosition = Math.max(0, Number(state.position) + elapsed);
+    }
+    applyRemoteState({ ...state, position: lastKnownPosition });
   });
 
   socket.on('songChanged', ({ track, reason, playedBy }) => {
@@ -3072,21 +3075,112 @@ audio.addEventListener('pause', () => {
   updatePlayIcon();
 });
 
-audio.addEventListener('waiting', () => document.getElementById('albumArt')?.classList.add('buffering'));
-['playing', 'canplay'].forEach(ev =>
-  audio.addEventListener(ev, () => document.getElementById('albumArt')?.classList.remove('buffering')));
+let lastGoodAudioPosition = 0;
+let positionRecoveryTrackId = null;
+let networkResumePending = false;
+let mediaErrorRetries = 0;
+let mediaRecoveryTimer = null;
+
+audio.addEventListener('timeupdate', () => {
+  if (currentTrack && Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
+    lastGoodAudioPosition = audio.currentTime;
+    positionRecoveryTrackId = currentTrack.id;
+  }
+});
+
+audio.addEventListener('waiting', () => {
+  document.getElementById('albumArt')?.classList.add('buffering');
+  // Waiting/stalled is not a reason to switch tracks. Keep the current position.
+  if (!audio.paused && currentTrack) {
+    networkResumePending = true;
+    lastGoodAudioPosition = Math.max(lastGoodAudioPosition, audio.currentTime || 0);
+    positionRecoveryTrackId = currentTrack.id;
+  }
+});
+
+audio.addEventListener('stalled', () => {
+  document.getElementById('albumArt')?.classList.add('buffering');
+  if (!audio.paused && currentTrack) {
+    networkResumePending = true;
+    lastGoodAudioPosition = Math.max(lastGoodAudioPosition, audio.currentTime || 0);
+    positionRecoveryTrackId = currentTrack.id;
+  }
+});
+
+['playing', 'canplay'].forEach(ev => audio.addEventListener(ev, () => {
+  document.getElementById('albumArt')?.classList.remove('buffering');
+  if (ev === 'playing') { networkResumePending = false; mediaErrorRetries = 0; }
+}));
+
+async function recoverCurrentAudio() {
+  if (!currentTrack || !audio.src || !navigator.onLine || (audio.paused && !networkResumePending)) return;
+  const trackId = currentTrack.id;
+  const resumeAt = Math.max(lastGoodAudioPosition, audio.currentTime || 0);
+  if (positionRecoveryTrackId && positionRecoveryTrackId !== trackId) return;
+  try {
+    if (audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA || audio.error) {
+      audio.src = currentTrack.audioUrl;
+      audio.load();
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { cleanup(); reject(new Error('media recovery timeout')); }, 10000);
+        const ok = () => { cleanup(); resolve(); };
+        const bad = () => { cleanup(); reject(new Error('media recovery failed')); };
+        const cleanup = () => {
+          clearTimeout(timer);
+          audio.removeEventListener('canplay', ok);
+          audio.removeEventListener('error', bad);
+        };
+        audio.addEventListener('canplay', ok, { once: true });
+        audio.addEventListener('error', bad, { once: true });
+      });
+    }
+    if (resumeAt > 0 && Number.isFinite(resumeAt)) {
+      try { audio.currentTime = resumeAt; } catch (_) {}
+    }
+    await audio.play();
+    networkResumePending = false;
+  } catch (_) {
+    // Keep the same track selected; a later online/playing event may recover it.
+  }
+}
+
+window.addEventListener('online', () => {
+  if (networkResumePending && currentTrack) {
+    clearTimeout(mediaRecoveryTimer);
+    mediaRecoveryTimer = setTimeout(() => recoverCurrentAudio(), 700);
+  }
+});
+
 audio.addEventListener('error', () => {
-  if (!currentTrack || !socket || !socket.connected || isLoadingNext) return;
-  showToast('This song could not be played. Loading next…', 'warning');
+  if (!currentTrack || isLoadingNext) return;
+  const code = audio.error?.code;
+  // MEDIA_ERR_NETWORK (2) is commonly transient. Retry the same source/position
+  // first; only move on for an unsupported/broken source or repeated failure.
+  if (code === 2 && mediaErrorRetries < 2) {
+    mediaErrorRetries++;
+    networkResumePending = true;
+    clearTimeout(mediaRecoveryTimer);
+    mediaRecoveryTimer = setTimeout(() => {
+      if (navigator.onLine && currentTrack && !audio.paused) recoverCurrentAudio();
+    }, 1200 * mediaErrorRetries);
+    return;
+  }
+  if (!socket || !socket.connected) return;
+  showToast('This song could not be played. Trying the next song…', 'warning');
   isLoadingNext = true;
   socket.emit('requestNext', { roomId });
-  setTimeout(() => { isLoadingNext = false; }, 5000);
+  setTimeout(() => { isLoadingNext = false; }, 12000);
 });
 
 /* ============ LOAD TRACK ============ */
 async function loadTrack(track, position = 0, autoPlay = false) {
   if (!track || !track.audioUrl) return;
   currentTrack = track;
+  lastGoodAudioPosition = Math.max(0, Number(position) || 0);
+  positionRecoveryTrackId = track.id;
+  networkResumePending = false;
+  mediaErrorRetries = 0;
+  clearTimeout(mediaRecoveryTimer);
   document.getElementById('songTitle').textContent = track.title;
   document.getElementById('songArtist').textContent = track.artist;
   const art = document.getElementById('albumArt');
@@ -3558,11 +3652,18 @@ function releaseMic(){
 function createPeerConnection(remoteId, remoteName) {
   if (peerConnections.has(remoteId)) return peerConnections.get(remoteId);
 
+  const defaultIceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+  // For reliable calls across restrictive networks, define
+  // window.SANGEETX_TURN_SERVERS before this app script, using your own TURN
+  // provider credentials. Never commit long-lived TURN secrets to public source.
+  const configuredTurnServers = Array.isArray(window.SANGEETX_TURN_SERVERS)
+    ? window.SANGEETX_TURN_SERVERS.filter(s => s && s.urls)
+    : [];
   const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ],
+    iceServers: [...defaultIceServers, ...configuredTurnServers],
     iceCandidatePoolSize: 10,
   });
 
@@ -3598,7 +3699,11 @@ function createPeerConnection(remoteId, remoteName) {
   };
 
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed') pc.restartIce();
+    if (pc.connectionState === 'failed' && localStream && pc.signalingState === 'stable') {
+      try { pc.restartIce(); } catch (_) {}
+      // restartIce() needs a new offer/answer exchange to be useful.
+      setTimeout(() => callNewPeer(remoteId, remoteName), 250);
+    }
   };
 
   peerConnections.set(remoteId, pc);
