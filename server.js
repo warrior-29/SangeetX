@@ -1,21 +1,111 @@
 const express = require('express');
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const axios = require('axios');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+const configuredOrigins = String(process.env.ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const io = new Server(server, {
-  cors: { origin: '*' },
+  cors: { origin: configuredOrigins.length ? configuredOrigins : '*', methods: ['GET', 'POST'] },
   pingTimeout: 30000,
   pingInterval: 25000,
   maxHttpBufferSize: 1e6
 });
 
+// Basic browser security headers; CSP is intentionally not forced because the UI
+// currently loads several third-party assets and needs a deployment-specific policy.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(self), payment=()');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
+
+// Lightweight per-socket event throttling. This protects expensive actions from
+// accidental rapid repeats without introducing a new runtime dependency.
+const socketEventWindows = new Map();
+function allowSocketEvent(socket, eventName, maxEvents, windowMs) {
+  const now = Date.now();
+  let entry = socketEventWindows.get(socket.id);
+  if (!entry) { entry = new Map(); socketEventWindows.set(socket.id, entry); }
+  let bucket = entry.get(eventName);
+  if (!bucket || now - bucket.startedAt >= windowMs) {
+    bucket = { startedAt: now, count: 0 };
+    entry.set(eventName, bucket);
+  }
+  bucket.count++;
+  return bucket.count <= maxEvents;
+}
+
+// Room playback snapshot uses Node's built-in filesystem, so no extra package is
+// required. Keep this file outside /public; override its location in deployment.
+const STATE_FILE = process.env.SANGEETX_STATE_FILE || path.join(__dirname, 'data', 'sangeetx-state.json');
+let persistTimer = null;
+function persistRoomState() {
+  try {
+    const room = rooms[GLOBAL_ROOM_ID];
+    if (!room) return;
+    const snapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      state: { ...room.state, position: getCurrentPosition(room), lastUpdated: Date.now() },
+      playedHistory: (room.playedHistory || []).slice(-30)
+    };
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    const tempFile = STATE_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(snapshot), { mode: 0o600 });
+    fs.renameSync(tempFile, STATE_FILE);
+  } catch (err) {
+    console.error('⚠️ Could not persist room state:', err.message);
+  }
+}
+function schedulePersistRoomState() {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => { persistTimer = null; persistRoomState(); }, 350);
+  if (persistTimer.unref) persistTimer.unref();
+}
+function restorePersistedRoomState() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) return;
+    const saved = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    if (!saved || saved.version !== 1 || !saved.state || typeof saved.state !== 'object') return;
+    const room = rooms[GLOBAL_ROOM_ID];
+    const state = saved.state;
+    if (state.track && typeof state.track.audioUrl === 'string') {
+      const audioUrl = new URL(state.track.audioUrl);
+      if (audioUrl.protocol !== 'https:') return;
+      const duration = Math.min(7200, Math.max(0, Number(state.track.duration) || 0));
+      let position = Math.max(0, Number(state.position) || 0);
+      if (state.isPlaying && Number.isFinite(saved.savedAt)) position += Math.max(0, Date.now() - saved.savedAt) / 1000;
+      if (duration > 0) position = Math.min(position, duration);
+      room.state = {
+        track: {
+          id: String(state.track.id || '').slice(0, 200),
+          title: String(state.track.title || 'Unknown').slice(0, 200),
+          artist: String(state.track.artist || 'Unknown').slice(0, 200),
+          duration, audioUrl: audioUrl.href,
+          ...(typeof state.track.image === 'string' && state.track.image.startsWith('https://') ? { image: state.track.image.slice(0, 2048) } : {})
+        },
+        position, isPlaying: state.isPlaying === true && (duration === 0 || position < duration),
+        playedBy: null, playedByName: String(state.playedByName || 'SangeetX').slice(0, 80),
+        autoDj: state.autoDj === true, isAmbient: state.isAmbient === true, lastUpdated: Date.now()
+      };
+      room._lastKnownDuration = duration;
+      room._lastChangeAt = Date.now();
+    }
+    room.playedHistory = Array.isArray(saved.playedHistory) ? saved.playedHistory.filter(t => t && typeof t.id === 'string' && typeof t.audioUrl === 'string' && t.audioUrl.startsWith('https://')).slice(-30) : [];
+    console.log('💾 Restored persisted SangeetX room state');
+  } catch (err) {
+    console.warn('⚠️ Saved room state could not be restored:', err.message);
+  }
+}
 
 // 🔐 Server pe environment variable ADMIN_PASSWORD set karo.
 // Set nahi hai to har start pe random password banega aur console me dikhega.
@@ -186,7 +276,9 @@ function ensureGlobalRoom() {
   }
 }
 ensureGlobalRoom();
+restorePersistedRoomState();
 setInterval(ensureGlobalRoom, 60000);
+setInterval(persistRoomState, 5000).unref?.();
 
 function getCurrentPosition(room) {
   if (!room || !room.state.track) return 0;
@@ -416,6 +508,11 @@ function startFunnyBot() {
 }
 
 // ===================== HTTP ROUTES =====================
+
+app.get('/api/health', (req, res) => {
+  const room = rooms[GLOBAL_ROOM_ID];
+  res.status(200).json({ status: 'ok', uptimeSeconds: Math.floor(process.uptime()), roomReady: !!room, hasCurrentTrack: !!(room && room.state.track), timestamp: Date.now() });
+});
 
 app.get('/api/global/stats', (req, res) => {
   ensureGlobalRoom();
@@ -731,7 +828,8 @@ const mapDev = s => ({
 });
 
 const mapNine = s => ({
-  id: s.id || String(s.media_url || s.download_url || Math.random()),
+  // Stable fallback identity: Math.random() made the same track look new on every search.
+  id: s.id || `url:${String(s.media_url || s.download_url || '').split('?')[0]}`, 
   title: s.song || s.title,
   artist: s.primary_artists || s.singers || 'Unknown',
   duration: parseInt(s.duration) || 0,
@@ -744,22 +842,28 @@ async function fetchSongList(query, limit = 15) {
   const q = encodeURIComponent(query);
   const get = async (url, pickFn) => {
     const r = await axios.get(url, { timeout: API_TIMEOUT });
-    const out = pickFn(r.data).filter(s => s.audioUrl && s.id);
-    if (!out.length) throw new Error('empty');
-    return out;
+    return pickFn(r.data).filter(s => s && s.audioUrl && s.id);
   };
-  try {
-    return await Promise.any([
-      get(`https://saavn.dev/api/search/songs?query=${q}&limit=${limit}`,
-          d => (d?.data?.results || []).map(mapDev)),
-      get(`https://saavnapi-nine.vercel.app/result?query=${q}`,
-          d => (Array.isArray(d) ? d : []).map(mapNine)),
-      get(`https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
-          d => (d?.data?.results || d?.results || []).map(mapDev))
-    ]);
-  } catch (e) {
-    return [];
+
+  // Merge successful providers instead of taking whichever API responds first.
+  // The fastest API often returned a duplicate/poor result, changing only the poster.
+  const results = await Promise.allSettled([
+    get(`https://saavn.dev/api/search/songs?query=${q}&limit=${limit}`,
+        d => (d?.data?.results || []).map(mapDev)),
+    get(`https://saavnapi-nine.vercel.app/result?query=${q}`,
+        d => (Array.isArray(d) ? d : []).map(mapNine)),
+    get(`https://jiosaavn-api-2-harsh-patel.vercel.app/search/songs?query=${q}`,
+        d => (d?.data?.results || d?.results || []).map(mapDev))
+  ]);
+
+  const merged = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  const unique = [];
+  for (const song of merged) {
+    if (!song.audioUrl || !song.id) continue;
+    if (unique.some(existing => isSameTrack(existing, song))) continue;
+    unique.push(song);
   }
+  return unique.slice(0, limit);
 }
 
 function cacheSet(map, key, data, max) {
@@ -772,9 +876,14 @@ async function searchSong(query) {
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) return cached.data;
 
-  const list = await fetchSongList(query, 5);
+  const list = await fetchSongList(query, 15);
   if (list.length > 0) {
-    const song = list[0];
+    const q = normalizeTrackText(query);
+    const exact = list.find(song => {
+      const title = normalizeTrackText(song.title);
+      return title && (title === q || q.startsWith(title + ' ') || title.startsWith(q + ' '));
+    });
+    const song = exact || list[0];
     cacheSet(searchCache, cacheKey, song, 200);
     return song;
   }
@@ -808,6 +917,47 @@ function pushHistory(room, track) {
 
 const historyIds = room => (room.playedHistory || []).map(t => t.id);
 
+// Some music APIs return different metadata/posters for the same underlying
+// audio file. Compare IDs, normalized title/artist and URL path (without signed
+// query parameters), not just the poster or provider ID.
+function normalizeTrackText(value) {
+  return String(value || '').toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(official|audio|video|lyrics?|remaster(ed)?|hd)\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function canonicalAudioUrl(value) {
+  try {
+    const u = new URL(String(value || ''));
+    return `${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, '')}`;
+  } catch (_) { return String(value || '').split('?')[0].trim().toLowerCase(); }
+}
+
+function isSameTrack(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && String(a.id) === String(b.id)) return true;
+  const aAudio = canonicalAudioUrl(a.audioUrl);
+  const bAudio = canonicalAudioUrl(b.audioUrl);
+  if (aAudio && bAudio && aAudio === bAudio) return true;
+  const aTitle = normalizeTrackText(a.title);
+  const bTitle = normalizeTrackText(b.title);
+  const aArtist = normalizeTrackText(a.artist);
+  const bArtist = normalizeTrackText(b.artist);
+  if (!aTitle || !bTitle || aTitle !== bTitle || !aArtist || !bArtist) return false;
+  if (aArtist === bArtist) return true;
+  // Provider results sometimes append/remove featured artists or reorder credits.
+  const aParts = new Set(aArtist.split(' ').filter(Boolean));
+  const bParts = new Set(bArtist.split(' ').filter(Boolean));
+  const overlap = [...aParts].filter(part => bParts.has(part)).length;
+  const smaller = Math.min(aParts.size, bParts.size);
+  return smaller > 0 && overlap / smaller >= 0.6;
+}
+
+function hasRecentlyPlayedIdentity(candidate, currentTrack, playedHistory = []) {
+  return isSameTrack(candidate, currentTrack) || playedHistory.some(t => isSameTrack(candidate, t));
+}
+
 async function getNextSongFromContext(currentTrack, playedHistory = []) {
   if (!currentTrack) return null;
 
@@ -825,7 +975,8 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
 
   // Level 1: same artist, history exclude
   for (const artist of artistList) {
-    const songs = await searchSimilarSongs(artist, fullExclude);
+    const songs = (await searchSimilarSongs(artist, fullExclude))
+      .filter(song => !hasRecentlyPlayedIdentity(song, currentTrack, playedHistory));
     if (songs.length > 0) {
       const p = pick(songs.slice(0, 5));
       console.log(`🎵 Next (L1 - exact artist "${artist}"): ${p.title}`);
@@ -841,7 +992,8 @@ async function getNextSongFromContext(currentTrack, playedHistory = []) {
     const similar = SIMILAR_ARTISTS[primaryArtist] || [];
     const shuffled = [...similar].sort(() => Math.random() - 0.5);
     for (const simArtist of shuffled.slice(0, 3)) {
-      const songs = await searchSimilarSongs(simArtist, fullExclude);
+      const songs = (await searchSimilarSongs(simArtist, fullExclude))
+        .filter(song => !hasRecentlyPlayedIdentity(song, currentTrack, playedHistory));
       if (songs.length > 0) {
         const p = pick(songs.slice(0, 3));
         console.log(`🎵 Next (L3 - similar "${simArtist}"): ${p.title}`);
@@ -861,7 +1013,8 @@ async function getSkipSong(currentTrack, playedHistory = []) {
   const fullExclude = [currentId, ...playedHistory].filter(Boolean);
 
   if (artist && artist !== 'Unknown') {
-    const artistSongs = await searchSimilarSongs(artist, fullExclude);
+    const artistSongs = (await searchSimilarSongs(artist, fullExclude))
+      .filter(song => !hasRecentlyPlayedIdentity(song, currentTrack, playedHistory));
     if (artistSongs.length > 0) {
       const p = pick(artistSongs.slice(0, 5));
       console.log(`🎲 Skip: ${artist} → ${p.title}`);
@@ -873,7 +1026,8 @@ async function getSkipSong(currentTrack, playedHistory = []) {
   if (similarArtists && similarArtists.length > 0) {
     const shuffled = [...similarArtists].sort(() => Math.random() - 0.5);
     for (const simArtist of shuffled) {
-      const songs = await searchSimilarSongs(simArtist, fullExclude);
+      const songs = (await searchSimilarSongs(simArtist, fullExclude))
+        .filter(song => !hasRecentlyPlayedIdentity(song, currentTrack, playedHistory));
       if (songs.length > 0) {
         const p = pick(songs.slice(0, 3));
         console.log(`🎲 Skip: similar ${simArtist} → ${p.title}`);
@@ -942,6 +1096,7 @@ function setRoomTrack(room, track, opts = {}) {
 
   io.to(room.roomId).emit('stateSync', room.state);
   io.to(room.roomId).emit('songChanged', { track, reason, playedBy: playedByName });
+  schedulePersistRoomState();
 
   prefetchNext(room);
 }
@@ -975,7 +1130,7 @@ async function playNextSong(reason = 'auto', user = null) {
 
     // A cached/prefetched recommendation can become stale while the room changes.
     const excludedIds = new Set([cur?.id, ...history].filter(Boolean));
-    if (nextSong && excludedIds.has(nextSong.id)) {
+    if (nextSong && (excludedIds.has(nextSong.id) || hasRecentlyPlayedIdentity(nextSong, cur, room.playedHistory || []))) {
       console.warn(`⚠️ Rejected duplicate/recent track: ${nextSong.title}`);
       nextSong = null;
     }
@@ -987,7 +1142,7 @@ async function playNextSong(reason = 'auto', user = null) {
         const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
         autoDjIndex++;
         const candidate = await searchSong(songName);
-        if (candidate && !excludedIds.has(candidate.id)) {
+        if (candidate && !excludedIds.has(candidate.id) && !hasRecentlyPlayedIdentity(candidate, cur, room.playedHistory || [])) {
           nextSong = candidate;
           break;
         }
@@ -1001,7 +1156,7 @@ async function playNextSong(reason = 'auto', user = null) {
         const songName = AUTO_DJ_PLAYLIST[autoDjIndex % AUTO_DJ_PLAYLIST.length];
         autoDjIndex++;
         const candidate = await searchSong(songName);
-        if (candidate && candidate.id !== cur.id) { nextSong = candidate; break; }
+        if (candidate && candidate.id !== cur.id && !hasRecentlyPlayedIdentity(candidate, cur, [])) { nextSong = candidate; break; }
       }
     }
 
@@ -1221,28 +1376,55 @@ io.on('connection', (socket) => {
     }
 
     const serverPos = getCurrentPosition(room);
-    const isTrackChange = newState.track &&
-      (!room.state.track || room.state.track.id !== newState.track.id);
+    const incomingTrack = newState.track;
+    const isTrackChange = incomingTrack &&
+      (!room.state.track || String(room.state.track.id) !== String(incomingTrack.id));
 
     if (isTrackChange) {
-      newState.autoDj = false;
-      newState.isAmbient = false;
-      newState.playedBy = socket.id;
-      newState.playedByName = user.name;
-      console.log(`🎵 ${user.name} playing: ${newState.track.title}`);
-
-      if (room.state.track && room.state.track.id !== newState.track.id) {
+      // Never trust a client-supplied arbitrary track object or URL as-is.
+      let audioUrl;
+      try {
+        audioUrl = new URL(String(incomingTrack.audioUrl || ''));
+        if (audioUrl.protocol !== 'https:') return;
+      } catch (_) { return; }
+      const imageUrl = (() => {
+        try {
+          const u = new URL(String(incomingTrack.image || ''));
+          return u.protocol === 'https:' ? u.href : undefined;
+        } catch (_) { return undefined; }
+      })();
+      const safeTrack = {
+        id: String(incomingTrack.id || '').slice(0, 200),
+        title: String(incomingTrack.title || 'Unknown').slice(0, 200),
+        artist: String(incomingTrack.artist || 'Unknown').slice(0, 200),
+        duration: Math.min(7200, Math.max(0, Number(incomingTrack.duration) || 0)),
+        audioUrl: audioUrl.href,
+        ...(imageUrl ? { image: imageUrl } : {})
+      };
+      if (!safeTrack.id || !safeTrack.title) return;
+      if (room.state.track && String(room.state.track.id) !== safeTrack.id) {
         pushHistory(room, room.state.track);
       }
 
       analytics.songsPlayed++;
-      room._lastKnownDuration = newState.track.duration || 0;
+      room._lastKnownDuration = safeTrack.duration;
       room._lastChangeAt = Date.now();
       room._prefetch = null;
+      room._endHandledFor = null;
 
-      room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
+      room.state = {
+        track: safeTrack,
+        position: 0,
+        isPlaying: newState.isPlaying !== false,
+        playedBy: socket.id,
+        playedByName: user.name,
+        autoDj: false,
+        isAmbient: false,
+        lastUpdated: Date.now()
+      };
       socket.to(room.roomId).emit('stateSync', room.state);
       io.to(room.roomId).emit('usersUpdate', getUsersWithStatus(room));
+      schedulePersistRoomState();
       prefetchNext(room);
       return;
     }
@@ -1251,10 +1433,13 @@ io.on('connection', (socket) => {
         room.state.track.id === newState.track.id &&
         newState.position !== undefined) {
 
-      const clientPos = Number(newState.position) || 0;
+      const duration = Number(room.state.track.duration || room._lastKnownDuration || 0);
+      let clientPos = Number(newState.position);
+      if (!Number.isFinite(clientPos)) clientPos = serverPos;
+      clientPos = Math.max(0, duration > 0 ? Math.min(clientPos, duration) : clientPos);
       const drift = Math.abs(clientPos - serverPos);
 
-      if (drift > 5 && !newState.seeked) {
+      if (drift > 5 && newState.seeked !== true) {
         console.log(`🚫 Rejected ${user.name}: drift ${drift.toFixed(1)}s`);
         socket.emit('stateSync', {
           track: room.state.track,
@@ -1267,16 +1452,24 @@ io.on('connection', (socket) => {
         return;
       }
 
-      if (newState.seeked) room._seekAt = Date.now();
+      if (newState.seeked === true) room._seekAt = Date.now();
       room.state.position = clientPos;
-      room.state.isPlaying = newState.isPlaying !== undefined ? newState.isPlaying : room.state.isPlaying;
+      room.state.isPlaying = typeof newState.isPlaying === 'boolean' ? newState.isPlaying : room.state.isPlaying;
       room.state.lastUpdated = Date.now();
-      socket.to(room.roomId).emit('stateSync', { ...room.state, seeked: !!newState.seeked });
+      socket.to(room.roomId).emit('stateSync', { ...room.state, seeked: newState.seeked === true });
+      schedulePersistRoomState();
       return;
     }
 
-    room.state = { ...room.state, ...newState, lastUpdated: Date.now() };
-    socket.to(room.roomId).emit('stateSync', room.state);
+    // Ignore arbitrary extra client state fields. Only accept a boolean play/pause
+    // change here; track objects and positions are handled by the validated paths above.
+    if (typeof newState.isPlaying === 'boolean') {
+      room.state.isPlaying = newState.isPlaying;
+      room.state.position = serverPos;
+      room.state.lastUpdated = Date.now();
+      socket.to(room.roomId).emit('stateSync', room.state);
+      schedulePersistRoomState();
+    }
   });
 
   // Seek (progress bar / rewind / forward) — ab client yahi bhejta hai
@@ -1300,6 +1493,7 @@ io.on('connection', (socket) => {
     room.state.lastUpdated = Date.now();
     room._seekAt = Date.now();
 
+    schedulePersistRoomState();
     socket.to(room.roomId).emit('stateSync', {
       track: room.state.track,
       position: pos,
@@ -1313,18 +1507,24 @@ io.on('connection', (socket) => {
 
   socket.on('reportDuration', ({ roomId, trackId, duration } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room || !room.state.track) return;
-    if (room.state.track.id === trackId && duration > 0) {
-      room.state.track.duration = duration;
-      room._lastKnownDuration = duration;
-      console.log(`📏 Duration updated: ${room.state.track.title} → ${duration}s`);
+    if (!room || !room.state.track || !room.users.some(u => u.id === socket.id)) return;
+    const reported = Number(duration);
+    if (String(room.state.track.id) === String(trackId) && Number.isFinite(reported) && reported > 0 && reported <= 7200) {
+      room.state.track.duration = Math.floor(reported);
+      room._lastKnownDuration = Math.floor(reported);
+      console.log(`📏 Duration updated: ${room.state.track.title} → ${Math.floor(reported)}s`);
     }
   });
 
   // ✅ NEW: client ka audio khatam hua — dedupe karke sirf ek baar next
   socket.on('trackEnded', ({ trackId } = {}) => {
     const room = rooms[GLOBAL_ROOM_ID];
-    if (!room || !room.state.track || room.state.track.id !== trackId) return;
+    if (!room || !room.users.some(u => u.id === socket.id) || !room.state.track || String(room.state.track.id) !== String(trackId)) return;
+    // Ignore premature ended events from a broken/short provider stream. The
+    // server clock must also be near the known end before a client can advance it.
+    const duration = Number(room.state.track.duration || room._lastKnownDuration || 0);
+    const position = getCurrentPosition(room);
+    if (duration > 0 && position < duration - 3) return;
     // Many listeners may report the same ended event; the server timer may also
     // notice it. Accept only one completion signal for the current track.
     if (room._changing || room._loadingNext || room._endHandledFor === trackId) return;
@@ -1340,6 +1540,13 @@ io.on('connection', (socket) => {
   socket.on('requestStart', async () => {
     const room = rooms[GLOBAL_ROOM_ID];
     if (!room) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    user.lastActive = Date.now();
+    if (user.blocked && user.blocked.play) {
+      socket.emit('permissionDenied', { action: 'play', message: 'You are blocked' });
+      return;
+    }
     if (room.state.track) {
       socket.emit('stateSync', {
         track: room.state.track,
@@ -1361,6 +1568,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestNext', async ({ roomId } = {}) => {
+    if (!allowSocketEvent(socket, 'requestNext', 3, 10000)) { socket.emit('nextAck', { status: 'rate_limited' }); return; }
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1454,6 +1662,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestSkip', async ({ roomId } = {}) => {
+    if (!allowSocketEvent(socket, 'requestSkip', 3, 10000)) { socket.emit('skipNotice', { message: 'Please wait before skipping again.' }); return; }
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1479,7 +1688,7 @@ io.on('connection', (socket) => {
 
   socket.on('requestSyncState', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room) return;
+    if (!room || !room.users.some(u => u.id === socket.id)) return;
     const currentPosition = getCurrentPosition(room);
     console.log(`🔄 Sync request → ${currentPosition.toFixed(1)}s`);
     socket.emit('stateSync', {
@@ -1534,6 +1743,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chatMessage', ({ roomId, text, mentions } = {}) => {
+    if (!allowSocketEvent(socket, 'chatMessage', 8, 5000)) { socket.emit('chatRateLimited', { retryAfterMs: 5000 }); return; }
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
@@ -1601,12 +1811,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('reaction', ({ roomId, emoji } = {}) => {
+    if (!allowSocketEvent(socket, 'reaction', 8, 3000)) return;
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
-    if (user) user.lastActive = Date.now();
+    if (!user) return;
+    const safeEmoji = String(emoji || '').slice(0, 16);
+    if (!safeEmoji) return;
+    user.lastActive = Date.now();
     analytics.reactionsSent++;
-    socket.to(room.roomId).emit('reaction', { emoji, userName: user?.name });
+    socket.to(room.roomId).emit('reaction', { emoji: safeEmoji, userName: user.name });
   });
 
   socket.on('chatPresence', ({ roomId, active } = {}) => {
@@ -1628,10 +1842,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('typing', ({ roomId, isTyping } = {}) => {
+    if (!allowSocketEvent(socket, 'typing', 6, 3000)) return;
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
-    if (!user) return;
+    if (!user || (user.blocked && user.blocked.chat) || isGloballyMuted(user.name)) return;
+    user.lastActive = Date.now();
     socket.to(room.roomId).emit('userTyping', {
       userName: user.name, userId: socket.id, isTyping: !!isTyping
     });
@@ -1641,29 +1857,44 @@ io.on('connection', (socket) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
     const user = room.users.find(u => u.id === socket.id);
-    if (user) user.lastActive = Date.now();
-    socket.to(room.roomId).emit('partnerMood', { mood, emoji, text, color });
+    if (!user) return;
+    user.lastActive = Date.now();
+    socket.to(room.roomId).emit('partnerMood', {
+      mood: String(mood || '').slice(0, 40),
+      emoji: String(emoji || '').slice(0, 16),
+      text: String(text || '').slice(0, 160),
+      color: /^#[0-9a-fA-F]{6}$/.test(String(color || '')) ? color : undefined
+    });
   });
 
   socket.on('shareLocation', ({ roomId, location, timezone, address, manualAddress } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
     if (!room) return;
-    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
+    if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng) ||
+        location.lat < -90 || location.lat > 90 || location.lng < -180 || location.lng > 180) return;
 
     const user = room.users.find(u => u.id === socket.id);
-    if (user) {
+    if (!user) return;
+    {
+      const accuracy = Number(location.accuracy);
       user.location = {
         lat: location.lat,
         lng: location.lng,
-        accuracy: location.accuracy || null
+        accuracy: Number.isFinite(accuracy) && accuracy > 0 ? Math.min(100000, accuracy) : null
       };
-      if (timezone) user.timezone = timezone;
-      if (address) user.address = address;
-      if (manualAddress) user.manualAddress = manualAddress;
+      if (typeof timezone === 'string') user.timezone = timezone.slice(0, 80);
+      if (address && typeof address === 'object' && !Array.isArray(address)) {
+        const cleanAddress = {};
+        for (const key of ['house','building','road','neighbourhood','city','state','postcode','country','shortLabel','fullAddress']) {
+          if (typeof address[key] === 'string') cleanAddress[key] = address[key].slice(0, key === 'fullAddress' ? 300 : 120);
+        }
+        user.address = cleanAddress;
+      }
+      if (typeof manualAddress === 'string') user.manualAddress = manualAddress.slice(0, 200);
       user.lastActive = Date.now();
 
-      const acc = location.accuracy ? `±${Math.round(location.accuracy)}m` : '?';
-      const label = manualAddress || address?.shortLabel || 'unknown';
+      const acc = user.location.accuracy ? `±${Math.round(user.location.accuracy)}m` : '?';
+      const label = user.manualAddress || user.address?.shortLabel || 'unknown';
       console.log(`📍 ${user.name}: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} ${acc} — ${label}`);
     }
 
@@ -1679,7 +1910,7 @@ io.on('connection', (socket) => {
 
   socket.on('requestGlobalListeners', ({ roomId } = {}) => {
     const room = rooms[roomId || GLOBAL_ROOM_ID];
-    if (!room) return;
+    if (!room || !room.users.some(u => u.id === socket.id)) return;
 
     const usersWithLocation = room.users
       .filter(u => u.location && u.location.lat && u.location.lng)
@@ -1736,6 +1967,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    socketEventWindows.delete(socket.id);
     const roomId = socket.roomId;
     analytics.activeSessions.delete(socket.id);
 
@@ -1790,8 +2022,19 @@ function getUsersWithStatus(room) {
 
 // ===================== SEARCH API =====================
 
+const searchRequestWindows = new Map();
+setInterval(() => {
+  const cutoff = Date.now() - 120000;
+  for (const [ip, bucket] of searchRequestWindows) if (bucket.startedAt < cutoff) searchRequestWindows.delete(ip);
+}, 60000).unref?.();
 app.get('/api/search', async (req, res) => {
-  const query = String(req.query.q || '').trim();
+  const ip = String(req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+  const now = Date.now();
+  const requestWindow = searchRequestWindows.get(ip);
+  if (requestWindow && now - requestWindow.startedAt < 60000 && requestWindow.count >= 30) return res.status(429).json({ results: [], error: 'Too many searches; please wait a minute.' });
+  if (!requestWindow || now - requestWindow.startedAt >= 60000) searchRequestWindows.set(ip, { startedAt: now, count: 1 });
+  else requestWindow.count++;
+  const query = String(req.query.q || '').trim().slice(0, 120);
   if (!query) return res.json({ results: [] });
 
   const cacheKey = 'search:' + query.toLowerCase();
@@ -1800,7 +2043,9 @@ app.get('/api/search', async (req, res) => {
     return res.json({ results: cached.data, cached: true });
   }
 
-  const songs = await fetchSongList(query, 15);
+  let songs;
+  try { songs = await fetchSongList(query, 15); }
+  catch (err) { console.error('Search provider failure:', err.message); return res.status(502).json({ results: [], error: 'Music search provider is temporarily unavailable.' }); }
   if (songs.length > 0) {
     cacheSet(searchCache, cacheKey, songs, 200);
     return res.json({ results: songs });
