@@ -5,6 +5,7 @@ const fs = require('fs');
 const { Server } = require('socket.io');
 const axios = require('axios');
 const path = require('path');
+const { instagramGetUrl } = require('instagram-url-direct');
 
 const app = express();
 const server = http.createServer(app);
@@ -544,6 +545,30 @@ app.get('/api/instagram-oembed', async (req, res) => {
   } catch (err) {
     console.error('Instagram oEmbed error:', err.message);
     res.status(502).json({ error: 'Instagram embed unavailable' });
+  }
+});
+
+// ===================== INSTAGRAM DIRECT MEDIA (PERSONAL USE) =====================
+app.get('/api/instagram-direct', async (req, res) => {
+  const reelUrl = String(req.query.url || '').trim();
+  if (!reelUrl || !/^https:\/\/(www\.)?instagram\.com\/(reel|p|tv)\//i.test(reelUrl)) {
+    return res.status(400).json({ error: 'Valid Instagram Reel URL required' });
+  }
+  try {
+    const result = await instagramGetUrl(reelUrl);
+    if (!result || !result.media_details || !result.media_details.length) {
+      return res.status(502).json({ error: 'No media found' });
+    }
+    const video = result.media_details.find(m => m.type === 'video');
+    if (!video || !video.url) return res.status(502).json({ error: 'No video found' });
+    res.json({ 
+      url: video.url, 
+      thumbnail: video.thumbnail || null,
+      type: 'video'
+    });
+  } catch (err) {
+    console.error('Instagram direct error:', err.message);
+    res.status(502).json({ error: 'Could not fetch media' });
   }
 });
 
