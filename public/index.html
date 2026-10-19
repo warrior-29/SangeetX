@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -1898,7 +1899,8 @@ button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible 
         <button class="picker-tab" type="button" data-picker-tab="music" role="tab" aria-selected="false">🎧 Mood</button>
       </div>
       <div class="picker-pane active" data-picker-pane="emoji" role="tabpanel">
-        <div class="emoji-grid">
+        <emoji-picker id="fullEmojiPicker" class="full-emoji-picker" locale="en" emoji-version="15.1"></emoji-picker>
+        <div class="emoji-grid emoji-fallback-grid" hidden>
           <button data-emoji="😀" aria-label="Grinning">😀</button><button data-emoji="😂" aria-label="Laughing">😂</button>
           <button data-emoji="🥰" aria-label="Love">🥰</button><button data-emoji="😍" aria-label="Heart eyes">😍</button>
           <button data-emoji="🤩" aria-label="Star struck">🤩</button><button data-emoji="😎" aria-label="Cool">😎</button>
@@ -1934,14 +1936,16 @@ button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible 
         <p class="picker-footnote">Stickers send as expressive oversized reactions in chat.</p>
       </div>
       <div class="picker-pane" data-picker-pane="gifs" role="tabpanel" hidden>
-        <div class="gif-picker-note">Tap a GIF to send it to everyone in the room</div>
-        <div class="gif-grid">
+        <label class="gif-search-wrap"><i data-lucide="search"></i><input id="gifSearchInput" type="search" maxlength="80" placeholder="Search millions of GIFs…" autocomplete="off"><button id="gifSearchClear" type="button" aria-label="Clear GIF search">×</button></label>
+        <div class="gif-picker-toolbar"><span id="gifResultsLabel">Trending GIFs</span><span class="gif-provider-label">Powered by GIPHY</span></div>
+        <div class="gif-grid" id="gifGrid" aria-live="polite">
           <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" aria-label="Typing cat GIF"><img loading="lazy" src="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" alt="Typing cat reaction"><span>Typing...</span></button>
           <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif" aria-label="Happy cat GIF"><img loading="lazy" src="https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif" alt="Happy cat reaction"><span>Happy vibes</span></button>
           <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif" aria-label="Party GIF"><img loading="lazy" src="https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif" alt="Party reaction"><span>Party!</span></button>
           <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" aria-label="Dance GIF"><img loading="lazy" src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" alt="Dance reaction"><span>Dance mode</span></button>
         </div>
-        <p class="picker-footnote">GIF previews need an internet connection. Small image and document files can be attached with the paperclip.</p>
+        <button class="gif-load-more" id="gifLoadMore" type="button">Load more GIFs <span>↓</span></button>
+        <p class="picker-footnote" id="gifPickerFootnote">Search by mood, reaction or phrase. Results load in pages; provider limits still apply. Small files can be shared with the paperclip.</p>
       </div>
       <div class="picker-pane" data-picker-pane="music" role="tabpanel" hidden>
         <div class="mood-sticker-grid">
@@ -3419,15 +3423,92 @@ chatInputEl.addEventListener('paste', (e) => {
 
 /* ============ EMOJI PICKER ============ */
 const emojiPickerEl = document.getElementById('emojiPicker');
-emojiPickerEl?.querySelectorAll('[data-gif-url]').forEach(btn => btn.addEventListener('click', () => {
+const gifGridEl = document.getElementById('gifGrid');
+const gifSearchInput = document.getElementById('gifSearchInput');
+const gifLoadMore = document.getElementById('gifLoadMore');
+let gifSearchOffset = 0;
+let gifSearchQuery = '';
+let gifSearchBusy = false;
+let gifSearchHasMore = true;
+let gifSearchTimer = null;
+const gifSeenUrls = new Set();
+const curatedFallbackGifs = [
+  {id:'typing-cat',title:'Typing cat',url:'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif',preview:'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif'},
+  {id:'happy-cat',title:'Happy vibes',url:'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif',preview:'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif'},
+  {id:'party',title:'Party!',url:'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif',preview:'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif'},
+  {id:'dance',title:'Dance mode',url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',preview:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'}
+];
+function renderGifItems(items, append = false) {
+  if (!gifGridEl) return;
+  if (!append) { gifGridEl.innerHTML = ''; gifSeenUrls.clear(); }
+  (items || []).forEach(item => {
+    if (!item || !/^https:\/\/media\d*\.giphy\.com\//i.test(item.url || '') || !/^https:\/\/media\d*\.giphy\.com\//i.test(item.preview || '') || gifSeenUrls.has(item.url)) return;
+    gifSeenUrls.add(item.url);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'gif-choice'; button.dataset.gifUrl = item.url; button.setAttribute('aria-label', (item.title || 'GIF').slice(0,120));
+    const img = document.createElement('img'); img.loading = 'lazy'; img.src = item.preview; img.alt = item.title || 'GIF';
+    const label = document.createElement('span'); label.textContent = item.title || 'GIF';
+    button.append(img,label); gifGridEl.appendChild(button);
+  });
+}
+async function loadGifs({ reset = false } = {}) {
+  if (gifSearchBusy) return;
+  if (reset) { gifSearchOffset = 0; gifSearchHasMore = true; if (gifGridEl) gifGridEl.innerHTML = '<p class="gif-loading">Finding your vibe…</p>'; }
+  if (!gifSearchHasMore) return;
+  gifSearchBusy = true; if (gifLoadMore) { gifLoadMore.disabled = true; gifLoadMore.textContent = 'Loading…'; }
+  try {
+    const params = new URLSearchParams({ q: gifSearchQuery, offset: String(gifSearchOffset), limit: '24' });
+    const response = await fetch('/api/gifs?' + params.toString(), { headers: { Accept: 'application/json' } });
+    const data = await response.json();
+    if (!response.ok) {
+      if (!reset && gifGridEl && !gifGridEl.children.length) gifGridEl.innerHTML = '';
+      if (data.configured === false) {
+        renderGifItems(curatedFallbackGifs, false);
+        const note = document.getElementById('gifPickerFootnote');
+        if (note) note.textContent = 'Live GIF search needs a GIPHY API key on the server. The starter GIFs remain available; add GIPHY_API_KEY to enable searchable, paginated results.';
+      } else if (response.status !== 503) showToast(data.error || 'GIF search is unavailable right now','warning');
+      gifSearchHasMore = false;
+      return;
+    }
+    if (reset) renderGifItems(data.items, false); else renderGifItems(data.items, true);
+    if (reset && !(data.items || []).length) gifGridEl.innerHTML = '<p class="gif-loading">No GIFs found. Try another search.</p>';
+    gifSearchOffset = Number(data.nextOffset || gifSearchOffset + (data.items || []).length);
+    gifSearchHasMore = Boolean(data.hasMore && (data.items || []).length);
+    const label = document.getElementById('gifResultsLabel'); if (label) label.textContent = gifSearchQuery ? `Results for “${gifSearchQuery}”` : 'Trending GIFs';
+    const note = document.getElementById('gifPickerFootnote'); if (note) note.textContent = 'Search reactions, moods, memes or phrases. Load more to keep exploring. GIF provider quotas apply.';
+  } catch (_) { if (reset && gifGridEl) gifGridEl.innerHTML = '<p class="gif-loading">Could not load GIFs. Check your connection.</p>'; }
+  finally { gifSearchBusy = false; if (gifLoadMore) { gifLoadMore.disabled = !gifSearchHasMore; gifLoadMore.innerHTML = gifSearchHasMore ? 'Load more GIFs <span>↓</span>' : 'You’re all caught up'; } }
+}
+emojiPickerEl?.addEventListener('click', event => {
+  const btn = event.target.closest('[data-gif-url]');
+  if (!btn) return;
   const gifUrl = btn.getAttribute('data-gif-url');
   if (!gifUrl || !socket || !socket.connected || !roomId) { showToast('Connect to the room to send a GIF','warning'); return; }
   if (myPermissions.chat) { showToast('You are blocked from chatting','error'); return; }
   socket.emit('chatGif', { roomId, url:gifUrl });
-  emojiPickerEl.classList.remove('show');
-  document.getElementById('chatEmojiBtn')?.classList.remove('active');
-}));
+  emojiPickerEl.classList.remove('show'); document.getElementById('chatEmojiBtn')?.classList.remove('active');
+});
+gifSearchInput?.addEventListener('input', () => {
+  clearTimeout(gifSearchTimer); gifSearchTimer = setTimeout(() => { gifSearchQuery = gifSearchInput.value.trim().slice(0,80); loadGifs({reset:true}); }, 350);
+});
+document.getElementById('gifSearchClear')?.addEventListener('click', () => { if (gifSearchInput) gifSearchInput.value = ''; gifSearchQuery = ''; loadGifs({reset:true}); });
+gifLoadMore?.addEventListener('click', () => loadGifs());
+gifGridEl?.addEventListener('scroll', () => { if (gifGridEl.scrollTop + gifGridEl.clientHeight >= gifGridEl.scrollHeight - 100) loadGifs(); }, { passive:true });
 
+const fullEmojiPicker = document.getElementById('fullEmojiPicker');
+fullEmojiPicker?.addEventListener('emoji-click', event => {
+  const emoji = event.detail?.unicode;
+  if (!emoji || !chatInputEl) return;
+  chatInputEl.focus();
+  const selection = window.getSelection();
+  if (selection?.rangeCount && chatInputEl.contains(selection.anchorNode)) {
+    const range = selection.getRangeAt(0); range.deleteContents();
+    const node = document.createTextNode(emoji); range.insertNode(node);
+    range.setStartAfter(node); range.collapse(true); selection.removeAllRanges(); selection.addRange(range);
+  } else { chatInputEl.append(document.createTextNode(emoji)); }
+  chatInputEl.dispatchEvent(new Event('input', { bubbles:true }));
+});
+fullEmojiPicker?.addEventListener('click', () => { const fallback = document.querySelector('.emoji-fallback-grid'); if (fallback) fallback.hidden = true; });
+fullEmojiPicker?.addEventListener('keydown', () => { const fallback = document.querySelector('.emoji-fallback-grid'); if (fallback) fallback.hidden = true; });
 const emojiBtn = document.getElementById('chatEmojiBtn');
 
 if (emojiBtn && emojiPickerEl) {
@@ -3486,6 +3567,7 @@ if (emojiBtn && emojiPickerEl) {
       pane.classList.toggle('active', active);
       pane.hidden = !active;
     });
+    if (key === 'gifs' && gifGridEl && !gifGridEl.dataset.loaded) { gifGridEl.dataset.loaded = '1'; loadGifs({reset:true}); }
   }));
 })();
 
@@ -3552,7 +3634,7 @@ function renderChat(messages,replace){
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
     const stickerValues = new Set(['🫶','🔥','🥹','👑','💖','😎','🚀','🎉','😂','🥰','💃','🎧','🪩','🎤','🌙','💿','🎶']);
     const isSticker = stickerValues.has(String(m.text || '').trim());
-    const isGif = m.type === 'gif' && typeof m.mediaUrl === 'string' && /^https:\/\/(media\.giphy\.com|media\.tenor\.com)\//i.test(m.mediaUrl);
+    const isGif = m.type === 'gif' && typeof m.mediaUrl === 'string' && /^https:\/\/(media\d*\.giphy\.com|media\.tenor\.com)\//i.test(m.mediaUrl);
     const isAttachment = m.type === 'attachment' && typeof m.fileUrl === 'string' && /^\/chat-uploads\/[a-zA-Z0-9._-]+$/.test(m.fileUrl);
     let messageBody = renderMessageHTML(m.text || '');
     if (isGif) messageBody = `<img src="${esc(m.mediaUrl)}" alt="GIF" loading="lazy" referrerpolicy="no-referrer">`;
@@ -4782,4 +4864,10 @@ document.getElementById('cancelWaitBtn')?.addEventListener('click', () => {
 .chat-msg.gif-message .chat-msg-text img { display:block;width:100%;max-height:250px;object-fit:cover;border-radius:13px; }
 @media(max-width:420px){.chat-attach-btn{flex-basis:36px;width:36px;height:40px}.gif-choice img{height:82px}.chat-input-row{gap:6px}}
 
+</style>
+
+<style>
+/* Searchable emoji/GIF media tray: compact, thumb-first and mobile safe. */
+.full-emoji-picker{display:block;width:100%;height:min(330px,44dvh);--background:#0b121c;--border-color:rgba(204,224,245,.12);--input-border-color:rgba(204,224,245,.14);--input-font-color:#f2f6fb;--category-emoji-size:21px;--emoji-size:26px;--emoji-padding:7px;--num-columns:8;--indicator-color:#c4ff4d;--button-hover-background:#1b2a3a;--button-active-background:#25354a;color-scheme:dark}
+.emoji-fallback-grid[hidden]{display:none!important}.gif-search-wrap{display:flex;align-items:center;gap:9px;margin:10px 0 9px;padding:0 12px;min-height:44px;border:1px solid rgba(204,224,245,.13);border-radius:14px;background:rgba(255,255,255,.045);color:#b8c7d9}.gif-search-wrap input{width:100%;min-width:0;background:transparent;border:0;outline:0;color:#f4f7fb;font:500 13px Inter,sans-serif}.gif-search-wrap button{border:0;background:transparent;color:#b8c7d9;font-size:22px;cursor:pointer}.gif-picker-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 2px 9px;font:650 11px Inter,sans-serif;color:#dce7f5}.gif-provider-label{color:#9aabc0;font-size:9px;letter-spacing:.08em;text-transform:uppercase}.gif-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-height:250px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.gif-choice{min-height:90px}.gif-choice img{height:100px;object-fit:cover}.gif-choice span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gif-load-more{width:100%;margin-top:10px;min-height:39px;border:1px solid rgba(196,255,77,.23);border-radius:12px;background:rgba(196,255,77,.07);color:#d9ff95;font:650 11px Inter,sans-serif;cursor:pointer}.gif-load-more:disabled{opacity:.55;cursor:default}.gif-load-more span{margin-left:5px}.gif-loading{grid-column:1/-1;padding:20px 8px;text-align:center;color:#a7b7c9;font-size:12px}.gif-message .chat-msg-text img{display:block;max-width:min(250px,62vw);max-height:250px;object-fit:contain;border-radius:12px}.chat-attachment img{max-width:min(230px,60vw);max-height:230px;object-fit:contain}@media(max-width:420px){.full-emoji-picker{height:min(300px,40dvh);--num-columns:7;--emoji-size:24px;--emoji-padding:5px}.gif-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:230px}.gif-choice img{height:100px}.gif-search-wrap{min-height:42px}}
 </style>
