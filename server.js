@@ -5,7 +5,8 @@ const fs = require('fs');
 const { Server } = require('socket.io');
 const axios = require('axios');
 const path = require('path');
-const { instagramGetUrl } = require('instagram-url-direct');
+const { ultraigdl } = require('ultra-igdl');
+const igdlClient = new ultraigdl();
 
 const app = express();
 const server = http.createServer(app);
@@ -555,11 +556,11 @@ app.get('/api/instagram-direct', async (req, res) => {
     return res.status(400).json({ error: 'Valid Instagram Reel URL required' });
   }
   try {
-    const result = await instagramGetUrl(reelUrl);
-    if (!result || !result.media_details || !result.media_details.length) {
-      return res.status(502).json({ error: 'No media found' });
+    const result = await igdlClient.download(reelUrl);
+    if (!result || result.code !== 200) {
+      return res.status(502).json({ error: result?.message || 'Download failed' });
     }
-    const video = result.media_details.find(m => m.type === 'video');
+    const video = (result.media || []).find(m => m.type === 'video');
     if (!video || !video.url) return res.status(502).json({ error: 'No video found' });
     res.json({ 
       url: video.url, 
