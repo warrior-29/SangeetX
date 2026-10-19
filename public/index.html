@@ -5149,44 +5149,65 @@ document.getElementById('cancelWaitBtn')?.addEventListener('click', () => {
   }
 
   async function loadReel(url, fromRemote = false) {
-    currentReelUrl = url;
-    reelsStage.innerHTML = '<div class="reels-empty"><div class="reels-empty-icon"><i data-lucide="loader"></i></div><div class="reels-empty-title">Loading Reel…</div></div>';
-    refreshIcons();
-    reelsStatus.textContent = '';
-    reelOpenExternal.style.display = 'none';
+  currentReelUrl = url;
+  reelsStage.innerHTML = '<div class="reels-empty"><div class="reels-empty-icon"><i data-lucide="loader"></i></div><div class="reels-empty-title">Loading Reel…</div></div>';
+  refreshIcons();
+  reelsStatus.textContent = '';
+  reelOpenExternal.style.display = 'none';
 
-    try {
-      const r = await fetch('/api/instagram-oembed?url=' + encodeURIComponent(url));
-      const data = await r.json();
-      if (!r.ok || !data.html) throw new Error(data.error || 'Embed failed');
-
-      reelsStage.innerHTML = data.html;
-      if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
-
+  // पहले direct media (असली वीडियो लिंक) try करो
+  try {
+    const r = await fetch('/api/instagram-direct?url=' + encodeURIComponent(url));
+    const data = await r.json();
+    if (r.ok && data.url) {
+      reelsStage.innerHTML = `
+        <video 
+          id="reelVideoPlayer"
+          src="${esc(data.url)}" 
+          poster="${esc(data.thumbnail || '')}"
+          controls 
+          playsinline 
+          autoplay
+          style="width:100%; max-height:70vh; border-radius:16px; background:#000;"
+        ></video>
+      `;
+      reelsStatus.textContent = fromRemote ? '🎬 Synced from room' : '🎬 Synced to room';
       reelOpenExternal.href = url;
       reelOpenExternal.style.display = 'inline-flex';
+      if (!fromRemote && socket && socket.connected) {
+        socket.emit('reelSync', { roomId, reelUrl: url });
+      }
+      return;
+    }
+  } catch (_) {}
 
+  // अगर direct फेल हो, तो oEmbed fallback
+  try {
+    const r2 = await fetch('/api/instagram-oembed?url=' + encodeURIComponent(url));
+    const data2 = await r2.json();
+    if (r2.ok && data2.html) {
+      reelsStage.innerHTML = data2.html;
+      if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
+      reelOpenExternal.href = url;
+      reelOpenExternal.style.display = 'inline-flex';
       if (!fromRemote && socket && socket.connected) {
         socket.emit('reelSync', { roomId, reelUrl: url });
         reelsStatus.textContent = '🎬 Synced to room';
       } else if (fromRemote) {
         reelsStatus.textContent = '🎬 Synced from room';
-      } else {
-        reelsStatus.textContent = '';
       }
-
       setTimeout(() => {
         if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
       }, 800);
-    } catch (e) {
-      showEmptyState('Preview unavailable', 'This Reel could not be loaded here. You can still open it on Instagram.');
-      if (reelOpenExternal) {
-        reelOpenExternal.href = url;
-        reelOpenExternal.style.display = 'inline-flex';
-      }
-      reelsStatus.textContent = '';
+      return;
     }
-  }
+  } catch (_) {}
+
+  showEmptyState('Preview unavailable', 'This Reel could not be loaded here. You can still open it on Instagram.');
+  reelOpenExternal.href = url;
+  reelOpenExternal.style.display = 'inline-flex';
+  reelsStatus.textContent = '';
+}
 
   function tryLoadFromInput() {
     const url = (reelUrlInput.value || '').trim();
