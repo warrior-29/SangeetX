@@ -1029,6 +1029,204 @@ input:checked + .slider:before { transform:translateX(16px); }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 ::-webkit-scrollbar { width:0; height:0; }
+
+
+/* ================= SANGEETX VISUAL REFRESH =================
+   Presentation-only layer: preserves existing DOM IDs and event hooks. */
+:root {
+  --bg:#07070D;
+  --surface:rgba(20,20,32,.82);
+  --surface-2:rgba(29,28,46,.88);
+  --border:rgba(199,184,255,.13);
+  --primary:#9470FF;
+  --primary-2:#C0ADFF;
+  --accent:#FF6BB5;
+  --primary-glow:rgba(148,112,255,.32);
+  --text:#F8F7FF;
+  --text-dim:#B6B2C9;
+  --muted:#77738D;
+}
+html, body { background-color:var(--bg); }
+body::before {
+  opacity:.13;
+  background:
+    radial-gradient(ellipse at 14% 8%, rgba(125,83,255,.9) 0%, transparent 34%),
+    radial-gradient(ellipse at 88% 78%, rgba(255,76,166,.68) 0%, transparent 32%),
+    radial-gradient(ellipse at 52% 48%, rgba(56,74,155,.22) 0%, transparent 52%);
+  filter:blur(54px);
+}
+body::after {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.18;
+  background-image:radial-gradient(rgba(205,195,255,.32) .65px, transparent .65px);
+  background-size:24px 24px;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.7),transparent 85%);
+}
+.screen { isolation:isolate; }
+#joinScreen { padding:clamp(16px,4vw,40px); }
+.join-box {
+  position:relative; overflow:hidden; isolation:isolate;
+  max-width:420px; padding:clamp(28px,4vw,38px) clamp(22px,4vw,34px) 26px;
+  border-radius:30px;
+  background:linear-gradient(145deg,rgba(27,25,45,.94),rgba(12,12,21,.92));
+  border:1px solid rgba(199,184,255,.19);
+  box-shadow:0 34px 100px rgba(0,0,0,.58),0 0 0 1px rgba(255,255,255,.025) inset,0 0 70px rgba(126,87,255,.09);
+  backdrop-filter:blur(28px) saturate(145%);
+  -webkit-backdrop-filter:blur(28px) saturate(145%);
+}
+.join-box::before {
+  content:""; position:absolute; inset:0 0 auto; height:180px; pointer-events:none; z-index:-1;
+  background:radial-gradient(ellipse at 50% 0%,rgba(148,112,255,.22),transparent 72%);
+}
+.join-logo {
+  width:76px; height:76px; border-radius:24px; margin-bottom:22px;
+  background:linear-gradient(140deg,#8D6BFF 0%,#B65BEE 52%,#FF6BB5 100%);
+  border:1px solid rgba(255,255,255,.32);
+  box-shadow:0 14px 36px rgba(148,112,255,.34),0 0 0 7px rgba(148,112,255,.07);
+}
+.join-logo img { object-fit:contain; }
+.join-box h1 { font-size:clamp(30px,5vw,36px); letter-spacing:-1.5px; }
+.join-box .subtitle { font-size:13px; line-height:1.65; max-width:290px; margin:0 auto 25px; }
+.input-wrap input {
+  min-height:52px; border-radius:15px; padding-top:15px; padding-bottom:15px;
+  background:rgba(5,5,13,.48); border-color:rgba(190,178,255,.13);
+}
+.input-wrap input:hover { border-color:rgba(190,178,255,.28); }
+.input-wrap input:focus { border-color:rgba(174,148,255,.85); box-shadow:0 0 0 4px rgba(148,112,255,.13),0 8px 24px rgba(0,0,0,.16); }
+.btn-primary {
+  min-height:52px; border-radius:15px; font-weight:800; letter-spacing:.1px;
+  background:linear-gradient(115deg,#8561FF 0%,#A15DF4 55%,#E85FAE 100%);
+  box-shadow:0 10px 26px rgba(139,92,246,.23),0 1px 0 rgba(255,255,255,.2) inset;
+}
+.btn-primary:hover { filter:brightness(1.08); box-shadow:0 13px 32px rgba(139,92,246,.3); transform:translateY(-1px); }
+.btn-secondary { border-radius:14px; background:rgba(255,255,255,.055); }
+#globalStats { background:linear-gradient(135deg,rgba(139,92,246,.11),rgba(236,72,153,.055)) !important; border-color:rgba(167,139,250,.17) !important; border-radius:16px !important; }
+.hint { letter-spacing:.08px; }
+#mainScreen { gap:10px; padding:12px; }
+.topbar {
+  min-height:58px; padding:8px 10px; border:1px solid rgba(199,184,255,.09);
+  border-radius:19px; background:rgba(15,14,25,.72);
+  box-shadow:0 8px 30px rgba(0,0,0,.13); backdrop-filter:blur(18px);
+}
+.status { background:rgba(255,255,255,.045); border-color:rgba(199,184,255,.1); padding:8px 13px; }
+.icon-btn { background:rgba(255,255,255,.055); border-color:rgba(199,184,255,.13); transition:transform .2s ease,background .2s ease,border-color .2s ease,box-shadow .2s ease; }
+.icon-btn:hover { background:rgba(148,112,255,.15); border-color:rgba(192,173,255,.42); box-shadow:0 5px 18px rgba(0,0,0,.18); }
+.icon-btn.primary { background:linear-gradient(135deg,#8D6BFF,#E65EAE); box-shadow:0 7px 22px rgba(148,112,255,.28); }
+.player-section {
+  position:relative; isolation:isolate; gap:12px; padding:18px 20px;
+  border:1px solid rgba(199,184,255,.105); border-radius:26px;
+  background:linear-gradient(155deg,rgba(23,22,38,.72),rgba(12,12,20,.62));
+  box-shadow:0 22px 55px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.025) inset;
+  backdrop-filter:blur(18px);
+}
+.player-section::before {
+  content:""; position:absolute; top:0; left:12%; right:12%; height:1px; z-index:-1;
+  background:linear-gradient(90deg,transparent,rgba(192,173,255,.46),rgba(255,107,181,.3),transparent);
+}
+.album-art {
+  border-radius:24px; border-color:rgba(255,255,255,.16);
+  box-shadow:0 20px 45px rgba(0,0,0,.4),0 0 44px color-mix(in srgb,var(--dynamic-1) 28%,transparent);
+}
+.album-art img { border-radius:23px; }
+.album-art.playing { box-shadow:0 22px 48px rgba(0,0,0,.42),0 0 0 1px rgba(255,255,255,.1),0 0 48px color-mix(in srgb,var(--dynamic-1) 35%,transparent); }
+.song-title { font-size:clamp(16px,2vw,21px); letter-spacing:-.45px; }
+.song-artist { font-size:12px; }
+.progress-track { height:5px; background:rgba(255,255,255,.105); }
+.progress-thumb { width:13px; height:13px; }
+.controls { gap:12px; }
+.ctrl-btn { background:rgba(255,255,255,.055); border-color:rgba(255,255,255,.13); box-shadow:0 5px 18px rgba(0,0,0,.23); }
+.ctrl-btn:hover { background:rgba(148,112,255,.16); border-color:rgba(192,173,255,.38); }
+.ctrl-btn.play { background:linear-gradient(135deg,#8D6BFF,#E65EAE); border:2px solid rgba(255,255,255,.9); box-shadow:0 12px 32px rgba(148,112,255,.34),0 0 0 5px rgba(148,112,255,.08); }
+.search-btn {
+  border-radius:16px; padding:10px 13px; min-height:54px;
+  background:linear-gradient(105deg,rgba(25,23,41,.94),rgba(17,16,28,.92));
+  border:1px solid rgba(199,184,255,.13); box-shadow:0 8px 24px rgba(0,0,0,.12);
+}
+.search-btn:hover { border-color:rgba(192,173,255,.4); background:rgba(36,29,58,.96); }
+.search-btn .search-icon { border-radius:11px; box-shadow:0 5px 14px rgba(148,112,255,.24); }
+.ptt-card {
+  border-radius:21px; padding:15px; gap:13px;
+  background:linear-gradient(150deg,rgba(24,22,40,.88),rgba(13,13,22,.88));
+  border-color:rgba(199,184,255,.12); box-shadow:0 14px 34px rgba(0,0,0,.17);
+}
+.ptt-title { font-size:12px; }
+.ptt-title .mic-icon { width:30px; height:30px; border-radius:10px; }
+.mode-switch { padding:4px; border-radius:13px; background:rgba(4,4,10,.36); }
+.mode-switch button { min-height:36px; border-radius:10px; }
+.ptt-button { min-height:48px; border-radius:14px; }
+.ptt-button.enabled { background:rgba(148,112,255,.12); box-shadow:0 0 0 3px rgba(148,112,255,.045); }
+.reactions { gap:8px; }
+.reaction-btn { height:44px; border-radius:14px; background:rgba(22,20,36,.72); border-color:rgba(199,184,255,.12); }
+.reaction-btn:hover { background:rgba(148,112,255,.14); border-color:rgba(192,173,255,.28); transform:translateY(-2px); }
+#usersPanel, #globalMapModal { background:rgba(4,4,10,.76); backdrop-filter:blur(16px); }
+.users-box, .global-map-box { background:linear-gradient(145deg,rgba(25,23,41,.98),rgba(11,11,19,.98)); border-color:rgba(199,184,255,.15); box-shadow:0 30px 100px rgba(0,0,0,.58); }
+#searchModal { background:radial-gradient(ellipse at 50% 0%,rgba(100,70,180,.13),transparent 42%),#08080D; }
+.search-header { background:rgba(13,12,22,.88); border-color:rgba(199,184,255,.12); }
+#searchInput { background:rgba(255,255,255,.045); border-color:rgba(199,184,255,.12); border-radius:14px; }
+.song-item { border:1px solid transparent; transition:background .18s ease,border-color .18s ease,transform .18s ease; }
+.song-item:hover { background:rgba(148,112,255,.09); border-color:rgba(192,173,255,.14); }
+button, [role="button"], .song-item, .search-btn { -webkit-tap-highlight-color:transparent; }
+:where(button,input,[tabindex="0"],[contenteditable="true"]):focus-visible { outline:2px solid rgba(192,173,255,.95); outline-offset:3px; }
+
+/* Desktop: a two-column listening dashboard; mobile keeps the familiar stacked flow. */
+@media (min-width:1000px) and (min-height:680px) {
+  #mainScreen {
+    display:none; width:100%; max-width:1500px; margin:0 auto;
+    padding:20px clamp(20px,3vw,44px) 24px; gap:12px;
+    grid-template-columns:minmax(0,1fr) minmax(300px,350px);
+    grid-template-rows:auto auto auto minmax(0,1fr) auto auto;
+    grid-template-areas:
+      "topbar topbar"
+      "output output"
+      "distance distance"
+      "player voice"
+      "search voice"
+      "reactions voice";
+    align-content:stretch;
+  }
+  #mainScreen.active { display:grid; }
+  #mainScreen > .topbar { grid-area:topbar; }
+  #mainScreen > .audio-output-badge { grid-area:output; justify-self:start; }
+  #mainScreen > .distance-meter { grid-area:distance; justify-self:center; }
+  #mainScreen > .player-section { grid-area:player; width:100%; min-height:0; }
+  #mainScreen > .search-btn { grid-area:search; }
+  #mainScreen > .ptt-card { grid-area:voice; min-width:0; align-self:stretch; justify-content:center; padding:clamp(16px,2vw,25px); gap:clamp(12px,1.7vh,20px); }
+  #mainScreen > .reactions { grid-area:reactions; }
+  .player-section { max-width:none; }
+  .album-art { width:min(25vw,285px); }
+  .song-info { max-width:620px; }
+  .progress-section { max-width:650px; }
+  .controls { gap:clamp(12px,1.6vw,20px); }
+  .ctrl-btn { width:46px; height:46px; }
+  .ctrl-btn.play { width:68px; height:68px; }
+  .topbar-actions { gap:8px; }
+}
+@media (min-width:768px) and (max-width:999px) {
+  #mainScreen { padding:16px; gap:10px; }
+  .player-section { border-radius:22px; }
+  .album-art { width:min(34vw,245px); }
+  .ptt-card { padding:13px; }
+}
+@media (max-width:767px) {
+  #mainScreen { padding-left:10px; padding-right:10px; }
+  .topbar { border-radius:15px; padding:7px 6px; gap:5px; }
+  .topbar-actions { gap:5px; }
+  .player-section { padding:10px 13px; border-radius:21px; gap:9px; }
+  .album-art { border-radius:21px; }
+  .search-btn { min-height:50px; }
+  .ptt-card { border-radius:18px; padding:11px; gap:9px; }
+  .reaction-btn { border-radius:12px; }
+  .join-box { border-radius:26px; }
+}
+@media (max-height:700px) {
+  .player-section { padding-top:8px; padding-bottom:8px; }
+  .ptt-card { gap:8px; }
+  .join-box { padding-top:24px; padding-bottom:20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { transition:none !important; }
+}
+/* ================= END SANGEETX VISUAL REFRESH ================= */
+
 </style>
 </head>
 <body>
@@ -2214,6 +2412,7 @@ function initSocket(){
   });
 
   socket.on('skipNotice', ({ userName, message }) => { showToast(message); });
+  socket.on('chatRateLimited', ({ retryAfterMs } = {}) => { showToast(`Please slow down and try again in ${Math.max(1, Math.ceil((Number(retryAfterMs) || 5000) / 1000))}s.`, 'error'); });
   socket.on('userJoined', ({ userName: joinedName, message, welcomeMessage }) => {
     showWelcomeToast(joinedName, welcomeMessage);
     showToast(message, 'success');
@@ -3414,6 +3613,8 @@ audio.addEventListener('loadedmetadata',()=>{
 });
 
 audio.addEventListener('ended',()=>{
+  // Ignore a stale queued ended event if a new source has already been loaded.
+  if (!audio.ended || !currentTrack) return;
   document.getElementById('albumArt').classList.remove('playing');
   document.getElementById('waveformLive').classList.remove('active');
   stopWaveform();stopBeatDetection();updatePlayIcon();
@@ -3684,18 +3885,26 @@ function createPeerConnection(remoteId, remoteName) {
   };
 
   pc.ontrack = e => {
-    const remote = new Audio();
-    remote.srcObject = e.streams[0];
-    remote.autoplay = true;
-    remote.playsInline = true;
-    remote.volume = 1.0;
+    // Reuse the peer's audio element on renegotiation; creating a new Audio for
+    // every ontrack event can leave an old stream playing underneath it.
+    let remoteEntry = remoteAudios.get(remoteId);
+    let remote = remoteEntry?.audio;
+    if (!remote) {
+      remote = new Audio();
+      remote.autoplay = true;
+      remote.playsInline = true;
+      remote.volume = 1.0;
+    }
+    const incomingStream = e.streams && e.streams[0];
+    if (incomingStream && remote.srcObject !== incomingStream) remote.srcObject = incomingStream;
     remote.play().catch(() => {
       const unlock = () => { remote.play().catch(()=>{}); document.removeEventListener('click', unlock); };
       document.addEventListener('click', unlock, { once: true });
     });
-    const isUserMuted = mutedUsers.has((remoteName||'').toLowerCase());
+    const resolvedName = remoteName || remoteEntry?.userName || 'Unknown';
+    const isUserMuted = mutedUsers.has(resolvedName.toLowerCase());
     remote.muted = muteAll || isUserMuted || audioMode === 'music';
-    remoteAudios.set(remoteId, { audio: remote, userName: remoteName, remoteId });
+    remoteAudios.set(remoteId, { audio: remote, userName: resolvedName, remoteId });
   };
 
   pc.onconnectionstatechange = () => {
@@ -3753,9 +3962,23 @@ async function handleVoiceSignal({ signal, from, fromName }) {
 }
 
 function callNewPeer(remoteId, remoteName) {
-  if (!socket) return;
+  if (!socket || !localStream || !remoteId || remoteId === socket.id) return;
   const pc = createPeerConnection(remoteId, remoteName);
-  if (!localStream || pc.signalingState !== 'stable') return;
+  if (pc.signalingState !== 'stable') return;
+
+  // A peer connection may have been created before this user enabled the mic.
+  // Reuse the PC, but ensure current local audio tracks are actually attached.
+  const senders = pc.getSenders();
+  localStream.getAudioTracks().forEach(track => {
+    const alreadyAdded = senders.some(sender => sender.track && sender.track.id === track.id);
+    if (!alreadyAdded) {
+      try { track.contentHint = 'speech'; pc.addTrack(track, localStream); } catch (e) {
+        console.warn('Could not attach local voice track:', e);
+      }
+    }
+  });
+
+  if (!pc.getSenders().some(sender => sender.track && sender.track.kind === 'audio')) return;
   pc.createOffer({ offerToReceiveAudio: true })
     .then(offer => pc.setLocalDescription(offer))
     .then(() => {
@@ -3764,7 +3987,7 @@ function callNewPeer(remoteId, remoteName) {
         signal: { type: 'offer', sdp: pc.localDescription.sdp }
       });
     })
-    .catch(() => {});
+    .catch(err => console.warn('Voice offer failed:', err));
 }
 
 /* ============ REACTIONS ============ */
