@@ -28,6 +28,18 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '32kb' }));
 
+// Chat uploads are intentionally small and restricted to non-executable formats.
+const CHAT_UPLOAD_DIR = path.join(__dirname, 'public', 'chat-uploads');
+const CHAT_UPLOAD_TYPES = new Map([
+  ['image/jpeg', '.jpg'], ['image/png', '.png'], ['image/webp', '.webp'],
+  ['image/gif', '.gif'], ['application/pdf', '.pdf'], ['text/plain', '.txt']
+]);
+function cleanUploadName(name) {
+  const base = path.basename(String(name || 'shared-file')).replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 90);
+  return base || 'shared-file';
+}
+
+
 // Lightweight per-socket event throttling. This protects expensive actions from
 // accidental rapid repeats without introducing a new runtime dependency.
 const socketEventWindows = new Map();
@@ -1781,6 +1793,62 @@ io.on('connection', (socket) => {
 
     // 🤖 Bot reply (bot ko bulao to hamesha, warna kabhi kabhi)
     maybeBotReply(room, user, clean);
+  });
+
+  socket.on('chatAttachment', ({ roomId, name, mime, data } = {}) => {
+    if (!allowSocketEvent(socket, 'chatAttachment', 3, 10000)) { socket.emit('chatRateLimited', { retryAfterMs: 10000 }); return; }
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room || typeof data !== 'string') return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    if ((user.blocked && user.blocked.chat) || isGloballyMuted(user.name)) {
+      socket.emit('permissionDenied', { action: 'chat', message: 'You are not allowed to chat' }); return;
+    }
+    const match = data.match(/^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+    const expectedMime = String(mime || '').toLowerCase();
+    if (!match || match[1].toLowerCase() !== expectedMime || !CHAT_UPLOAD_TYPES.has(expectedMime)) {
+      socket.emit('chatUploadError', { message: 'Unsupported file type' }); return;
+    }
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer.length || buffer.length > 400 * 1024 || buffer.toString('base64').replace(/=+$/, '') !== match[2].replace(/=+$/, '')) {
+      socket.emit('chatUploadError', { message: 'File must be 400 KB or smaller' }); return;
+    }
+    if (Date.now() - (user._lastMsgAt || 0) < 500) { socket.emit('chatUploadError', { message: 'Please wait a moment before sending another message' }); return; }
+    user._lastMsgAt = Date.now();
+    const id = crypto.randomBytes(16).toString('hex');
+    const ext = CHAT_UPLOAD_TYPES.get(expectedMime);
+    const diskName = id + ext;
+    try {
+      fs.mkdirSync(CHAT_UPLOAD_DIR, { recursive: true });
+      fs.writeFileSync(path.join(CHAT_UPLOAD_DIR, diskName), buffer, { flag: 'wx', mode: 0o644 });
+    } catch (err) { socket.emit('chatUploadError', { message: 'Upload failed on the server' }); return; }
+    const msg = { id: Date.now() + '-' + id.slice(0, 7), userId: socket.id, userName: user.name,
+      text: '', time: Date.now(), type: 'attachment', name: cleanUploadName(name), mime: expectedMime,
+      fileUrl: '/chat-uploads/' + diskName };
+    room.messages.push(msg); if (room.messages.length > 100) room.messages.shift();
+    room._lastChatAt = Date.now(); analytics.messagesSent++;
+    io.to(room.roomId).emit('chatMessage', msg);
+  });
+
+  socket.on('chatGif', ({ roomId, url } = {}) => {
+    if (!allowSocketEvent(socket, 'chatGif', 6, 10000)) { socket.emit('chatRateLimited', { retryAfterMs: 10000 }); return; }
+    const room = rooms[roomId || GLOBAL_ROOM_ID];
+    if (!room || typeof url !== 'string' || url.length > 2048) return;
+    const user = room.users.find(u => u.id === socket.id);
+    if (!user) return;
+    if ((user.blocked && user.blocked.chat) || isGloballyMuted(user.name)) {
+      socket.emit('permissionDenied', { action: 'chat', message: 'You are not allowed to chat' }); return;
+    }
+    let parsed;
+    try { parsed = new URL(url); } catch (_) { return; }
+    if (parsed.protocol !== 'https:' || !['media.giphy.com', 'media.tenor.com'].includes(parsed.hostname) || !/\.(gif|webp|png|jpe?g)$/i.test(parsed.pathname)) return;
+    if (Date.now() - (user._lastMsgAt || 0) < 500) return;
+    user._lastMsgAt = Date.now();
+    const msg = { id: Date.now() + '-' + crypto.randomBytes(5).toString('hex'), userId: socket.id,
+      userName: user.name, text: '', time: Date.now(), type: 'gif', mediaUrl: parsed.href };
+    room.messages.push(msg); if (room.messages.length > 100) room.messages.shift();
+    room._lastChatAt = Date.now(); analytics.messagesSent++;
+    io.to(room.roomId).emit('chatMessage', msg);
   });
 
   socket.on('voiceSignal', ({ roomId, to, signal } = {}) => {
