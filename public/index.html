@@ -1278,6 +1278,181 @@ button, [role="button"], .song-item, .search-btn { -webkit-tap-highlight-color:t
 .mood-sticker:hover { border-color:rgba(196,181,253,.4); }
 @media (max-width:420px) { .picker-tab { font-size:10px; padding:9px 3px; } .sticker-grid { gap:7px; } .sticker-choice { min-height:82px; } .sticker-art { font-size:30px; } .chat-msg.sticker .chat-msg-text { font-size:52px; } }
 @media (prefers-reduced-motion: reduce) { .picker-pane.active { animation:none; } .sticker-choice, .picker-tab, .emoji-grid button { transition:none; } }
+
+/* ================= SANGEETX MOBILE-FIRST SIGNATURE REFRESH =================
+   Presentation-only overrides: keep existing IDs, events and app logic intact. */
+:root {
+  --sx-violet:#8b5cf6; --sx-pink:#ec4899; --sx-ink:#080710;
+  --sx-line:rgba(210,194,255,.14); --sx-glass:rgba(22,18,36,.76);
+}
+html { background:var(--sx-ink); -webkit-text-size-adjust:100%; }
+body {
+  background:
+    radial-gradient(ellipse at 12% 4%,rgba(113,73,255,.17),transparent 34%),
+    radial-gradient(ellipse at 88% 34%,rgba(236,72,153,.09),transparent 32%),
+    linear-gradient(160deg,#080710 0%,#0b0915 52%,#090710 100%);
+  color:#f7f4ff;
+}
+button,input,[contenteditable="true"] { font-family:inherit; }
+button { touch-action:manipulation; }
+
+/* Join / entry screen */
+#joinScreen {
+  justify-content:center; align-items:center; overflow-y:auto;
+  padding:clamp(18px,5vw,36px) 16px max(22px,env(safe-area-inset-bottom));
+  background:
+    radial-gradient(ellipse at 50% 12%,rgba(139,92,246,.20),transparent 42%),
+    radial-gradient(ellipse at 0% 100%,rgba(236,72,153,.10),transparent 38%);
+}
+.join-box {
+  width:min(100%,430px); padding:clamp(25px,6vw,38px) clamp(19px,5vw,32px) 25px;
+  border-radius:30px; border:1px solid rgba(215,200,255,.18);
+  background:linear-gradient(145deg,rgba(27,23,44,.92),rgba(12,10,20,.94));
+  box-shadow:0 28px 90px rgba(0,0,0,.48),0 1px 0 rgba(255,255,255,.07) inset,0 0 55px rgba(139,92,246,.08);
+}
+.join-logo { width:74px;height:74px;border-radius:23px; }
+.join-box h1 { font-size:clamp(32px,8vw,40px); letter-spacing:-1.6px; }
+.join-box .subtitle { max-width:290px; margin-bottom:25px; color:#b9b0cf; }
+.input-wrap input { min-height:54px; font-size:16px; border-radius:16px; }
+.btn-primary,.btn-secondary { min-height:53px; border-radius:16px; }
+.btn-primary { background:linear-gradient(115deg,#8059ff 0%,#a354f0 52%,#ef5ba8 100%); }
+.hint { color:#a49ab9; }
+
+/* Main player: mobile gets a deliberate vertical rhythm, never a cramped desktop layout. */
+#mainScreen { gap:11px; padding:10px 12px max(14px,env(safe-area-inset-bottom)); }
+.topbar {
+  min-height:56px; gap:7px; padding:7px 8px; border-radius:20px;
+  background:linear-gradient(110deg,rgba(24,21,39,.92),rgba(15,13,25,.82));
+  border:1px solid var(--sx-line); box-shadow:0 10px 28px rgba(0,0,0,.18);
+}
+.status { min-height:36px; padding:7px 10px; font-size:10px; }
+.topbar-actions { gap:6px; padding:5px 2px; margin:0; }
+.icon-btn { width:39px;height:39px; }
+.player-section {
+  flex:1 0 auto; min-height:unset; overflow:visible; gap:13px;
+  padding:18px 15px 17px; border-radius:27px;
+  background:linear-gradient(155deg,rgba(25,21,41,.91),rgba(12,11,20,.82));
+  border:1px solid rgba(205,190,255,.15);
+  box-shadow:0 20px 48px rgba(0,0,0,.25),0 1px 0 rgba(255,255,255,.035) inset;
+}
+.album-art { width:clamp(170px,54vw,245px); max-width:72%; border-radius:27px; }
+.album-art img { border-radius:26px; }
+.song-info { padding:0 4px; gap:5px; }
+.song-title { max-width:100%; font-size:clamp(17px,4.8vw,22px); letter-spacing:-.5px; }
+.song-artist { font-size:12px; color:#b7aecb; }
+.progress-section { padding:0 2px; }
+.progress-track { height:5px; border-radius:99px; }
+.progress-thumb { width:14px;height:14px; }
+.controls { width:100%; justify-content:center; gap:clamp(10px,4vw,18px); }
+.ctrl-btn { width:43px;height:43px; border-radius:50%; }
+.ctrl-btn.play { width:62px;height:62px; }
+.search-btn {
+  min-height:58px; border-radius:19px; padding:10px 13px; gap:11px;
+  background:linear-gradient(110deg,rgba(25,22,41,.96),rgba(15,13,25,.95));
+  border-color:rgba(205,190,255,.16); box-shadow:0 10px 26px rgba(0,0,0,.16);
+}
+.search-btn .search-icon { width:37px;height:37px;border-radius:12px; }
+.ptt-card {
+  border-radius:22px; padding:14px; gap:12px;
+  background:linear-gradient(145deg,rgba(25,22,40,.92),rgba(13,12,22,.94));
+  border-color:rgba(205,190,255,.15); box-shadow:0 12px 32px rgba(0,0,0,.17);
+}
+.ptt-title { font-size:12px; }
+.ptt-button { min-height:50px; }
+.reactions { gap:8px; }
+.reaction-btn { flex:1; min-width:0; height:48px; border-radius:16px; }
+.audio-output-badge,.distance-meter { max-width:100%; }
+
+/* Chat panel — explicitly retain the existing moonlit lake wallpaper under readable overlays. */
+#chatPanel {
+  background:#080611;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.chat-header {
+  min-height:68px; padding:10px 14px;
+  background:linear-gradient(110deg,rgba(13,8,25,.96),rgba(21,11,35,.91));
+  border-bottom:1px solid rgba(190,164,255,.18);
+}
+.chat-messages {
+  background-color:#0a0614;
+  background-image:
+    linear-gradient(180deg,rgba(7,5,14,.56),rgba(7,5,14,.30) 45%,rgba(7,5,14,.66)),
+    radial-gradient(ellipse at 14% 0%,rgba(139,92,246,.16),transparent 46%),
+    url('/moonlit-purple-valley-lake.png');
+  background-size:cover,cover,cover;
+  background-position:center,center,center center;
+  background-repeat:no-repeat,no-repeat,no-repeat;
+  background-attachment:local,local,local;
+  padding:17px 13px 20px;
+}
+.chat-msg-row { max-width:min(86%,560px); }
+.chat-msg { backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+.chat-msg.mine { background:linear-gradient(135deg,rgba(107,58,205,.88),rgba(126,42,157,.78)); border-color:rgba(220,200,255,.31); }
+.chat-msg.theirs,.chat-msg.bot { background:linear-gradient(135deg,rgba(22,18,35,.90),rgba(18,14,29,.86)); border-color:rgba(220,200,255,.17); }
+.chat-input-row {
+  padding:10px 11px max(11px,env(safe-area-inset-bottom));
+  background:rgba(12,8,22,.97); border-top:1px solid rgba(190,164,255,.18);
+}
+.chat-input-editable { min-height:44px; font-size:16px; border-radius:17px; }
+.chat-emoji-btn,.chat-send { min-width:42px; min-height:42px; border-radius:14px; }
+.emoji-picker { max-height:min(48dvh,390px); padding:13px 12px max(14px,env(safe-area-inset-bottom)); }
+.emoji-grid { grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; }
+.emoji-grid button { min-height:42px; border-radius:12px; }
+.sticker-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.sticker-choice { min-height:88px; border-radius:17px; }
+.mood-sticker { min-height:58px; border-radius:16px; }
+
+/* Search and modal surfaces */
+#searchModal { background:linear-gradient(160deg,#0b0915,#080710 70%); }
+.search-header { gap:9px; padding:11px 12px; }
+#searchInput { min-height:46px; font-size:16px; }
+.search-results { padding:12px; }
+.song-item { min-height:72px; padding:10px; border-radius:16px; background:rgba(255,255,255,.018); }
+.song-item img { width:52px;height:52px;border-radius:13px; }
+#usersPanel,#globalMapModal { padding:12px; }
+.users-box,.global-map-box { max-width:100%; border-radius:24px; }
+
+/* Small phones: controls remain tappable and content can scroll rather than clip. */
+@media (max-width:767px) {
+  #mainScreen { overflow-y:auto; overflow-x:hidden; }
+}
+@media (max-width:420px) {
+  #mainScreen { overflow-y:auto; overflow-x:hidden; }
+  .topbar { gap:4px; padding:6px; }
+  .status { padding:7px 8px; max-width:none; }
+  .topbar-actions { gap:4px; }
+  .icon-btn { width:36px;height:36px; }
+  .player-section { padding:15px 12px; gap:11px; }
+  .album-art { width:clamp(158px,49vw,200px); }
+  .controls { gap:10px; }
+  .ctrl-btn { width:40px;height:40px; }
+  .ctrl-btn.play { width:58px;height:58px; }
+  .reaction-btn { height:44px; }
+  .chat-header-info h3 { font-size:14px; }
+  .chat-msg-row { max-width:90%; }
+  .emoji-grid { grid-template-columns:repeat(7,minmax(0,1fr)); }
+}
+@media (max-width:350px) {
+  #mainScreen { padding-left:8px;padding-right:8px; }
+  .status { font-size:9px; }
+  .icon-btn { width:33px;height:33px; }
+  .topbar-actions { gap:3px; }
+  .controls { gap:7px; }
+  .ctrl-btn { width:37px;height:37px; }
+  .ctrl-btn.play { width:54px;height:54px; }
+  .picker-tab { font-size:9px; }
+}
+@media (min-width:768px) {
+  .chat-messages { background-position:center,center,center 58%; }
+  .chat-input-row { padding-left:16px;padding-right:16px; }
+  .emoji-picker { border-radius:22px 22px 0 0; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .join-logo,.join-box,.chat-msg-row { animation:none !important; }
+}
+/* ================= END MOBILE-FIRST SIGNATURE REFRESH ================= */
+
 </style>
 </head>
 <body>
