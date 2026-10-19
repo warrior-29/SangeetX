@@ -28,6 +28,38 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '32kb' }));
 
+// Searchable, paginated GIF catalog. Keep provider API keys on the server only.
+// Set GIPHY_API_KEY in the environment; without it the UI falls back to curated GIFs.
+const gifSearchWindows = new Map();
+app.get('/api/gifs', async (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+  const now = Date.now();
+  let bucket = gifSearchWindows.get(ip);
+  if (!bucket || now - bucket.startedAt > 60_000) { bucket = { startedAt: now, count: 0 }; gifSearchWindows.set(ip, bucket); }
+  bucket.count++;
+  if (bucket.count > 35) return res.status(429).json({ error: 'GIF search limit reached. Try again in a minute.' });
+  const apiKey = String(process.env.GIPHY_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'GIF search is not configured yet.', configured: false });
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const offset = Math.max(0, Math.min(4999, Number.parseInt(req.query.offset, 10) || 0));
+  const limit = Math.max(1, Math.min(24, Number.parseInt(req.query.limit, 10) || 24));
+  try {
+    const endpoint = q ? 'https://api.giphy.com/v1/gifs/search' : 'https://api.giphy.com/v1/gifs/trending';
+    const response = await axios.get(endpoint, { params: { api_key: apiKey, q: q || undefined, limit, offset, rating: 'pg-13', bundle: 'messaging_non_clips' }, timeout: 7000 });
+    const items = (response.data?.data || []).map(item => {
+      const images = item.images || {};
+      const preview = images.fixed_width_small?.url || images.preview_gif?.url || images.fixed_width?.url;
+      const full = images.original?.url || images.downsized_medium?.url || images.fixed_width?.url;
+      if (!preview || !full) return null;
+      return { id: String(item.id || ''), title: String(item.title || 'GIF').slice(0, 120), preview, url: full, width: Number(images.fixed_width?.width || images.original?.width || 0), height: Number(images.fixed_width?.height || images.original?.height || 0) };
+    }).filter(Boolean);
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.json({ items, nextOffset: offset + items.length, hasMore: items.length === limit, configured: true, attribution: 'GIPHY' });
+  } catch (err) {
+    res.status(502).json({ error: 'GIF search is temporarily unavailable. Please try again.' });
+  }
+});
+
 // Chat uploads are intentionally small and restricted to non-executable formats.
 const CHAT_UPLOAD_DIR = path.join(__dirname, 'public', 'chat-uploads');
 const CHAT_UPLOAD_TYPES = new Map([
@@ -1841,7 +1873,7 @@ io.on('connection', (socket) => {
     }
     let parsed;
     try { parsed = new URL(url); } catch (_) { return; }
-    if (parsed.protocol !== 'https:' || !['media.giphy.com', 'media.tenor.com'].includes(parsed.hostname) || !/\.(gif|webp|png|jpe?g)$/i.test(parsed.pathname)) return;
+    if (parsed.protocol !== 'https:' || !(/^(media\d*\.giphy\.com|media\.tenor\.com)$/i.test(parsed.hostname)) || !/\.(gif|webp|png|jpe?g)$/i.test(parsed.pathname)) return;
     if (Date.now() - (user._lastMsgAt || 0) < 500) return;
     user._lastMsgAt = Date.now();
     const msg = { id: Date.now() + '-' + crypto.randomBytes(5).toString('hex'), userId: socket.id,
