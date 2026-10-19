@@ -1454,6 +1454,160 @@ button { touch-action:manipulation; }
 /* ================= END MOBILE-FIRST SIGNATURE REFRESH ================= */
 
 </style>
+<style>
+/* ================= SANGEETX: NIGHT SIGNAL DESIGN SYSTEM =================
+   A deliberately distinct mobile-first music-club visual identity.
+   Presentation-only: existing IDs, handlers, chat wallpaper and app logic remain intact. */
+:root {
+  --bg:#070b12; --surface:#101722; --surface-2:#151f2c;
+  --border:rgba(220,236,255,.11);
+  --primary:#c4ff4d; --primary-2:#dcff9b; --accent:#7c6cff;
+  --primary-glow:rgba(196,255,77,.19);
+  --text:#f4f7fb; --text-dim:#a7b2c2; --muted:#667386;
+  --dynamic-1:#c4ff4d; --dynamic-2:#7c6cff;
+}
+html,body { background:#070b12; }
+body { color:#f4f7fb; }
+body::before {
+  opacity:.15;
+  background:radial-gradient(ellipse at 15% 5%,#7c6cff 0%,transparent 35%),radial-gradient(ellipse at 90% 72%,#c4ff4d 0%,transparent 27%);
+  filter:blur(54px);
+}
+button { touch-action:manipulation; }
+button:focus-visible,input:focus-visible,[contenteditable="true"]:focus-visible { outline:2px solid #c4ff4d; outline-offset:3px; }
+
+/* Entry: independent-listening-club poster, not a generic glass card */
+#joinScreen {
+  padding:clamp(16px,5vw,34px) 16px max(20px,env(safe-area-inset-bottom));
+  background:radial-gradient(ellipse at 50% 10%,rgba(124,108,255,.16),transparent 42%),linear-gradient(180deg,#090e17,#070b12 72%);
+}
+.join-box {
+  width:min(100%,440px); position:relative; overflow:hidden;
+  padding:clamp(26px,6vw,38px) clamp(19px,5vw,32px) 24px;
+  border:1px solid rgba(211,230,255,.13); border-radius:28px;
+  background:linear-gradient(150deg,rgba(17,25,37,.97),rgba(9,14,22,.98));
+  box-shadow:0 32px 90px rgba(0,0,0,.48),0 1px 0 rgba(255,255,255,.05) inset;
+}
+.join-box::before { content:"LISTEN TOGETHER · FEEL CLOSER"; display:block; margin:0 0 23px; color:#c4ff4d; font-size:9px; font-weight:900; letter-spacing:2.1px; }
+.join-logo { width:68px;height:68px;margin-bottom:17px;border-radius:21px;background:linear-gradient(145deg,#c4ff4d,#7c6cff);box-shadow:0 0 0 7px rgba(196,255,77,.055),0 15px 36px rgba(124,108,255,.18); }
+.join-box h1 { color:#f4f7fb;background:none;-webkit-text-fill-color:#f4f7fb;letter-spacing:-1.8px;font-size:clamp(34px,9vw,44px); }
+.join-box .subtitle { color:#9eacbf; }
+.input-wrap input { border:1px solid rgba(203,220,241,.13);background:#0a111b;border-radius:14px;min-height:53px; }
+.input-wrap input:focus { border-color:#c4ff4d;box-shadow:0 0 0 3px rgba(196,255,77,.1);background:#0a111b; }
+.input-wrap input:focus ~ .input-icon { color:#c4ff4d; }
+.btn-primary { background:#c4ff4d;color:#11180b;box-shadow:0 8px 24px rgba(196,255,77,.13);font-weight:900; }
+.btn-primary:hover { filter:brightness(1.05);box-shadow:0 10px 28px rgba(196,255,77,.2); }
+.btn-secondary { background:#121c29;border-color:rgba(203,220,241,.12); }
+#globalStats { background:linear-gradient(130deg,rgba(196,255,77,.065),rgba(124,108,255,.07))!important;border-color:rgba(196,255,77,.14)!important; }
+#onlineCount { color:#c4ff4d!important; }
+#totalCount { color:#b9b1ff!important; }
+
+/* Main room: studio-console surfaces and clear action hierarchy */
+#mainScreen { gap:10px;padding:10px 12px max(16px,env(safe-area-inset-bottom)); }
+.topbar { border-radius:18px;background:rgba(12,19,29,.94);border:1px solid rgba(204,224,245,.1);box-shadow:0 12px 34px rgba(0,0,0,.18); }
+.status { background:#0a111b;border-color:rgba(204,224,245,.1);color:#b7c2d1; }
+.dot.online { background:#c4ff4d;box-shadow:0 0 10px rgba(196,255,77,.6); }
+.icon-btn { background:#121d2a;border-color:rgba(204,224,245,.11);border-radius:13px; }
+.icon-btn.primary { color:#11180b;background:#c4ff4d;box-shadow:0 6px 18px rgba(196,255,77,.15); }
+.icon-btn:hover { border-color:rgba(196,255,77,.5);background:#1a2735; }
+.player-section {
+  overflow:visible;gap:13px;border-radius:27px;padding:clamp(15px,4vw,24px);
+  border:1px solid rgba(204,224,245,.1);
+  background:linear-gradient(145deg,rgba(17,26,39,.98),rgba(9,15,23,.97));
+  box-shadow:0 24px 60px rgba(0,0,0,.25),0 1px 0 rgba(255,255,255,.035) inset;
+}
+.player-section::before { left:18%;right:18%;background:linear-gradient(90deg,transparent,#c4ff4d, #7c6cff,transparent);opacity:.7; }
+.album-art {
+  width:clamp(176px,55vw,252px);max-width:75%;border-radius:23px;
+  border:1px solid rgba(255,255,255,.17);
+  box-shadow:0 20px 42px rgba(0,0,0,.45),0 0 0 7px rgba(196,255,77,.035),0 0 48px rgba(124,108,255,.16);
+  position:relative;
+}
+.album-art::after { content:"";position:absolute;inset:8px;border:1px solid rgba(255,255,255,.12);border-radius:17px;pointer-events:none; }
+.album-art.playing { box-shadow:0 20px 42px rgba(0,0,0,.45),0 0 0 7px rgba(196,255,77,.06),0 0 45px rgba(196,255,77,.14); }
+.waveform-live span { background:linear-gradient(180deg,#c4ff4d,#7c6cff); }
+.song-title { color:#f6f8fb;letter-spacing:-.55px;font-weight:850; }
+.song-artist { color:#9eacbf; }
+.played-by,.mood-meter { background:rgba(196,255,77,.08);border-color:rgba(196,255,77,.19);color:#d8ff9c; }
+.progress-track { height:5px;background:rgba(216,230,248,.13); }
+.progress-fill { background:linear-gradient(90deg,#c4ff4d,#7c6cff); }
+.progress-thumb { background:#c4ff4d;box-shadow:0 0 0 4px rgba(196,255,77,.12); }
+.controls { gap:clamp(9px,3.5vw,16px); }
+.ctrl-btn { background:#121d2a;border:1px solid rgba(204,224,245,.12);box-shadow:none; }
+.ctrl-btn:hover { border-color:rgba(196,255,77,.45);background:#1b2937; }
+.ctrl-btn.play { color:#11180b;background:#c4ff4d;border:0;box-shadow:0 10px 26px rgba(196,255,77,.17),0 0 0 5px rgba(196,255,77,.055); }
+.ctrl-btn.play svg { fill:#11180b!important;stroke:#11180b!important; }
+.search-btn { border-radius:17px;background:#101a27;border:1px solid rgba(204,224,245,.11);box-shadow:none; }
+.search-btn .search-icon { background:#c4ff4d;color:#11180b;box-shadow:none; }
+.ptt-card { border-radius:22px;background:linear-gradient(145deg,#121d2a,#0b121c);border-color:rgba(204,224,245,.1);box-shadow:none; }
+.ptt-button { background:#182536;border:1px solid rgba(204,224,245,.12); }
+.ptt-button.active,.ptt-button:active { background:#c4ff4d;color:#11180b; }
+.reaction-btn { background:#111c29;border:1px solid rgba(204,224,245,.11);border-radius:15px; }
+.reaction-btn:active { border-color:#c4ff4d;background:rgba(196,255,77,.1); }
+
+/* Chat keeps the moonlit lake image; overlays only improve message contrast */
+#chatPanel { background:#080d15; }
+.chat-header { background:rgba(8,14,22,.95);border-bottom:1px solid rgba(196,255,77,.14); }
+.chat-header-avatar { background:linear-gradient(145deg,#c4ff4d,#7c6cff);box-shadow:0 0 0 5px rgba(196,255,77,.05); }
+.chat-header-avatar [data-lucide] { color:#10170b; }
+.chat-header-avatar::after { border-color:#080e16; }
+.chat-header-info h3 { font-weight:800;letter-spacing:-.35px; }
+.chat-header-info .chat-sub { color:#a7b5c6; }
+.chat-close { background:#121d2a;color:#e5edf7; }
+.chat-presence { background:rgba(7,13,21,.88); }
+.chat-presence-user { background:rgba(196,255,77,.08);border:1px solid rgba(196,255,77,.14);color:#dcff9b; }
+.chat-presence-dot { background:#c4ff4d;box-shadow:0 0 6px rgba(196,255,77,.5); }
+.chat-messages {
+  /* Keep the original wallpaper as the final image layer. */
+  background-color:#0a1119;
+  background-image:linear-gradient(180deg,rgba(5,10,17,.54),rgba(5,10,17,.22) 42%,rgba(5,10,17,.62)),radial-gradient(ellipse at 8% 0%,rgba(124,108,255,.13),transparent 44%),url('/moonlit-purple-valley-lake.png');
+  background-size:cover,cover,cover;background-position:center,center,center center;background-repeat:no-repeat,no-repeat,no-repeat;
+}
+.chat-msg.mine { background:linear-gradient(140deg,rgba(196,255,77,.96),rgba(170,231,66,.93));color:#10170b;border:1px solid rgba(237,255,207,.4);box-shadow:0 8px 22px rgba(0,0,0,.15); }
+.chat-msg.mine .chat-msg-text,.chat-msg.mine .chat-msg-sender,.chat-msg.mine .chat-msg-time { color:#10170b; }
+.chat-msg.theirs,.chat-msg.bot { background:rgba(10,17,27,.88);border:1px solid rgba(222,235,250,.16);color:#f1f5fa; }
+.chat-input-row { background:rgba(8,14,22,.97);border-top:1px solid rgba(196,255,77,.13); }
+.chat-input-editable { background:#111c29;border:1px solid rgba(204,224,245,.12);color:#f4f7fb; }
+.chat-attach-btn,.chat-emoji-btn { background:#142131;border-color:rgba(204,224,245,.12);color:#d8e4f3; }
+.chat-send { background:#c4ff4d;color:#10170b; }
+.emoji-picker { background:#0b121c;border:1px solid rgba(204,224,245,.12); }
+.picker-tab.active { color:#11180b;background:#c4ff4d;border-color:#c4ff4d; }
+.emoji-grid button:hover,.sticker-choice:hover,.gif-choice:hover { border-color:rgba(196,255,77,.55); }
+.sticker-choice { background:linear-gradient(145deg,rgba(124,108,255,.12),rgba(196,255,77,.055)); }
+.mood-sticker { background:linear-gradient(110deg,rgba(124,108,255,.13),rgba(196,255,77,.04)); }
+.chat-msg.gif-message { background:rgba(10,17,27,.82); }
+
+/* Distinct mobile rhythm: less chrome, larger tap targets, scroll-safe */
+@media(max-width:767px) {
+  #mainScreen { gap:9px;padding:8px 10px max(14px,env(safe-area-inset-bottom)); }
+  .topbar { min-height:54px;padding:6px;border-radius:16px; }
+  .topbar-actions { gap:5px; }
+  .icon-btn { width:36px;height:36px;border-radius:12px; }
+  .player-section { padding:17px 13px 16px;border-radius:24px; }
+  .album-art { width:clamp(170px,52vw,225px); }
+  .ctrl-btn { width:41px;height:41px; }
+  .ctrl-btn.play { width:60px;height:60px; }
+  .search-btn { min-height:54px; }
+  .ptt-card { padding:13px;border-radius:19px; }
+  .reaction-btn { min-height:44px; }
+  #chatPanel { padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
+  .chat-header { min-height:64px;padding:9px 13px; }
+  .chat-input-row { padding:9px 9px max(10px,env(safe-area-inset-bottom));gap:7px; }
+  .chat-attach-btn,.chat-emoji-btn,.chat-send { min-width:42px;min-height:42px;border-radius:13px; }
+  .chat-input-editable { min-width:0;min-height:44px;font-size:16px; }
+}
+@media(max-width:360px) {
+  .topbar-actions { gap:3px; }
+  .icon-btn { width:33px;height:33px; }
+  .album-art { width:clamp(155px,48vw,190px); }
+  .controls { gap:7px; }
+  .ctrl-btn { width:37px;height:37px; }
+  .ctrl-btn.play { width:54px;height:54px; }
+  .chat-attach-btn,.chat-emoji-btn,.chat-send { min-width:37px; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important; } }
+
+</style>
 </head>
 <body>
 
@@ -1713,6 +1867,10 @@ button { touch-action:manipulation; }
   </div>
 
   <div class="chat-input-row">
+    <button class="chat-attach-btn" id="chatAttachBtn" type="button" aria-label="Attach a small file" title="Attach image or small file">
+      <i data-lucide="paperclip"></i>
+    </button>
+    <input id="chatFileInput" type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain" />
     <button class="chat-emoji-btn" id="chatEmojiBtn" type="button" aria-label="Emoji">
       <i data-lucide="smile"></i>
     </button>
@@ -1736,7 +1894,8 @@ button { touch-action:manipulation; }
       <div class="picker-tabs" role="tablist" aria-label="Message reactions">
         <button class="picker-tab active" type="button" data-picker-tab="emoji" role="tab" aria-selected="true">😊 Emoji</button>
         <button class="picker-tab" type="button" data-picker-tab="stickers" role="tab" aria-selected="false">✨ Stickers</button>
-        <button class="picker-tab" type="button" data-picker-tab="music" role="tab" aria-selected="false">🎧 Music mood</button>
+        <button class="picker-tab" type="button" data-picker-tab="gifs" role="tab" aria-selected="false">GIFs</button>
+        <button class="picker-tab" type="button" data-picker-tab="music" role="tab" aria-selected="false">🎧 Mood</button>
       </div>
       <div class="picker-pane active" data-picker-pane="emoji" role="tabpanel">
         <div class="emoji-grid">
@@ -1773,6 +1932,16 @@ button { touch-action:manipulation; }
           <button class="sticker-choice" data-emoji="🎧" aria-label="Tune in"><span class="sticker-art">🎧</span><span>Tune in</span></button>
         </div>
         <p class="picker-footnote">Stickers send as expressive oversized reactions in chat.</p>
+      </div>
+      <div class="picker-pane" data-picker-pane="gifs" role="tabpanel" hidden>
+        <div class="gif-picker-note">Tap a GIF to send it to everyone in the room</div>
+        <div class="gif-grid">
+          <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" aria-label="Typing cat GIF"><img loading="lazy" src="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" alt="Typing cat reaction"><span>Typing...</span></button>
+          <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif" aria-label="Happy cat GIF"><img loading="lazy" src="https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif" alt="Happy cat reaction"><span>Happy vibes</span></button>
+          <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif" aria-label="Party GIF"><img loading="lazy" src="https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif" alt="Party reaction"><span>Party!</span></button>
+          <button class="gif-choice" type="button" data-gif-url="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" aria-label="Dance GIF"><img loading="lazy" src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" alt="Dance reaction"><span>Dance mode</span></button>
+        </div>
+        <p class="picker-footnote">GIF previews need an internet connection. Small image and document files can be attached with the paperclip.</p>
       </div>
       <div class="picker-pane" data-picker-pane="music" role="tabpanel" hidden>
         <div class="mood-sticker-grid">
@@ -2760,6 +2929,7 @@ function initSocket(){
     if(!chatOpen&&msg.userId!==socket.id){unreadMessages++;updateChatBadge();}
   });
 
+  socket.on('chatUploadError', ({ message }) => showToast(message || 'Could not send file', 'error'));
   socket.on('chatPending', ({ message }) => showToast(message, 'info'));
   socket.on('chatRejected', ({ messageId }) => {
     document.querySelector(`[data-msg-id="${messageId}"]`)?.remove();
@@ -3023,6 +3193,32 @@ document.getElementById('closeChat').addEventListener('click',()=>{
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
 
+// Small, safe chat attachments (max 400 KB). Server validates the MIME type and size again.
+const chatFileInput = document.getElementById('chatFileInput');
+document.getElementById('chatAttachBtn')?.addEventListener('click', () => chatFileInput?.click());
+chatFileInput?.addEventListener('change', async () => {
+  const file = chatFileInput.files?.[0];
+  chatFileInput.value = '';
+  if (!file) return;
+  const maxBytes = 400 * 1024;
+  const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','application/pdf','text/plain']);
+  if (!allowed.has(file.type)) { showToast('Use JPG, PNG, WebP, GIF, PDF or TXT files only','error'); return; }
+  if (file.size > maxBytes) { showToast('File is too large. Maximum size is 400 KB','error'); return; }
+  if (!socket || !socket.connected || !roomId) { showToast('Connect to the room before sending a file','warning'); return; }
+  if (myPermissions.chat) { showToast('You are blocked from chatting','error'); return; }
+  try {
+    showToast('Uploading small file…','info');
+    const data = await new Promise((resolve,reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(file);
+    });
+    socket.emit('chatAttachment', { roomId, name:file.name, mime:file.type, data });
+  } catch (err) { showToast('Could not read that file','error'); }
+});
+
+
 const chatInputEl = document.getElementById('chatInput');
 
 /* ============ MENTION AUTOCOMPLETE (WhatsApp-style) ============ */
@@ -3223,6 +3419,15 @@ chatInputEl.addEventListener('paste', (e) => {
 
 /* ============ EMOJI PICKER ============ */
 const emojiPickerEl = document.getElementById('emojiPicker');
+emojiPickerEl?.querySelectorAll('[data-gif-url]').forEach(btn => btn.addEventListener('click', () => {
+  const gifUrl = btn.getAttribute('data-gif-url');
+  if (!gifUrl || !socket || !socket.connected || !roomId) { showToast('Connect to the room to send a GIF','warning'); return; }
+  if (myPermissions.chat) { showToast('You are blocked from chatting','error'); return; }
+  socket.emit('chatGif', { roomId, url:gifUrl });
+  emojiPickerEl.classList.remove('show');
+  document.getElementById('chatEmojiBtn')?.classList.remove('active');
+}));
+
 const emojiBtn = document.getElementById('chatEmojiBtn');
 
 if (emojiBtn && emojiPickerEl) {
@@ -3347,15 +3552,25 @@ function renderChat(messages,replace){
     const senderName = isBot ? 'Music Bot' : (mine ? 'You' : (m.userName || 'Unknown'));
     const stickerValues = new Set(['🫶','🔥','🥹','👑','💖','😎','🚀','🎉','😂','🥰','💃','🎧','🪩','🎤','🌙','💿','🎶']);
     const isSticker = stickerValues.has(String(m.text || '').trim());
+    const isGif = m.type === 'gif' && typeof m.mediaUrl === 'string' && /^https:\/\/(media\.giphy\.com|media\.tenor\.com)\//i.test(m.mediaUrl);
+    const isAttachment = m.type === 'attachment' && typeof m.fileUrl === 'string' && /^\/chat-uploads\/[a-zA-Z0-9._-]+$/.test(m.fileUrl);
+    let messageBody = renderMessageHTML(m.text || '');
+    if (isGif) messageBody = `<img src="${esc(m.mediaUrl)}" alt="GIF" loading="lazy" referrerpolicy="no-referrer">`;
+    if (isAttachment) {
+      const mediaUrl = esc(m.fileUrl);
+      if (String(m.mime || '').startsWith('image/')) messageBody = `<a class="chat-attachment" href="${mediaUrl}" target="_blank" rel="noopener"><img src="${mediaUrl}" alt="${esc(m.name || 'Shared image')}" loading="lazy"></a>`;
+      else messageBody = `<a class="chat-attachment-link" href="${mediaUrl}" target="_blank" rel="noopener" download="${esc(m.name || 'shared-file')}"><i data-lucide="file-down"></i><span>${esc(m.name || 'Shared file')}</span></a>`;
+    }
     
     row.innerHTML = `
       <div class="chat-msg-sender"><span>${esc(senderName)}</span></div>
-      <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}${isSticker?' sticker':''}" data-msg-id="${esc(String(m.id))}">
-        <span class="chat-msg-text">${renderMessageHTML(m.text)}</span>
+      <div class="chat-msg ${mine?'mine':'theirs'}${m.pending?' pending':''}${isBot?' bot':''}${isSticker?' sticker':''}${isGif?' gif-message':''}" data-msg-id="${esc(String(m.id))}">
+        <span class="chat-msg-text">${messageBody}</span>
         <span class="chat-msg-meta"><span>${time}</span>${mine?'<span class="chat-msg-tick">✓✓</span>':''}</span>
       </div>
     `;
     box.appendChild(row);
+    if (typeof refreshIcons === 'function') refreshIcons();
 
     // 2️⃣ Bot message 10 second baad apne aap delete ho jayega (naam + message dono)
     if (isBot) {
@@ -4547,3 +4762,24 @@ document.getElementById('cancelWaitBtn')?.addEventListener('click', () => {
 </script>
 </body>
 </html>
+<style>
+
+/* WhatsApp-inspired GIF tray and small-file attachments */
+.chat-attach-btn { flex:0 0 40px; width:40px; height:42px; display:grid; place-items:center; border-radius:14px; border:1px solid rgba(167,139,250,.18); color:#d8c7ff; background:rgba(139,92,246,.09); cursor:pointer; transition:background .16s ease,transform .16s ease; }
+.chat-attach-btn:active { transform:scale(.93); }
+.chat-attach-btn svg { width:20px;height:20px; }
+.gif-picker-note { color:#a99bbf;font-size:11px;margin:0 0 10px 2px; }
+.gif-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px; }
+.gif-choice { min-width:0;overflow:hidden;padding:0;border:1px solid rgba(196,181,253,.17);border-radius:15px;background:rgba(255,255,255,.035);color:#eee6ff;cursor:pointer;text-align:left; }
+.gif-choice img { display:block;width:100%;height:94px;object-fit:cover;background:rgba(255,255,255,.04); }
+.gif-choice span { display:block;padding:7px 9px;font:600 11px Inter,sans-serif; }
+.gif-choice:active { transform:scale(.98); }
+.chat-attachment { display:block;max-width:min(240px,65vw);border-radius:12px;overflow:hidden;margin:2px 0 5px; }
+.chat-attachment img { display:block;max-width:100%;max-height:220px;object-fit:contain;border-radius:12px; }
+.chat-attachment-link { display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid rgba(196,181,253,.18);border-radius:12px;color:#eee6ff;text-decoration:none;background:rgba(255,255,255,.045);overflow-wrap:anywhere; }
+.chat-msg.gif-message { padding:7px;max-width:min(270px,70vw); }
+.chat-msg.gif-message .chat-msg-text { display:block; }
+.chat-msg.gif-message .chat-msg-text img { display:block;width:100%;max-height:250px;object-fit:cover;border-radius:13px; }
+@media(max-width:420px){.chat-attach-btn{flex-basis:36px;width:36px;height:40px}.gif-choice img{height:82px}.chat-input-row{gap:6px}}
+
+</style>
